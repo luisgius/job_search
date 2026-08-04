@@ -93,5 +93,29 @@ db:
 cv:
   path: cv/base_cv.md
 
+notify:
+  # A run that fetched nothing because every board 404'd produces the same
+  # empty digest as a genuinely quiet Tuesday. This is what tells them apart.
+  enabled: true
+  on: [no_digest, missed_run, no_jobs, source_zero, all_sources_failed]
+  channels:
+    console: true          # stderr — ends up in run.log, and in cron's mail
+    file: true             # output/ALERT.txt, deleted again when a run is healthy
+    # Any command. Gets the message as its last argument, on stdin, and in
+    # $JOBHUNTER_ALERT. Run without a shell, so job text can never be injected.
+    #   macOS:  terminal-notifier -title "Job Hunter" -message
+    #   Linux:  notify-send "Job Hunter"
+    #   phone:  curl -d @- https://ntfy.sh/your-topic
+    command: ""
+    email: {}
+      # to: you@example.com
+      # from: you@example.com
+      # smtp_host: smtp.gmail.com
+      # smtp_port: 587
+      # username: you@example.com
+      # starttls: true
+      # password comes from $JOBHUNTER_SMTP_PASSWORD, not from this file
+  exit_nonzero: false      # true = a run with alerts exits 4, for schedulers
+
 logging:
   level: INFO

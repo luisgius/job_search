@@ -502,6 +502,130 @@ def test_format_summary_counts_errors(tmp_path: Path, stub_sources, memory_track
 
 
 # ==========================================================================
+# failure notification
+# ==========================================================================
+
+
+def alerting_config(tmp_path: Path, **notify_overrides):
+    settings = {"enabled": True,
+                "channels": {"console": False, "file": True,
+                             "command": "", "email": {}}}
+    settings.update(notify_overrides)
+    return write_config(
+        tmp_path,
+        {"sources": {"greenhouse": True, "lever": False},
+         "output": {"dir": str(tmp_path / "output"), "open_browser": False},
+         "db": {"path": str(tmp_path / "output" / "tracker.sqlite3")},
+         "apply": {"enabled": False}, "tailoring": {"enabled": False},
+         "notify": settings},
+        watchlist={"greenhouse": ["acme"]},
+    )
+
+
+def test_a_run_that_fetches_nothing_writes_an_alert(tmp_path: Path, monkeypatch,
+                                                    capsys):
+    """The whole point: an empty digest because every board 404'd must not
+    look like a genuinely quiet Tuesday."""
+    from src.notify import ALERT_FILENAME
+
+    monkeypatch.setattr(main_module.ats_boards, "fetch", lambda config, **kw: [])
+    alerting_config(tmp_path)
+
+    code = main(["--no-browser", "--config", str(tmp_path / "config.yaml"),
+                 "--watchlist", str(tmp_path / "watchlist.yaml")])
+    assert code == 0                       # exit_nonzero is off by default
+    alert = (tmp_path / "output" / ALERT_FILENAME)
+    assert alert.exists()
+    assert "no postings fetched" in alert.read_text(encoding="utf-8")
+
+
+def test_a_healthy_run_clears_yesterdays_alert(tmp_path: Path, monkeypatch):
+    """A stale ALERT.txt after recovery is worse than none: it trains you to
+    ignore the file."""
+    from src.notify import ALERT_FILENAME
+
+    monkeypatch.setattr(main_module.ats_boards, "fetch",
+                        lambda config, **kw: fresh_jobs(2))
+    monkeypatch.setattr(main_module.scoring, "score_jobs",
+                        lambda jobs, cv, cfg, **kw: _scored(jobs))
+    alerting_config(tmp_path)
+    (tmp_path / "output").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "output" / ALERT_FILENAME).write_text("old", encoding="utf-8")
+
+    main(["--no-browser", "--config", str(tmp_path / "config.yaml"),
+          "--watchlist", str(tmp_path / "watchlist.yaml")])
+    assert not (tmp_path / "output" / ALERT_FILENAME).exists()
+
+
+def test_exit_nonzero_is_opt_in(tmp_path: Path, monkeypatch):
+    """It changes the documented exit codes, so it must never turn itself on."""
+    monkeypatch.setattr(main_module.ats_boards, "fetch", lambda config, **kw: [])
+
+    alerting_config(tmp_path)
+    assert main(["--no-browser", "--config", str(tmp_path / "config.yaml"),
+                 "--watchlist", str(tmp_path / "watchlist.yaml")]) == 0
+
+    alerting_config(tmp_path, exit_nonzero=True)
+    assert main(["--no-browser", "--config", str(tmp_path / "config.yaml"),
+                 "--watchlist", str(tmp_path / "watchlist.yaml")]) == 4
+
+
+def test_notify_on_filters_which_alerts_are_delivered(tmp_path: Path, monkeypatch):
+    from src.notify import ALERT_FILENAME
+
+    monkeypatch.setattr(main_module.ats_boards, "fetch", lambda config, **kw: [])
+    alerting_config(tmp_path, on=["missed_run"])     # deliberately not no_jobs
+
+    main(["--no-browser", "--config", str(tmp_path / "config.yaml"),
+          "--watchlist", str(tmp_path / "watchlist.yaml")])
+    assert not (tmp_path / "output" / ALERT_FILENAME).exists()
+
+
+def test_a_broken_notifier_does_not_break_the_run(tmp_path: Path, monkeypatch,
+                                                  capsys):
+    """A notifier that takes down the run it was meant to warn about is
+    strictly worse than no notifier."""
+    monkeypatch.setattr(main_module.ats_boards, "fetch", lambda config, **kw: [])
+    monkeypatch.setattr(main_module.notify, "send",
+                        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("boom")))
+    alerting_config(tmp_path)
+
+    assert main(["--no-browser", "--config", str(tmp_path / "config.yaml"),
+                 "--watchlist", str(tmp_path / "watchlist.yaml")]) == 0
+    assert "digest:" in capsys.readouterr().out
+
+
+def test_a_broken_health_check_does_not_break_the_run(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(main_module.ats_boards, "fetch", lambda config, **kw: [])
+    monkeypatch.setattr(main_module.health, "assess",
+                        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("boom")))
+    alerting_config(tmp_path)
+    assert main(["--no-browser", "--config", str(tmp_path / "config.yaml"),
+                 "--watchlist", str(tmp_path / "watchlist.yaml")]) == 0
+
+
+def test_the_baseline_comes_from_runs_before_this_one(tmp_path: Path, monkeypatch):
+    """`assess` must not compare the run against itself — reading the history
+    after inserting this run's row would make every source look normal."""
+    from src.notify import ALERT_FILENAME
+
+    monkeypatch.setattr(main_module.ats_boards, "fetch",
+                        lambda config, **kw: fresh_jobs(40))
+    monkeypatch.setattr(main_module.scoring, "score_jobs",
+                        lambda jobs, cv, cfg, **kw: _scored(jobs))
+    alerting_config(tmp_path)
+    argv = ["--no-browser", "--config", str(tmp_path / "config.yaml"),
+            "--watchlist", str(tmp_path / "watchlist.yaml")]
+
+    main(argv)                                  # establishes a baseline
+    assert not (tmp_path / "output" / ALERT_FILENAME).exists()
+
+    monkeypatch.setattr(main_module.ats_boards, "fetch", lambda config, **kw: [])
+    main(argv)                                  # the board went silent
+    assert (tmp_path / "output" / ALERT_FILENAME).exists()
+
+
+# ==========================================================================
 # a real end-to-end run through the CLI
 # ==========================================================================
 

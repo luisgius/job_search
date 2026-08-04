@@ -215,10 +215,66 @@ be the wrong interpreter and `ANTHROPIC_API_KEY` will not be set (put it in
 the crontab or a sourced file).
 
 **macOS caveat:** cron does not run while the laptop is asleep and does not
-catch up afterwards. If the lid is shut at 08:00 the run simply never happens
-and nothing tells you. `launchd` (or a systemd timer on Linux) at least fires
-on wake. Either way, the real check is noticing that today's digest is
-missing.
+catch up afterwards. If the lid is shut at 08:00 the run simply never happens.
+`launchd` (or a systemd timer on Linux) at least fires on wake — and the next
+run that *does* happen will tell you it missed one (see below).
+
+---
+
+## Failure notification
+
+The failure worth worrying about is the quiet one. A morning where every board
+returned 404, or where cron never fired, produces exactly what a genuinely
+quiet Tuesday produces: an empty digest, or no digest at all. Read that for a
+week and you conclude the market is dead rather than that your watchlist
+rotted.
+
+So every run is assessed against the history in the tracker, and these five
+things raise an alert:
+
+| Alert | Fires when |
+|---|---|
+| `no_digest` | the run finished without writing a page |
+| `missed_run` | no run completed for ~36h (weekends excused for a weekday cron) |
+| `no_jobs` | zero postings from every source at once |
+| `source_zero` | a source that averaged 3+/run returned nothing — a renamed board looks exactly like an empty one |
+| `all_sources_failed` | every source errored |
+
+Deliberately **not** alerted on: a low job count (a real quiet day — crying
+wolf is how an alert gets ignored), zero matches, a single scoring failure, or
+the first ever run.
+
+```yaml
+notify:
+  enabled: true
+  on: [no_digest, missed_run, no_jobs, source_zero, all_sources_failed]
+  channels:
+    console: true          # stderr — lands in cron.log, and in cron's own mail
+    file: true             # output/ALERT.txt, deleted again when a run recovers
+    command: ""            # anything at all — see below
+    email: {}              # to / from / smtp_host / smtp_port / username / starttls
+  exit_nonzero: false      # true = a run with alerts exits 4
+```
+
+`ALERT.txt` is the channel that survives a closed laptop and a cleared
+terminal: if the file is there, the last run had a problem. It is removed
+automatically when a run comes back healthy.
+
+`command` is the escape hatch, and it means this project needs no notifier
+dependency. The message arrives three ways — as the final argument, on stdin,
+and in `$JOBHUNTER_ALERT` — so most tools work with no wrapper:
+
+```yaml
+    command: "terminal-notifier -title 'Job Hunter' -message"   # macOS
+    command: "notify-send 'Job Hunter'"                         # Linux
+    command: "curl -d @- https://ntfy.sh/your-topic"            # phone push
+```
+
+It runs **without a shell**, so a job title containing `; rm -rf ~` is an
+argument and never a command.
+
+For email, the SMTP password comes from `$JOBHUNTER_SMTP_PASSWORD`, not from
+`config.yaml` — same reason as the Anthropic key.
 
 ---
 

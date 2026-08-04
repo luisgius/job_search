@@ -28,7 +28,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
-from . import digest, filters, pdf, scoring, tailor
+from . import digest, filters, health, notify, pdf, scoring, tailor
 from .apply import autoapply
 from .config import Config, ConfigError
 from .db import Tracker
@@ -676,6 +676,9 @@ def _run_cli(args: argparse.Namespace) -> int:
 
     with Tracker(config.db_path) as tracker:
         now = utcnow()
+        # Read the history BEFORE inserting this run, so `assess` compares
+        # against previous runs rather than against the one in progress.
+        previous_runs = tracker.recent_runs(limit=health.BASELINE_RUNS + 1)
         run_id = tracker.start_run(now=now)
         scored_jobs, stats = run_pipeline(
             config,
@@ -689,14 +692,56 @@ def _run_cli(args: argparse.Namespace) -> int:
 
     print(format_summary(stats))
 
+    report = _check_health(config, args, stats, previous_runs, now)
+
     path = getattr(stats, "digest_path", None)
     if path and not args.no_browser and bool(_cfg(config, "output.open_browser", True)):
         open_in_browser(path)
+
+    # Opt-in: a scheduler that watches exit codes can then act on a bad run.
+    if not report.ok and bool(_cfg(config, "notify.exit_nonzero", False)):
+        return 4
     return 0
 
 
+def _check_health(
+    config: Config,
+    args: argparse.Namespace,
+    stats: RunStats,
+    previous_runs: Sequence[Any],
+    now: datetime,
+) -> health.HealthReport:
+    """Assess the run and deliver any alerts. Never raises.
+
+    Guarded end to end on purpose: a notifier that breaks the run it was
+    meant to warn about is worse than no notifier at all.
+    """
+    try:
+        report = health.assess(
+            stats,
+            previous_runs=previous_runs,
+            digest_path=getattr(stats, "digest_path", None),
+            now=now,
+            active_sources=_active_sources(config, args.sources),
+        )
+        report = health.filter_alerts(report, _cfg(config, "notify.on", None))
+    except Exception as exc:
+        logger.warning("health check failed: %s", exc)
+        return health.HealthReport()
+
+    try:
+        notify.send(report, config, output_dir=config.output_dir)
+    except Exception as exc:
+        logger.warning("sending notifications failed: %s", exc)
+    return report
+
+
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry point. 0 ok, 1 config invalid, 2 unexpected, 130 interrupted."""
+    """CLI entry point.
+
+    Exit codes: 0 ok, 1 config invalid, 2 unexpected, 4 ran but raised health
+    alerts (only when `notify.exit_nonzero` is on), 130 interrupted.
+    """
     parser = build_parser()
     args = parser.parse_args(argv)
     # Logging has to exist before the config is read, or a broken config.yaml

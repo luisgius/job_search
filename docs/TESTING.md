@@ -1,6 +1,6 @@
 # Testing
 
-**881 tests, ~37s, fully offline.**
+**958 tests, ~37s, fully offline.**
 
 ```bash
 pytest -q                      # the whole suite, offline, no API key, no browser
@@ -21,11 +21,13 @@ pytest --cov=src --cov-report=term-missing
 | `test_models.py` | 45 | job identity — the tracker's primary key |
 | `test_llm.py` | 43 | JSON recovery, retry policy |
 | `test_tailor.py` | 42 | **the anti-fabrication guarantee** |
+| `test_main.py` | 42 | the pipeline end to end, offline |
 | `test_db.py` | 40 | **the double-apply guarantee** |
+| `test_health.py` | 39 | a quiet day vs a broken pipeline |
 | `test_digest.py` | 36 | escaping, and legibility of failure |
 | `test_config.py` | 36 | env-beats-file, validate-everything-at-once |
-| `test_main.py` | 35 | the pipeline end to end, offline |
 | `test_adzuna.py` | 32 | snippets, duplicates, key redaction |
+| `test_notify.py` | 31 | no shell injection; one channel's death is contained |
 | `test_pdf.py` | 16 | every half-failure of the user's hook |
 
 The suite runs with **PyYAML, Jinja2 and pytest** installed and nothing else.
@@ -133,6 +135,15 @@ actually occur in production payloads:
 - **`test_main.py`** — the pipeline end to end with a fake LLM, an in-memory
   tracker and no network, including the funnel counts and the CLI's exit
   codes.
+- **`test_health.py`** — every alert comes in a pair: a case that must fire it
+  and a neighbouring case that must stay silent. Zero jobs from every board is
+  an alert; two jobs instead of forty is a quiet Tuesday and is not. A
+  Friday→Monday gap is excused; a Saturday→Tuesday gap of the same length is
+  not, because it really did miss Monday.
+- **`test_notify.py`** — the `command` channel runs a subprocess with text
+  built from job titles, so a posting called `; rm -rf ~` is asserted to stay
+  an argument. And one channel's failure never stops the others: a notifier
+  that breaks the run it was meant to warn about is worse than none.
 
 ## Markers
 

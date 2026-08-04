@@ -105,6 +105,25 @@ DEFAULTS: dict[str, Any] = {
     "cv": {
         "path": "cv/base_cv.md",
     },
+    "notify": {
+        # The failure this exists for is the quiet one: a morning where every
+        # board 404'd looks exactly like a genuinely quiet Tuesday.
+        "enabled": True,
+        # Alert kinds to deliver; see health.ALERT_KINDS. `errors` is omitted
+        # by default because a single flaky board is noise, not news.
+        "on": ["no_digest", "missed_run", "no_jobs", "source_zero",
+               "all_sources_failed"],
+        "channels": {
+            "console": True,
+            "file": True,
+            "command": "",   # e.g. "notify-send" / "terminal-notifier -message"
+            "email": {},     # {to, from, smtp_host, smtp_port, username, starttls}
+        },
+        # Exit non-zero when a run raises an alert. Off by default because it
+        # changes the documented exit codes; turn it on if your scheduler
+        # notices failures for you.
+        "exit_nonzero": False,
+    },
     "logging": {
         "level": "INFO",
     },

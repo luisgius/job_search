@@ -194,9 +194,12 @@ token, and your application history.
 
 In rough order of value:
 
-1. **Notify on failure.** A run that produces no digest, or a source that
-   returns zero when it returned 40 yesterday, should reach you. Today it
-   does not. This is the single biggest gap.
+1. ~~**Notify on failure.**~~ **Done** — `src/health.py` assesses every run
+   against the tracker's history and `src/notify.py` delivers alerts over
+   console, a file, an arbitrary command, or SMTP. It catches the five quiet
+   failures (§7): no digest, a missed run, zero jobs, a source that went
+   silent, and every source failing. It deliberately stays quiet on a low job
+   count, because crying wolf is precisely how an alert stops being read.
 2. **Persist the scores.** The tracker records a score per application but
    not the reasons; a month of `score_reasons` compared against the jobs you
    actually got interviews for is real calibration data, and it is being
