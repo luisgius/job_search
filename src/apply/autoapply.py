@@ -77,6 +77,11 @@ IGNORED_INPUT_TYPES: frozenset[str] = frozenset(
     {"hidden", "submit", "button", "reset", "image"}
 )
 
+#: `<input>` types that are NOT a box you type an answer into. Anything else
+#: (text, url, tel, email, number, date, ...) is free text, and `inspect_form`
+#: holds free-text boxes to a higher standard than the rest.
+NON_TEXT_INPUT_TYPES: frozenset[str] = frozenset({"file", "checkbox", "radio"})
+
 #: Where a field's human label may hide, best first.
 LABEL_ATTRIBUTES: tuple[str, ...] = (
     "aria-label", "data-label", "placeholder", "title", "alt",
@@ -301,6 +306,25 @@ def detect_ats(url: str | None) -> str | None:
 # --------------------------------------------------------------------------
 
 
+def _tracker_flag(tracker: Any, method: str, *args: Any) -> bool | None:
+    """Ask an optional tracker method. `None` means "it could not answer".
+
+    The tracker is duck-typed — the pipeline injects a real `db.Tracker`, but
+    callers and tests pass partial stand-ins — so a gate the object simply
+    does not implement degrades to False rather than crashing the stage. A
+    method that exists and *raises* is a different thing entirely: the answer
+    is unknown, and unknown in front of a submit click is not a yes.
+    """
+    func = getattr(tracker, method, None)
+    if not callable(func):
+        return False
+    try:
+        return bool(func(*args))
+    except Exception as exc:
+        logger.warning("tracker.%s failed: %s", method, exc)
+        return None
+
+
 def eligible(
     scored: ScoredJob,
     config: Any,
@@ -321,6 +345,21 @@ def eligible(
         return False, (
             "not a Greenhouse or Lever application form — apply by hand: "
             f"{job.url}"
+        )
+
+    # A job the scorer could not judge is not a job that scored badly. When
+    # the LLM call fails, scoring emits `Score(value=0, error=...)` and routes
+    # the job to the digest *because a human has to look at it*. Comparing
+    # only the number turns an API outage into a run that auto-applies to
+    # everything it never assessed the moment `apply.min_score` is 0 — which
+    # is exactly how someone writes "apply to everything you can".
+    score = scored.score
+    if score is None:
+        return False, "no score — auto-apply never acts on an unjudged job"
+    if score.error:
+        return False, (
+            f"the scorer could not judge this job ({score.error}) — "
+            "a human decides this one"
         )
 
     min_score = _int(_cfg(config, "apply.min_score", 80), 80)
@@ -347,6 +386,30 @@ def eligible(
             return False, f"could not verify apply history ({exc}) — not applying"
         if applied:
             return False, "already applied to this job"
+
+        # A submit click that never came back (see `apply_one`). The outcome
+        # was recorded `apply_failed`, which deliberately does not block — but
+        # the POST may well have landed, so the *click* blocks even when the
+        # outcome did not.
+        attempted = _tracker_flag(tracker, "submit_attempted", job.key)
+        if attempted is None:
+            return False, "could not verify apply history — not applying"
+        if attempted:
+            return False, (
+                "submit was already clicked for this job and the result could "
+                f"not be confirmed — check it by hand: {job.url}"
+            )
+
+        # The same role re-posted under a new requisition id is a new
+        # `Job.key` but the same `dedupe_key`.
+        similar = _tracker_flag(tracker, "has_applied_similar", job.dedupe_key)
+        if similar is None:
+            return False, "could not verify apply history — not applying"
+        if similar:
+            return False, (
+                "already applied to this role at this company (re-posted under "
+                "a new id)"
+            )
 
     return True, ""
 
@@ -630,6 +693,27 @@ def inspect_form(page: Any) -> tuple[bool, str]:
         if bool(field.get("required")) and kind == "unknown":
             return False, f"required field {what} is not one this bot can fill"
 
+        # A free-text box with no readable label AND nothing recognisable in
+        # its name is how Greenhouse renders every custom question: the
+        # wording lives in a sibling `<label for=...>`, the input itself
+        # carries no aria-label, no placeholder and no `required` (custom
+        # questions are validated client-side). Reading only the element's own
+        # attributes, "Why do you want to work at Acme?" arrives here as an
+        # anonymous optional text box — and submitting leaves it blank.
+        #
+        # So an unreadable free-text box counts as a question we cannot see.
+        # The cost is a bail on the rare genuinely anonymous optional input
+        # (one click); the alternative is filing an application that visibly
+        # ignored the one thing the employer asked.
+        if (tag == "input" and ftype not in NON_TEXT_INPUT_TYPES
+                and kind == "unknown"
+                and not str(field.get("label") or "").strip()):
+            return False, (
+                f"free-text field {what} has no label this bot can read — its "
+                "question is in markup we cannot see, so it would be submitted "
+                "blank"
+            )
+
     if not any(classify_field(field) == "resume" for field in fields):
         return False, (
             "no resume upload field found — this does not look like a simple "
@@ -727,6 +811,40 @@ def _fill_fields(
     return filled
 
 
+def _unfillable_required(
+    fields: list[dict[str, Any]],
+    config: Any,
+    scored: ScoredJob,
+    cv_pdf: str | None,
+) -> list[str]:
+    """Required fields we recognise but have no value for.
+
+    `inspect_form` bails on required fields it cannot *classify*; this is the
+    other half. A phone field is recognised, so it sails through inspection —
+    but plenty of people leave `applicant.phone` empty and plenty of German
+    boards mark it required, and `_fill_fields` simply skips a kind with no
+    value. Without this the run clicks submit on a form it knowingly left
+    incomplete, which is a worse first impression than not applying at all.
+    """
+    values = _values_for(config, scored)
+    missing: list[str] = []
+    for field in fields:
+        if not bool(field.get("required")):
+            continue
+        kind = classify_field(field)
+        if kind == "resume":
+            if not cv_pdf:
+                missing.append(_describe(field))
+            continue
+        # consent is ticked, not typed; unknown already bailed in inspection;
+        # a cover letter is optional by the definition of its category.
+        if kind in ("consent", "unknown", "cover_letter_optional"):
+            continue
+        if not values.get(kind, "").strip():
+            missing.append(f"{_describe(field)} — applicant.{kind} is empty")
+    return missing
+
+
 def _screenshot(page: Any, directory: Path) -> str | None:
     """Save `<artifact_dir>/form_filled.png`. Diagnostic, never fatal."""
     try:
@@ -749,18 +867,14 @@ def _find_submit(page: Any) -> str | None:
     return None
 
 
-def _confirmed(page: Any, timeout_ms: int, before: str | None = None) -> str | None:
-    """Wait for any confirmation signal. Returns the signal, or None.
+def _confirmation_selector(page: Any, timeout_ms: int) -> str | None:
+    """Wait for a confirmation *element*. Returns the selector, or None.
 
     The per-selector budget is split so a form with no confirmation cannot
     stall the run for `len(CONFIRMATION_SELECTORS)` × the full timeout.
 
-    `before` is the page text captured *before* the submit click, and it is
-    what makes the text fallback mean anything. A plain substring search over
-    the whole page matches a posting whose own ad says "thanks for applying" —
-    and a false confirmation is the worst outcome in this module: the run
-    records APPLIED for an application that was never sent, and the tracker
-    then blocks the real one forever.
+    An element the ATS only renders after a successful POST is the strong
+    signal; the text search below is the weak one.
     """
     budget = max(1000, timeout_ms // max(1, len(CONFIRMATION_SELECTORS)))
     for selector in CONFIRMATION_SELECTORS:
@@ -769,15 +883,74 @@ def _confirmed(page: Any, timeout_ms: int, before: str | None = None) -> str | N
                 return selector
         except Exception:
             continue
+    return None
+
+
+def _page_text(page: Any) -> str | None:
+    """`page.content()`, or None when the page cannot be read at all.
+
+    The None is load-bearing: "the page says nothing" and "there is no page
+    left to ask" lead to opposite decisions after a submit click.
+    """
     try:
-        content = str(page.content() or "").lower()
+        return str(page.content() or "")
     except Exception:
         return None
+
+
+def _confirmation_text(content: str | None, before: str | None) -> str | None:
+    """Confirmation phrase that appeared *because of* the submit, or None.
+
+    `before` is the page text captured before the click, and it is what makes
+    this fallback mean anything. A plain substring search over the whole page
+    matches a posting whose own ad says "thanks for applying" — and a false
+    confirmation is the worst outcome in this module: the run records APPLIED
+    for an application that was never sent, and the tracker then blocks the
+    real one forever.
+    """
+    if content is None:
+        return None
+    lowered = content.lower()
     prior = str(before or "").lower()
     for phrase in CONFIRMATION_TEXTS:
-        if phrase in content and phrase not in prior:
+        if phrase in lowered and phrase not in prior:
             return phrase
     return None
+
+
+def _note_submit_attempt(
+    tracker: Any, scored: ScoredJob, *, method: str, now: datetime
+) -> None:
+    """Record the intent to click submit. Best effort, never fatal.
+
+    A tracker that cannot take this note still gets the outcome row, and the
+    orphan file in `_record` remains the last line of defence — refusing to
+    apply because of a bookkeeping failure would cost the user the
+    application every time their DB is momentarily locked.
+    """
+    record = getattr(tracker, "record_submit_attempt", None)
+    if not callable(record):
+        return
+    try:
+        record(scored.job.key, url=scored.job.url, method=method, now=now)
+    except Exception as exc:
+        logger.warning(
+            "could not write the pre-submit record for %s (%s) — a crash from "
+            "here on would be invisible to the next run",
+            scored.job.key, exc,
+        )
+
+
+def _clear_submit_attempt(tracker: Any, scored: ScoredJob) -> None:
+    """Undo `_note_submit_attempt` once we know nothing was sent."""
+    clear = getattr(tracker, "clear_submit_attempt", None)
+    if not callable(clear):
+        return
+    try:
+        clear(scored.job.key)
+    except Exception as exc:
+        logger.debug("could not clear the pre-submit record for %s: %s",
+                     scored.job.key, exc)
 
 
 def _write_orphan_record(
@@ -865,13 +1038,15 @@ def _record(
     except Exception as exc:
         if outcome.status in (ApplyStatus.APPLIED,
                               ApplyStatus.SUBMITTED_UNCONFIRMED):
-            # An application really was sent and the only record of it just
-            # failed to save. Swallowing this makes the job invisible to
-            # tomorrow's run, which then sends a second one. Shout, and leave a
-            # file behind that survives the process.
+            # An application really was sent and the outcome row just failed to
+            # save. The pre-submit record written before the click is what
+            # normally stops tomorrow's run repeating it, but that is a
+            # different table and a different write, so it may be missing too.
+            # Shout, and leave a file behind that survives the process.
             logger.error(
-                "APPLIED to %s but could not record it (%s) — tomorrow's run "
-                "cannot see this. Recording it on disk instead.",
+                "APPLIED to %s but could not record the outcome (%s) — the "
+                "pre-submit record should still block a repeat; recording it "
+                "on disk as well.",
                 scored.job.url, exc,
             )
             _write_orphan_record(scored, artifacts_dir, method, now, exc)
@@ -972,6 +1147,19 @@ def apply_one(
             )
 
         # From here on the run is really applying on the user's behalf.
+        missing = _unfillable_required(fields, config, scored, cv_pdf)
+        if missing:
+            # Checked here rather than before the dry-run branch on purpose: a
+            # dry run submits nothing, so an incomplete form is still a useful
+            # screenshot. Only the real submit has to refuse.
+            return finish(
+                ApplyStatus.DIGEST,
+                "the form requires " + "; ".join(missing)
+                + " — refusing to submit it incomplete, apply by hand: "
+                + job.url,
+                shot,
+            )
+
         for field in fields:
             if str(field.get("type", "")).lower() == "checkbox" \
                     and classify_field(field) == "consent":
@@ -992,16 +1180,44 @@ def apply_one(
                 "no submit button found on the form",
                 shot,
             )
+        # Write down that a submit is about to happen, BEFORE it happens.
+        # Everything after the click can fail — the tab can die, the page can
+        # become unreadable — and the outcome row is written afterwards, so
+        # without this a crashed submit leaves only `apply_failed` behind and
+        # tomorrow's run cheerfully sends a second application. Cleared again
+        # below, but only on positive evidence that nothing was sent.
+        _note_submit_attempt(tracker, scored, method=method, now=now)
         page.click(submit)
 
-        signal = _confirmed(page, timeout_ms, before=before_submit)
+        selector_signal = _confirmation_selector(page, timeout_ms)
+        after = _page_text(page)
+        signal = selector_signal or _confirmation_text(after, before_submit)
+        still_a_form = _form_still_present(page)
+
+        if signal is not None and selector_signal is None and still_a_form:
+            # A multi-step form acknowledges step 1 — "Thanks for applying!
+            # Just a few more questions." — while the application is still
+            # sitting unsent on page 2. The words alone cannot tell that from
+            # a real confirmation, so the text fallback additionally requires
+            # the form to be *gone*: Greenhouse and Lever both replace it on
+            # success. Believing the text here records a terminal `applied`
+            # for an application that was never sent, and the user can then
+            # never file the real one through this tool.
+            signal = None
+
         if signal is None:
             # Two very different situations look identical from here, and
             # conflating them is expensive in both directions.
-            if _form_still_present(page):
+            if still_a_form:
                 # The form is still on screen: client-side validation rejected
                 # the submission and nothing left the machine. The job must
                 # stay eligible, or a fixable problem costs the application.
+                if after is not None:
+                    # ...but only erase the write-ahead record when the page
+                    # actually answered us. A page that cannot be read at all
+                    # is not evidence of anything, whatever a stale DOM query
+                    # still says.
+                    _clear_submit_attempt(tracker, scored)
                 return finish(
                     ApplyStatus.APPLY_FAILED,
                     "submit was rejected by the form and nothing was sent — "

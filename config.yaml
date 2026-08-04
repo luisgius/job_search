@@ -50,17 +50,83 @@ filters:
 
   # Empty = allow any title. Whole-word, case-insensitive matching.
   title_include: []
+  # This list REPLACES the shipped defaults rather than adding to them, so it
+  # spells them all out. There is no stemming — "intern" does not catch
+  # "internships" — and an EU search is not an English-language search, so the
+  # entry-level words every local board uses are listed too. Whole-word
+  # matching is what makes that safe: "intern" cannot hit "International",
+  # "stage" cannot hit "Backstage".
   title_exclude:
     - intern
+    - interns
     - internship
+    - internships
+    - apprentice
+    - apprentices
+    - apprenticeship
+    - apprenticeships
+    - graduate program
+    - graduate programs
+    - graduate programme
+    - graduate programmes
+    - graduate scheme
+    - graduate schemes
     - working student
+    - volunteer
+    # German
     - werkstudent
     - praktikum
-    - apprentice
-    - graduate program
+    - praktikant
+    - praktikantin
+    - ausbildung
+    - auszubildende
+    - azubi
+    - duales studium
+    # French
+    - stage
+    - stagiaire
+    - alternance
+    - alternant
+    - apprentissage
+    # Spanish / Portuguese
+    - becario
+    - becaria
+    - practicas
+    - estagio
+    - estagiario
+    # Dutch
+    - stagiair
+    - afstudeerstage
+    # Polish
+    - praktyki
+    - praktykant
+    - staz
+    - stazysta
+    # Italian
+    - tirocinio
+    - stagista
   description_exclude:
     - security clearance
     - must be a us citizen
+  # Read only from what the board states as structured data — Lever's
+  # categories.commitment, Adzuna's contract_type — never from the title.
+  # This catches the roles whose title is neutral but whose type is not.
+  # `contract` and `freelance` are left OUT on purpose: plenty of real EU tech
+  # work is contract, and a default that deletes jobs is the wrong kind of
+  # opinionated. Uncomment them if you only want permanent roles.
+  employment_type_exclude:
+    - internship
+    - intern
+    - apprenticeship
+    - apprentice
+    - temporary
+    - temp
+    - seasonal
+    - volunteer
+    - work experience
+    # - contract
+    # - contractor
+    # - freelance
   require_keywords_any: []
   min_description_chars: 0
 

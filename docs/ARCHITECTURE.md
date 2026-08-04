@@ -62,12 +62,23 @@ digest.render        -> output/digest_YYYY-MM-DD.html
 
 `Tracker(path)`, `record_job(job, now=)`, `has_job(key)`,
 `record_status(key, status, detail=, score=, method=, artifacts_dir=, now=)`,
-`get_status(key)`, `has_applied(key)`,
+`get_status(key)`, `has_applied(key)`, `has_applied_similar(dedupe_key)`,
+`record_submit_attempt(key, url=, method=, now=)` /
+`clear_submit_attempt(key)` / `submit_attempted(key)`,
 `should_surface(key, within_days=, now=)`, `start_run` / `finish_run`,
 `counts_by_status()`.
 
 `has_applied` is True only for `applied`. A dry run must leave the job
 eligible for a real application later.
+
+`has_applied_similar` is the same gate one notch blunter, on `dedupe_key`: a
+recruiter closing and re-opening a requisition produces a new ATS id for the
+same role, and `has_applied` cannot see that.
+
+The `submit_attempt*` trio is a write-ahead record of a submit *click*, taken
+before the click and cleared only on positive evidence that nothing was sent.
+It is what stops a browser that dies mid-submit from turning into a second
+application tomorrow; `apply.eligible` consults it.
 
 ---
 
@@ -77,9 +88,15 @@ eligible for a real application later.
 ```python
 EU_COUNTRIES: dict[str, str]          # ISO alpha-2 -> English name
 def country_of(location: str) -> str | None      # ISO alpha-2 or None
+def countries_of(location: str) -> list[str]     # all of them, best first
 def is_remote(location: str, title: str = "", description: str = "") -> bool
 def mentions_eu(text: str) -> bool     # "Remote (EU)", "EMEA", "Europe" ...
 ```
+`countries_of` exists because "Remote (Portugal, Spain, Poland)" is one job
+you may take from any of three countries; `country_of` can only ever name one
+of them, and the location gate must not pin the role to it. Its first element
+is always exactly what `country_of` returns. A country named only to be ruled
+out ("EMEA (excluding UK)") is not a country either function reports.
 Must handle: `"Berlin, Germany"`, `"Berlin"`, `"Munich, DE"`, `"Amsterdam,
 Netherlands"`, `"London, UK"`, `"Remote - Europe"`, `"EMEA"`, `"Paris, France;
 Remote"`, `"Zürich"`, `"Kraków, Poland"`. Must NOT match `"Berlin, CT"` →
@@ -102,10 +119,13 @@ def passes_location(job, config) -> tuple[bool, str]
 def passes_title(job, config) -> tuple[bool, str]
 def passes_keywords(job, config) -> tuple[bool, str]
 ```
-Filter order (cheapest first): title → location → freshness → keywords →
-min_description_chars. `apply_filters` also stamps `job.country`.
+Filter order (cheapest first): title → employment type → location → freshness
+→ keywords → min_description_chars. `apply_filters` also stamps
+`job.country`.
 Title include/exclude match **whole words, case-insensitively** — `"intern"`
 must not reject `"International Sales"`, but must reject `"Intern - Backend"`.
+The employment-type stage reads only what a source states as structured data
+(Lever `categories.commitment`, Adzuna `contract_type`), never the title.
 
 ### `src/sources/ats_boards.py`
 ```python
@@ -216,20 +236,28 @@ def inspect_form(page) -> tuple[bool, str]      # (simple enough?, reason)
 def apply_one(scored, config, *, page=None, tracker=None, now=None) -> ApplyOutcome
 def run(scored_jobs, config, *, tracker=None, browser=None) -> list[ScoredJob]
 ```
-`eligible` gates on, in order: `apply.enabled`, supported ATS,
-`score >= apply.min_score`, a tailored CV PDF exists (when
-`apply.require_pdf`), and `not tracker.has_applied(key)`.
+`eligible` gates on, in order: `apply.enabled`, supported ATS, a score the
+model actually produced (`Score.error` unset — a job the scorer failed on is
+not a job that scored badly), `score >= apply.min_score`, a tailored CV PDF
+exists (when `apply.require_pdf`), and then the tracker: not already applied,
+no unresolved submit click, and not the same role under a new requisition id.
 
 `inspect_form` is the safety core and must **bail** (return False) whenever
 the form contains anything beyond first/last/full name, email, phone,
 resume upload, LinkedIn/website URL, and a legally-required consent
 checkbox. Any `<textarea>`, any `<select>`, any radio group, any required
 field it does not recognise, any question-like label (`?`, "why", "describe",
-"sponsorship", "salary", "notice period", "how did you hear") ⇒ bail.
+"sponsorship", "salary", "notice period", "how did you hear"), and any
+free-text box with no readable label at all (that is how Greenhouse renders
+every custom question) ⇒ bail.
 
 `apply_one` in `dry_run` mode fills the form, saves
 `<artifact_dir>/form_filled.png`, and returns `DRY_RUN` **without clicking
-submit**. Only with `dry_run: false` does it click and return `APPLIED`.
+submit**. Only with `dry_run: false` does it click — and then only if every
+required field it recognises has a value in `config.applicant`; a form it
+would have to submit incomplete goes to the digest instead. A confirmation
+found only as *text* is believed only when the form is also gone, so a
+multi-step form thanking you on step 1 is not read as a submission.
 `page=` is the test seam — the whole module must be exercisable with a fake
 page object; Playwright is imported only inside `run`.
 

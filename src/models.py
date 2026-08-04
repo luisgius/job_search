@@ -50,23 +50,47 @@ _COMPANY_SUFFIXES = {
 
 
 def normalize_text(value: str | None) -> str:
-    """Lowercase, fold accents, strip punctuation and collapse whitespace."""
+    """Lowercase, fold accents, strip punctuation and collapse whitespace.
+
+    Invisible formatting characters are *deleted* rather than turned into
+    whitespace. German boards emit soft hyphens for hyphenation
+    ("Software\xadentwickler") and rich-text editors leak zero-width spaces, and
+    neither is a word boundary to a human reader — but both are non-alphanumeric,
+    so the punctuation pass would split the word in two and "Back​end Engineer"
+    would stop matching `title_include: [backend]`. The job then vanishes with a
+    reason ("matches none of filters.title_include") that the user cannot act on
+    because the title looks perfectly ordinary on screen.
+
+    Real spaces — including NBSP and the thin spaces boards decorate with — stay
+    spaces: they *are* word boundaries.
+    """
     if not value:
         return ""
     transliterated = str(value).translate(_TRANSLITERATE)
     decomposed = unicodedata.normalize("NFKD", transliterated)
-    ascii_only = "".join(c for c in decomposed if not unicodedata.combining(c))
+    ascii_only = "".join(
+        c for c in decomposed
+        if not unicodedata.combining(c) and unicodedata.category(c) != "Cf"
+    )
     lowered = ascii_only.lower()
     depunct = _PUNCT_RE.sub(" ", lowered)
     return _WS_RE.sub(" ", depunct).strip()
 
 
+def collapse_initialisms(value: str | None) -> str:
+    """"U.S." -> "US", "B.V." -> "BV", leaving "Booking.com" alone.
+
+    Dotted initialisms are one token to a reader and two to `normalize_text`,
+    which turns every dot into a space. That difference decides whether a
+    shipped exclusion fires: "must be a US citizen" is caught and "must be a
+    U.S. citizen" — the spelling defence contractors actually use — is not.
+    """
+    return _INITIALISM_RE.sub(lambda m: m.group(0).replace(".", ""), str(value or ""))
+
+
 def normalize_company(value: str | None) -> str:
     """Normalise a company name and drop trailing legal-entity noise."""
-    collapsed = _INITIALISM_RE.sub(
-        lambda m: m.group(0).replace(".", ""), str(value or "")
-    )
-    tokens = normalize_text(collapsed).split()
+    tokens = normalize_text(collapse_initialisms(value)).split()
     while tokens and tokens[-1] in _COMPANY_SUFFIXES:
         tokens.pop()
     # Never normalise a company down to nothing (e.g. a company literally

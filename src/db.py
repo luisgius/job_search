@@ -23,7 +23,7 @@ from typing import Any, Iterable, Iterator
 
 from .models import ApplyStatus, Job, ensure_utc, utcnow
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 MIGRATIONS: list[str] = [
     # v1 — initial schema
@@ -66,6 +66,26 @@ MIGRATIONS: list[str] = [
         started_at   TEXT NOT NULL,
         finished_at  TEXT,
         stats_json   TEXT NOT NULL DEFAULT '{}'
+    );
+    """,
+    # v2 — write-ahead record of submit clicks.
+    #
+    # The outcome row is written *after* the click, so a browser that dies
+    # between "the POST left the machine" and "we read the confirmation"
+    # leaves behind `apply_failed`, which deliberately does not block — and
+    # tomorrow's run submits a second application. This table records the
+    # intent *before* the click instead, and is cleared again only when the
+    # run can see for itself that the form rejected the submission.
+    #
+    # Deliberately no foreign key onto `jobs`: this row is the safety record,
+    # and it must be writable even when everything else about the job is
+    # missing or inconsistent.
+    """
+    CREATE TABLE IF NOT EXISTS submit_attempts (
+        key           TEXT PRIMARY KEY,
+        url           TEXT NOT NULL DEFAULT '',
+        method        TEXT NOT NULL DEFAULT '',
+        attempted_at  TEXT NOT NULL
     );
     """,
 ]
@@ -256,6 +276,81 @@ class Tracker:
     def has_applied(self, key: str) -> bool:
         """The hard double-apply gate. True == never submit again."""
         return (self.get_status(key) or "") in TERMINAL_APPLY_STATUSES
+
+    def has_applied_similar(self, dedupe_key: str) -> bool:
+        """True when *some* posting of the same role was already applied to.
+
+        `has_applied` is keyed on the ATS id, so a recruiter closing and
+        re-opening a requisition — same company, same title, same city, new id
+        — reads as a brand new job and earns the employer a second application
+        a week after the first. `dedupe_key` is the identity that survives
+        that, and the tracker already stores and indexes it.
+
+        Blunter than `has_applied` on purpose, and blunt in the safe
+        direction: the false positive is one job the user applies to by hand,
+        the false negative is a duplicate application they cannot unsend.
+        """
+        key = str(dedupe_key or "").strip()
+        if not key:
+            return False
+        placeholders = ",".join("?" * len(TERMINAL_APPLY_STATUSES))
+        row = self.conn.execute(
+            f"""
+            SELECT 1 FROM applications a JOIN jobs j ON j.key = a.key
+            WHERE j.dedupe_key = ? AND a.status IN ({placeholders})
+            LIMIT 1
+            """,
+            (key, *sorted(TERMINAL_APPLY_STATUSES)),
+        ).fetchone()
+        return row is not None
+
+    # -- submit attempts --------------------------------------------------
+
+    def record_submit_attempt(
+        self,
+        key: str,
+        *,
+        url: str = "",
+        method: str = "",
+        now: datetime | None = None,
+    ) -> None:
+        """Note that submit is about to be clicked, before it is.
+
+        Written ahead of the click precisely so it survives the click failing
+        to come back. `clear_submit_attempt` is the only thing that removes
+        it, and only on positive evidence that nothing was sent.
+        """
+        stamp = (ensure_utc(now) or utcnow()).isoformat()
+        self.conn.execute(
+            """
+            INSERT INTO submit_attempts (key, url, method, attempted_at)
+            VALUES (?,?,?,?)
+            ON CONFLICT(key) DO UPDATE SET
+                url          = excluded.url,
+                method       = excluded.method,
+                attempted_at = excluded.attempted_at
+            """,
+            (key, str(url or ""), str(method or ""), stamp),
+        )
+        self.conn.commit()
+
+    def clear_submit_attempt(self, key: str) -> None:
+        """Forget a submit click that demonstrably sent nothing."""
+        self.conn.execute("DELETE FROM submit_attempts WHERE key = ?", (key,))
+        self.conn.commit()
+
+    def submit_attempted(self, key: str) -> bool:
+        """True when a previous run clicked submit and never cleared it."""
+        row = self.conn.execute(
+            "SELECT 1 FROM submit_attempts WHERE key = ?", (key,)
+        ).fetchone()
+        return row is not None
+
+    def submit_attempt(self, key: str) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM submit_attempts WHERE key = ?", (key,)
+        ).fetchone()
+        return dict(row) if row else None
 
     def should_surface(self, key: str, *, within_days: int = 30,
                        now: datetime | None = None) -> bool:

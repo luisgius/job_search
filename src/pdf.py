@@ -149,5 +149,33 @@ def render_if_available(
         logger.warning("%s render() wrote a zero-byte file at %s", HOOK_PATH, out)
         return None
 
+    if out.is_file() and not _looks_like_pdf(out):
+        # A hook that shells out to a converter leaves the converter's error
+        # page behind when it fails — HTML, non-empty, and named cv.pdf. Four
+        # magic bytes are the whole check, and without them auto-apply
+        # attaches "Conversion failed: no such binary" to an application as
+        # the user's CV.
+        #
+        # Only the header is verified: a PDF that ReportLab started and never
+        # finished still begins with %PDF, and structural validation is a much
+        # heavier job than this function claims to do. A directory at
+        # `out_path` cannot be read at all and is deliberately left to
+        # `eligible()`'s `is_file()` check rather than conflated with this.
+        logger.warning(
+            "%s render() wrote %s, but it does not start with %%PDF — refusing "
+            "to hand a non-PDF to an employer as a CV", HOOK_PATH, out
+        )
+        return None
+
     logger.info("wrote %s (%d bytes)", out, size)
     return str(out)
+
+
+def _looks_like_pdf(path: Path) -> bool:
+    """True when the file starts with the `%PDF` magic bytes."""
+    try:
+        with path.open("rb") as handle:
+            return handle.read(4) == b"%PDF"
+    except OSError as exc:
+        logger.warning("could not read %s back after rendering: %s", path, exc)
+        return False

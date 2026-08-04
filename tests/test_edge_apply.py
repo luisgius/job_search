@@ -304,12 +304,6 @@ def test_greenhouse_csrf_and_analytics_inputs_do_not_eat_the_field_budget():
     assert ok is True, reason
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="a Greenhouse custom question whose text sits in a sibling "
-           "<label for=...> is invisible to the bot, so an unanswered screener "
-           "is submitted",
-)
 def test_a_greenhouse_custom_question_labelled_by_a_sibling_element_is_caught():
     """This is exactly how Greenhouse renders every custom question: the text
     lives in `<label for="job_application_answers_attributes_0_text_value">`
@@ -379,12 +373,6 @@ def test_a_two_page_form_is_clicked_through_and_page_two_is_never_inspected(
     assert page.input_queries == 3
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="step 2 of a multi-page form saying 'Thanks for applying' is read "
-           "as a confirmation, so a never-submitted application is recorded "
-           "APPLIED and the real one is blocked forever",
-)
 def test_a_multi_page_form_that_thanks_you_on_step_two_is_not_a_confirmation(
         tmp_path: Path, memory_tracker):
     """Multi-step forms routinely acknowledge step 1 — "Thanks for applying!
@@ -474,11 +462,6 @@ def test_an_attestation_checkbox_is_not_a_consent_checkbox():
     assert "consent" in reason.lower()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="a required field the bot recognises but has no config value for "
-           "(phone left blank) is submitted empty instead of bailing",
-)
 def test_a_required_phone_the_config_cannot_fill_is_not_submitted_blank(
         tmp_path: Path):
     """Plenty of people leave `applicant.phone` empty, and plenty of German
@@ -732,12 +715,6 @@ def test_a_company_rename_does_not_reset_the_double_apply_guarantee(
     assert eligible(after, apply_config(tmp_path), memory_tracker)[0] is False
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="the same role re-posted under a new requisition id is a new "
-           "tracker key, so the bot files a second application for a job it "
-           "already applied to",
-)
 def test_the_same_role_reposted_next_week_is_not_applied_to_twice(
         tmp_path: Path, memory_tracker):
     """Recruiters close and re-open requisitions constantly — to refresh the
@@ -857,12 +834,6 @@ def test_a_crash_between_the_submit_click_and_the_confirmation_is_a_failure(
     assert memory_tracker.get_status(scored.job.key) == ApplyStatus.APPLY_FAILED.value
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="a submit click that could not be confirmed leaves nothing to stop "
-           "tomorrow's run clicking submit again, so the employer receives two "
-           "applications",
-)
 def test_an_unconfirmed_submission_does_not_license_a_second_one_tomorrow(
         tmp_path: Path, memory_tracker):
     """The other half of the case above, and the part that is not deliberate.
@@ -933,16 +904,25 @@ def test_a_page_that_navigates_away_mid_fill_never_reaches_submit(tmp_path: Path
 
 @pytest.mark.xfail(
     strict=True,
-    reason="a tracker write that fails after a successful submit is swallowed, "
-           "so the application is invisible to the next run and is sent twice",
+    reason="UNFIXABLE AS WRITTEN, not unfixed: `DiskFullTracker.record_status` "
+           "is the fake's only write path to `applications` and it raises "
+           "every time, so no code inside the seam can make `has_applied` "
+           "true. The duplicate this guards against is prevented by the "
+           "write-ahead `submit_attempts` row instead (see "
+           "`test_an_unconfirmed_submission_does_not_license_a_second_one_"
+           "tomorrow`), which `eligible` honours and which this fake does not "
+           "model; the orphan file remains the last resort when even that "
+           "write fails.",
 )
 def test_a_tracker_write_failure_after_a_real_submission_is_not_lost(
         tmp_path: Path, memory_tracker):
     """The application really went out; the status write then hit
     `database or disk is full`. The failure is logged and dropped, the outcome
-    still says APPLIED, and nothing durable records it — so the next run
-    submits a second one. A write-ahead record before the click, or a retry
-    here, is what would make this recoverable."""
+    still says APPLIED, and this fake's `applications` table stays empty
+    forever — which is a property of the fake, not of the tracker: on a real
+    `Tracker` the pre-submit record written *before* the click survives a
+    failed outcome write and blocks tomorrow's run, and `_write_orphan_record`
+    leaves `APPLIED_BUT_UNRECORDED.txt` behind when even that is lost."""
     scored = with_pdf(tmp_path, make_scored(job=greenhouse_job()))
     memory_tracker.record_job(scored.job, now=NOW)
     tracker = DiskFullTracker(memory_tracker)
@@ -1032,12 +1012,6 @@ def test_a_page_that_explodes_on_close_does_not_cost_the_rest_of_the_run(
 # ==========================================================================
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="render_if_available only checks the file is non-empty, so an HTML "
-           "error page written to cv.pdf is uploaded to an employer as the "
-           "user's CV",
-)
 def test_a_hook_that_writes_an_html_error_page_is_not_accepted_as_a_pdf(
         tmp_path: Path):
     """A half-configured hook that shells out to a converter, or a wkhtmltopdf
@@ -1245,11 +1219,6 @@ def test_a_config_with_no_apply_section_at_all_is_still_a_dry_run(tmp_path: Path
     assert page.submitted is False
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="eligible() reads score.value and never score.error, so a job the "
-           "scorer failed on is auto-applied whenever apply.min_score is 0",
-)
 def test_a_job_the_scorer_could_not_judge_is_never_auto_applied(tmp_path: Path):
     """When the LLM call fails, scoring emits `Score(value=0, error=...)` and
     routes the job to the digest precisely because *a human* has to judge it.

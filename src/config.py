@@ -66,12 +66,62 @@ DEFAULTS: dict[str, Any] = {
         "allow_remote": True,
         "remote_requires_eu_hint": True,
         "title_include": [],
+        # Whole-word, accent-folded and case-insensitive (`filters._matches`),
+        # so "intern" cannot reject "International Sales" — which is why this
+        # list can afford to be explicit rather than clever.
+        #
+        # It has to carry every spelling a board actually uses, because there
+        # is no stemming: "intern" does not catch "internships", "apprentice"
+        # does not catch "apprenticeship", and "graduate program" does not
+        # catch the British "graduate programme". And a search across Berlin,
+        # Paris, Madrid, Amsterdam and Warsaw is not an English-language
+        # search: every entry-level term below turns up in one week of it, and
+        # each one that gets through costs a paid LLM call and a slot in the
+        # digest.
         "title_exclude": [
-            "intern", "internship", "working student", "werkstudent",
-            "praktikum", "apprentice", "graduate program", "volunteer",
+            # English
+            "intern", "interns", "internship", "internships",
+            "apprentice", "apprentices", "apprenticeship", "apprenticeships",
+            "graduate program", "graduate programs",
+            "graduate programme", "graduate programmes",
+            "graduate scheme", "graduate schemes",
+            "working student", "volunteer",
+            # German
+            "werkstudent", "praktikum", "praktikant", "praktikantin",
+            "ausbildung", "auszubildende", "azubi", "duales studium",
+            # French
+            "stage", "stagiaire", "alternance", "alternant", "apprentissage",
+            # Spanish / Portuguese
+            "becario", "becaria", "practicas", "estagio", "estagiario",
+            # Dutch ("stagiaire" is already listed under French)
+            "stagiair", "afstudeerstage",
+            # Polish
+            "praktyki", "praktykant", "staz", "stazysta",
+            # Italian
+            "tirocinio", "stagista",
         ],
         "description_exclude": [
             "security clearance", "must be a us citizen", "ts/sci",
+        ],
+        # Employment types a source states as structured data (Lever's
+        # `categories.commitment`, Adzuna's `contract_type`). Matched only
+        # against those fields, never against the title, and a posting that
+        # states nothing is never rejected here.
+        #
+        # Trade-off, stated because the default is opinionated: this drops
+        # genuine contract/freelance work for anyone who wants it, and that is
+        # one config line to undo, visible in the digest's funnel counts with
+        # an explicit reason. The other default silently sends a
+        # permanent-role hunter to pay for scoring internships every morning.
+        # Only the types that are already excluded by title, so this stage
+        # catches the ones whose title is neutral. `contract`/`freelance` are
+        # deliberately NOT here: plenty of real EU tech work is contract, and
+        # a default that deletes jobs is the wrong kind of opinionated — a
+        # dropped posting is invisible forever, while a wrong card costs a
+        # glance. Add them yourself if you only want permanent roles.
+        "employment_type_exclude": [
+            "internship", "intern", "apprenticeship", "apprentice",
+            "temporary", "temp", "seasonal", "volunteer", "work experience",
         ],
         "require_keywords_any": [],
         "min_description_chars": 0,

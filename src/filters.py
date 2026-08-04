@@ -11,8 +11,8 @@ Two things matter as much as the filtering itself:
 * **Determinism.** Same input list, same output order, every run — otherwise
   the digest reshuffles for no reason and the tracker looks noisy.
 
-Filter order is cheapest-first: title -> location -> freshness -> keywords ->
-description length.
+Filter order is cheapest-first: title -> employment type -> location ->
+freshness -> keywords -> description length.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from datetime import datetime
 from typing import Any, NamedTuple
 
 from . import geo
-from .models import Job, ensure_utc, normalize_text, utcnow
+from .models import Job, collapse_initialisms, ensure_utc, normalize_text, utcnow
 from .util import get_logger
 
 logger = get_logger(__name__)
@@ -33,6 +33,7 @@ logger = get_logger(__name__)
 REASON_CATEGORIES: tuple[str, ...] = (
     "title_excluded",
     "title_not_included",
+    "employment_type_excluded",
     "location_outside_eu",
     "stale",
     "undated",
@@ -126,7 +127,7 @@ def _terms(value: Any) -> list[str]:
         return []
     out: list[str] = []
     for item in value:
-        term = normalize_text(str(item))
+        term = _fold(str(item))
         if term:
             out.append(term)
     return out
@@ -144,6 +145,16 @@ def _countries(config: Any) -> set[str]:
 # --------------------------------------------------------------------------
 
 
+def _fold(text: str) -> str:
+    """Normalise text for whole-word matching, collapsing dotted initialisms.
+
+    "U.S. citizen" and "US citizen" are the same requirement written two ways,
+    and only the second one survives plain `normalize_text` as a single token.
+    Applied to the config terms as well, so both sides agree.
+    """
+    return normalize_text(collapse_initialisms(text))
+
+
 def _tokens(*parts: str) -> list[str]:
     """Accent-folded, punctuation-free tokens for whole-word matching.
 
@@ -154,7 +165,7 @@ def _tokens(*parts: str) -> list[str]:
     for index, part in enumerate(parts):
         if index:
             joined.append("\x00")
-        joined.extend(normalize_text(part).split())
+        joined.extend(_fold(part).split())
     return joined
 
 
@@ -213,6 +224,49 @@ def passes_title(job: Job, config: Any) -> tuple[bool, str]:
     return check.ok, check.reason
 
 
+#: Where a source records the employment type on `Job.raw`. Lever states it
+#: as `categories.commitment`, Adzuna as `contract_type`; both are already
+#: fetched and stored, and until this filter existed neither was ever read.
+EMPLOYMENT_TYPE_KEYS: tuple[str, ...] = (
+    "commitment", "contract_type", "employment_type", "employmentType",
+)
+
+
+def _check_employment_type(job: Job, config: Any) -> _Check:
+    """Reject on the employment type the *source* states, not on the title.
+
+    A Lever posting titled plainly "Software Engineer" with
+    `commitment: Internship` passes every title rule ever written, because the
+    title says nothing — the structured field is the only place the truth is
+    recorded. Same for an Adzuna result with `contract_type: contract`.
+
+    Deliberately narrow: only the keys in `EMPLOYMENT_TYPE_KEYS` are read
+    (never `contract_time`, which says full/part-time, not what kind of
+    engagement it is), and a posting that states nothing is never rejected
+    here. The trade-off in the default list is documented in `config.DEFAULTS`.
+    """
+    exclude = _terms(_cfg(config, "filters.employment_type_exclude", []))
+    if not exclude:
+        return _Check(True, "")
+    raw = getattr(job, "raw", None)
+    if not isinstance(raw, Mapping):
+        return _Check(True, "")
+
+    for key in EMPLOYMENT_TYPE_KEYS:
+        value = raw.get(key)
+        if not value or isinstance(value, bool):
+            continue
+        hit = _first_match(_tokens(str(value)), exclude)
+        if hit:
+            return _Check(
+                False,
+                f"the board states this is {str(value)!r} ({key}), which matches "
+                f"filters.employment_type_exclude ({hit!r})",
+                "employment_type_excluded",
+            )
+    return _Check(True, "")
+
+
 def _check_location(job: Job, config: Any) -> _Check:
     allowed = _countries(config)
     allow_remote = bool(_cfg(config, "filters.allow_remote", True))
@@ -229,16 +283,50 @@ def _check_location(job: Job, config: Any) -> _Check:
     if not allowed:
         return _Check(True, "")  # no country list configured -> no location gate
 
+    # A posting open in several countries is one job you may take from any of
+    # them: "Remote (Portugal, Spain, Poland)" must not be pinned to whichever
+    # country happens to be named last. Any allowed country is a pass, and the
+    # job is then filed under *that* one rather than under the primary — the
+    # digest's country is meant to tell the user where they could work.
+    #
+    # The trade-off runs the other way too: a location that merely *mentions*
+    # an allowed country ("London, UK (occasional travel to Berlin)") now
+    # survives. That costs one wrong card in the digest, which the user can
+    # see and dismiss; pinning a multi-country role to one country loses a
+    # real job with no trace anywhere.
     country = resolved.country
+    allowed_hit = next((c for c in resolved.countries if c in allowed), None)
+    if allowed_hit:
+        if allowed_hit != job.country:
+            job.country = allowed_hit
+        return _Check(True, "")
+
     if country:
-        if country in allowed:
-            return _Check(True, "")
         # Resolved somewhere we cannot work. Say where, so the digest can
         # tell "wrong country" from "unparseable".
         return _Check(
             False,
             f"location {job.location!r} resolves to {geo.country_name(country)} "
             f"({country}), which is not in filters.countries",
+            "location_outside_eu",
+        )
+
+    # An explicit "Remote (US)" is the most authoritative sentence in the
+    # posting, and it is checked *before* the remote branch on purpose: half
+    # of all US company descriptions mention their European offices, and the
+    # EU hint that rescues a genuinely pan-European remote role would
+    # otherwise rescue a US-only one on the strength of "we also have an
+    # office in Berlin".
+    #
+    # `eu_stated` is the deliberate exception, and it is what keeps this from
+    # over-reaching: "Remote (US or Europe)" and "Remote - US, Germany" name
+    # both sides in the *location*, and those are jobs an EU applicant can
+    # take. Only a European mention that lives solely in the prose is
+    # discounted.
+    if resolved.us and not resolved.eu_stated:
+        return _Check(
+            False,
+            f"location {job.location!r} looks like the United States",
             "location_outside_eu",
         )
 
@@ -259,12 +347,6 @@ def _check_location(job: Job, config: Any) -> _Check:
             )
         return _Check(True, "")
 
-    if resolved.us:
-        return _Check(
-            False,
-            f"location {job.location!r} looks like the United States",
-            "location_outside_eu",
-        )
     return _Check(
         False,
         f"location {job.location!r} could not be resolved to an allowed country",
@@ -414,6 +496,7 @@ def apply_filters(
         try:
             stages = (
                 lambda j=job: _check_title(j, config),
+                lambda j=job: _check_employment_type(j, config),
                 lambda j=job: _check_location(j, config),
                 lambda j=job: _check_freshness(j, max_age, skip_undated, moment),
                 lambda j=job: _check_keywords(j, config),
@@ -444,16 +527,28 @@ def apply_filters(
 # --------------------------------------------------------------------------
 
 
-def _richness(job: Job) -> tuple[int, int, int]:
+def _richness(job: Job) -> tuple[int, int, int, float]:
     """Sort key for "which copy of this posting do we keep?".
 
     A real date first (freshness filtering depends on it), then the longest
-    description (the scorer reads it), then the most trustworthy source.
+    description (the scorer reads it), then the most trustworthy source, and
+    only then the most recent posting date.
+
+    Recency is *last* on purpose. Boards accumulate — the same role sits there
+    as a two-day-old req and as today's repost — and when the two copies tie
+    on everything else the older one used to win on input order and then be
+    dropped as stale, taking the job with it. But promoting recency any higher
+    would hand every posting to whichever source claims the newest date, and
+    that is the LinkedIn alert email: every job in it inherits the email's
+    receipt time, so it looks fresher than the ATS record it was scraped from
+    while carrying no description and a linkedin.com URL nobody can apply
+    through.
     """
     rank = SOURCE_RANK.get((job.source or "").strip().lower(), 0)
     if job.ats and rank == 0:
         rank = 3  # an unknown source that still carries an ATS id is an ATS
-    return (1 if job.posted_at else 0, len(job.description or ""), rank)
+    posted = job.posted_at.timestamp() if job.posted_at else 0.0
+    return (1 if job.posted_at else 0, len(job.description or ""), rank, posted)
 
 
 def dedupe(jobs: list[Job]) -> list[Job]:

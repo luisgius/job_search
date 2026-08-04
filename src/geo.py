@@ -421,10 +421,30 @@ _ZIP_RE = re.compile(r"^\d{5}(?:-\d{4})?$")
 # "Portland, OR" keeps its state code.
 _PHRASE_SPLIT_RE = re.compile(r"[;|/\n·•]|[()\[\]]|\s+-\s+|\s+or\s+|\s+and\s+|\s+&\s+")
 
+# "EMEA (excluding UK)" names the United Kingdom precisely because the job is
+# NOT there, and reading it as a UK posting is the wrong answer twice over: it
+# files a pan-European role under the one country it excludes, and on the
+# common post-Brexit config (GB off the list) it drops the job outright with a
+# reason that reads like a parser bug.
+#
+# The word list is deliberately short. "outside" and "minus" are ambiguous in
+# a location field, and "no" is the ISO code for Norway — a wrong entry here
+# deletes the country a job really is in, which is worse than the bug.
+_EXCLUSION_RE = re.compile(
+    r"\b(?:excluding|excl\.?|except(?:\s+for)?|other\s+than|apart\s+from|"
+    r"not\s+including)\b[^,;)\]|/]*",
+    re.IGNORECASE,
+)
+
 
 def _phrases(location: str) -> list[str]:
-    """Break a multi-location string into independently resolvable chunks."""
-    return [p.strip() for p in _PHRASE_SPLIT_RE.split(location) if p and p.strip()]
+    """Break a multi-location string into independently resolvable chunks.
+
+    Exclusion clauses are dropped first: a country named only to be ruled out
+    must not become the country the job is filed under.
+    """
+    text = _EXCLUSION_RE.sub(" ", str(location))
+    return [p.strip() for p in _PHRASE_SPLIT_RE.split(text) if p and p.strip()]
 
 
 def _ngram_hit(tokens: list[str], table: Iterable[str] | Mapping[str, str],
@@ -617,6 +637,39 @@ def country_of(location: str | None) -> str | None:
     return None
 
 
+def countries_of(location: str | None) -> list[str]:
+    """*Every* country a location names, best guess first, US segments dropped.
+
+    "Remote (Portugal, Spain, Poland)" is one job you may take from any of
+    three countries, and `country_of` can only ever answer with one of them —
+    so an applicant in Lisbon whose `filters.countries` is [PT, ES] would
+    never see it. This is the list `filters.passes_location` gates on; the
+    first element is always exactly what `country_of` returns, so nothing that
+    reads the primary country changes behaviour.
+
+        >>> countries_of("Remote (Portugal, Spain, Poland)")
+        ['PL', 'PT', 'ES']
+        >>> countries_of("Berlin, Germany")
+        ['DE']
+    """
+    if not location:
+        return []
+    found: list[str] = []
+    primary = country_of(location)
+    if primary:
+        found.append(primary)
+    for phrase in _phrases(str(location)):
+        if _phrase_looks_us(phrase):
+            continue
+        # Per comma-part, so every country in a list is seen and not just the
+        # one in the country slot at the end.
+        for part in phrase.split(","):
+            iso = _phrase_country(part)
+            if iso and iso not in found:
+                found.append(iso)
+    return found
+
+
 # --------------------------------------------------------------------------
 # remote detection
 # --------------------------------------------------------------------------
@@ -790,6 +843,14 @@ class GeoResult:
     remote: bool = False
     eu_hint: bool = False
     us: bool = False
+    #: Every country the posting names, best guess first. `country` is the
+    #: first entry; a multi-country remote role is the reason both exist.
+    countries: tuple[str, ...] = ()
+    #: Europe named in the *structured* fields — location or title — rather
+    #: than anywhere in the prose. `eu_hint` includes the description, which
+    #: is far weaker evidence: half of all US company descriptions mention
+    #: their European offices.
+    eu_stated: bool = False
 
     @property
     def in_eu(self) -> bool:
@@ -811,6 +872,7 @@ def resolve(job_like: Any) -> GeoResult:
     """
     if isinstance(job_like, str):
         location, title, description, declared = job_like, "", "", None
+        stated = None
     else:
         location = _field(job_like, "location")
         title = _field(job_like, "title")
@@ -819,21 +881,37 @@ def resolve(job_like: Any) -> GeoResult:
             job_like.get("remote") if isinstance(job_like, Mapping)
             else getattr(job_like, "remote", None)
         )
+        stated = _field(job_like, "country").strip().upper()
+        # Only an ISO-3166 alpha-2 shape is believed. Sources write this
+        # field, so a stray "Europe" or "n/a" would otherwise be reported to
+        # the user as the country the job is in.
+        stated = stated if len(stated) == 2 and stated.isalpha() else None
 
-    country = country_of(location)
-    if country is None and not looks_like_us(location):
+    us = looks_like_us(location)
+    countries = countries_of(location)
+    if not countries and not us:
         # Some boards leave `location` empty and only say "Remote - Germany"
         # in the title. Cheap second look; never overrides an explicit US.
-        country = country_of(title)
+        countries = countries_of(title)
+    if not countries and not us and stated:
+        # The source already knows. Adzuna indexes by country, so a result
+        # from `.../jobs/de/...` is a German posting even when its `location`
+        # node is missing entirely — and re-deriving the country from free
+        # text throws that away and rejects the job as "could not be
+        # resolved". Only consulted when the text says nothing at all: a
+        # declared country must never override a location that reads US, or a
+        # mis-stamped source would walk a US posting past an EU-only filter.
+        countries = [stated]
+    country = countries[0] if countries else None
 
     # A source that already decided (`Job.remote`) is trusted over guessing.
     remote = declared if isinstance(declared, bool) else is_remote(
         location, title, description
     )
 
-    eu_hint = bool(country and country in EU_COUNTRIES)
-    if not eu_hint:
-        eu_hint = mentions_eu(f"{location}\n{title}") or mentions_eu(description)
+    eu_stated = (any(c in EU_COUNTRIES for c in countries)
+                 or mentions_eu(f"{location}\n{title}"))
+    eu_hint = eu_stated or mentions_eu(description)
 
-    return GeoResult(country=country, remote=remote, eu_hint=eu_hint,
-                     us=looks_like_us(location))
+    return GeoResult(country=country, remote=remote, eu_hint=eu_hint, us=us,
+                     countries=tuple(countries), eu_stated=eu_stated)

@@ -150,11 +150,6 @@ def test_the_german_terms_the_defaults_do_list_survive_their_decorations(tmp_pat
     assert reason
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="shipped filters.title_exclude is English+German only: French, Spanish, "
-    "Dutch, Polish and the German apprenticeship terms all reach the scorer",
-)
 def test_the_shipped_exclusions_cover_the_other_eu_languages(tmp_path):
     """One week of a Berlin/Paris/Madrid/Amsterdam/Warsaw search returns all
     of these, and every one of them is an internship, an apprenticeship or a
@@ -179,12 +174,6 @@ def test_the_shipped_exclusions_cover_the_other_eu_languages(tmp_path):
     assert missed == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="whole-word matching has no stemming, so plural and British-spelt "
-    "variants of the shipped exclusions ('internships', 'apprenticeship', "
-    "'graduate programme') are not caught",
-)
 def test_plural_and_british_variants_of_a_listed_exclusion_are_caught(tmp_path):
     """`title_exclude` already lists "intern", "internship", "apprentice" and
     "graduate program". A board writing the plural, the -ship form or the
@@ -241,11 +230,6 @@ def test_emoji_nbsp_and_bracket_decoration_do_not_hide_a_title(tmp_path, title):
     assert passes_title(make_job(title=title), conf)[0] is True
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="a zero-width space or soft hyphen inside a word is normalised to a "
-    "space, splitting the token, so title_include no longer matches",
-)
 def test_an_invisible_character_inside_a_word_does_not_split_it(tmp_path):
     """German boards emit soft hyphens for hyphenation ("Software\xadentwickler")
     and rich-text editors leak zero-width spaces. The title still *reads*
@@ -305,12 +289,6 @@ def test_the_shipped_defaults_send_management_titles_to_the_scorer(tmp_path):
 # ==========================================================================
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="Lever's categories.commitment and Adzuna's contract_type are stored in "
-    "Job.raw but no filter ever reads them, so an internship or a contract role "
-    "with a neutral title survives every hard filter",
-)
 def test_structured_employment_type_is_filtered_not_just_recorded(tmp_path):
     """Lever states the employment type as structured data; the title often
     does not. A posting titled plainly "Software Engineer" with
@@ -334,8 +312,29 @@ def test_structured_employment_type_is_filtered_not_just_recorded(tmp_path):
     )
     assert contractor.raw["contract_type"] == "contract"
 
-    result = apply_filters([internship, contractor], conf, now=NOW)
-    assert result.kept == []
+    # The shipped default drops the internship, whose title gives nothing away.
+    assert apply_filters([internship], conf, now=NOW).kept == []
+
+    # It deliberately does NOT drop contract work — see the companion test —
+    # but the mechanism is there for anyone who only wants permanent roles.
+    permanent_only = fresh_cfg(
+        tmp_path, employment_type_exclude=["internship", "contract"]
+    )
+    assert apply_filters([contractor], permanent_only, now=NOW).kept == []
+
+
+def test_the_shipped_default_does_not_delete_contract_work(tmp_path):
+    """A default that deletes jobs is the wrong kind of opinionated. Plenty of
+    real EU tech work is contract or B2B — Poland and the Netherlands
+    especially — and a dropped posting is invisible forever, while a wrong
+    card costs a glance. `contract` and `freelance` are therefore left out of
+    the shipped `employment_type_exclude` and commented in config.yaml for
+    anyone who wants them."""
+    conf = fresh_cfg(tmp_path)
+    contractor = parse_result(
+        adzuna_result(title="Backend Engineer", contract_type="contract"), "de"
+    )
+    assert apply_filters([contractor], conf, now=NOW).kept == [contractor]
 
 
 def test_freelance_and_fixed_term_titles_need_an_explicit_exclusion(tmp_path):
@@ -389,11 +388,6 @@ def test_a_timezone_only_location_is_kept_as_remote_with_a_european_hint():
     assert geo.mentions_eu("Anywhere in CET ±2") is True
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="'EMEA (excluding UK)' resolves to GB — the country named only to be "
-    "excluded is the one the job is filed under",
-)
 def test_a_location_that_names_a_country_in_order_to_exclude_it(tmp_path):
     """A pan-European posting that says "EMEA (excluding UK)" is a job an EU
     applicant can take. It resolves to the United Kingdom, so it is either
@@ -407,11 +401,6 @@ def test_a_location_that_names_a_country_in_order_to_exclude_it(tmp_path):
     assert passes_location(job, conf)[0] is True
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="a multi-country remote location resolves to whichever country is "
-    "listed last, so the role is dropped when only the earlier ones are allowed",
-)
 def test_a_remote_role_open_in_several_countries_is_not_pinned_to_the_last(tmp_path):
     """"Remote (Portugal, Spain, Poland)" is one job you may take from any of
     three countries. It resolves to PL only, so an applicant based in Lisbon
@@ -422,12 +411,6 @@ def test_a_remote_role_open_in_several_countries_is_not_pinned_to_the_last(tmp_p
     assert ok is True, reason
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="filters._check_location tests the remote branch before the US branch, so "
-    "an explicitly US-only remote role is kept whenever its description names a "
-    "European city",
-)
 def test_a_us_only_remote_role_is_not_rescued_by_a_european_office(tmp_path):
     """Half of all US company descriptions mention their European offices.
     The location field here says "Remote (US)" in as many words, which is the
@@ -444,12 +427,6 @@ def test_a_us_only_remote_role_is_not_rescued_by_a_european_office(tmp_path):
     assert passes_location(job, conf)[0] is False
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="passes_location re-derives the country from free text and ignores the "
-    "Job.country the source already established, so a located posting with an "
-    "unhelpful location string is dropped",
-)
 def test_a_country_the_source_already_knows_is_believed(tmp_path):
     """A result from `api.adzuna.com/.../jobs/de/...` is a German posting —
     the index is the country, and `adzuna.parse_result` records that on
@@ -700,11 +677,6 @@ def test_ampersands_and_slashes_in_a_company_name_normalise_stably(name, normali
     assert normalize_company(name) == normalize_company(name.upper())
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="_MAX_LOCATIONS truncates the office list to 4, so a posting whose only "
-    "European office is listed fifth reads as a US-only role",
-)
 def test_the_only_european_office_survives_a_long_office_list():
     """US companies list their offices home-first: SF, NYC, Austin, Seattle,
     then Berlin. Everything past the fourth is cut, and what is left looks
@@ -759,12 +731,6 @@ def test_an_english_promoted_badge_is_not_mistaken_for_the_employer():
     assert job.location == "Berlin, Germany"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="the badge/CTA/age noise filters in linkedin_email are English-only, so a "
-    "localised alert files the badge text as the company and the footer link as the "
-    "last card's employer",
-)
 def test_a_localised_alert_does_not_file_its_chrome_as_the_employer():
     """A German alert says "Anzeige" where an English one says "Promoted", and
     "Alle Jobs anzeigen" where an English one says "See all jobs". Both slip
@@ -785,11 +751,6 @@ def test_a_localised_alert_does_not_file_its_chrome_as_the_employer():
     assert extract_jobs_from_html(with_footer, received_at=RECEIVED)[0].company == ""
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="a job link wrapped in a click-tracking redirector yields no job id, so "
-    "every card in such an alert is dropped",
-)
 def test_a_click_tracking_redirector_still_yields_the_job():
     """LinkedIn routes some alert links through `click.linkedin.com/?url=…`.
     The href still contains the posting URL, but the tracking parameters that
@@ -935,11 +896,6 @@ def test_the_same_title_opened_in_berlin_and_munich_is_two_jobs():
     assert len(dedupe([berlin, munich])) == 2
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="dedupe's richness tie-break ignores posted_at, so an older duplicate "
-    "listed first wins and is then dropped as stale, losing the job entirely",
-)
 def test_a_repost_does_not_lose_the_fresh_copy_to_the_stale_one():
     """Boards accumulate: the same role sits there as a two-day-old req and as
     today's repost with a new id. The two tie on date-present, description
@@ -967,11 +923,6 @@ def test_dedupe_never_merges_across_countries():
 # ==========================================================================
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="the shipped 'must be a us citizen' exclusion is a five-token phrase, so "
-    "the punctuated 'U.S. citizen' spelling walks past it",
-)
 def test_a_citizenship_requirement_is_caught_however_it_is_punctuated(tmp_path):
     """US defence and government contractors write "U.S. citizen" far more
     often than "US citizen", and this exclusion exists precisely to drop

@@ -64,8 +64,21 @@ _STATUS_HINTS: dict[int, str] = {
     429: "rate limited — try again later",
 }
 
-# How many distinct locations we keep when a posting lists many.
-_MAX_LOCATIONS = 4
+# How long the joined location field may get when a posting lists many offices.
+#
+# A *count* cap used to live here, and it cost real jobs: US companies list
+# their offices home-first — SF, NYC, Austin, Seattle, then Berlin — so cutting
+# at the fourth left a string that reads unambiguously American, and the one
+# posting genuinely open in Berlin was rejected as a US role. This field is not
+# decoration; it is the entire input to the geo filter, so anything dropped
+# here deletes a job invisibly.
+#
+# The remaining cap is a sanity bound on a pathological payload rather than a
+# tidiness rule, and it is generous enough for every real multi-office posting
+# (~20 offices). A posting with more than that can still lose its last office —
+# the alternative is an unbounded string in the digest, which is the cheaper
+# failure of the two.
+_MAX_LOCATION_CHARS = 600
 
 
 # --------------------------------------------------------------------------
@@ -119,13 +132,31 @@ def _clean_location(value: Any) -> str:
 
 
 def _join_locations(values: Iterable[Any]) -> str:
-    """De-duplicate and join location strings, capped so the field stays sane."""
+    """De-duplicate and join location strings, bounded by `_MAX_LOCATION_CHARS`.
+
+    Every distinct office is kept: the geo filter reads this string, and a
+    truncated office list is how a role open in Berlin gets rejected as
+    American. Only an absurdly long list is cut, and always on a whole entry.
+    """
     seen: list[str] = []
     for value in values:
         text = _clean_location(value)
         if text and text.lower() not in {s.lower() for s in seen}:
             seen.append(text)
-    return "; ".join(seen[:_MAX_LOCATIONS])
+
+    kept: list[str] = []
+    length = 0
+    for text in seen:
+        extra = len(text) + (2 if kept else 0)
+        if kept and length + extra > _MAX_LOCATION_CHARS:
+            logger.debug(
+                "location list truncated at %d of %d entries (over %d chars)",
+                len(kept), len(seen), _MAX_LOCATION_CHARS,
+            )
+            break
+        kept.append(text)
+        length += extra
+    return "; ".join(kept)
 
 
 def _describe_error(exc: Exception) -> str:

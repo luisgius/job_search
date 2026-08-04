@@ -35,6 +35,7 @@ from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import unquote
 
 from ..config import Config
 from ..models import Job, ensure_utc
@@ -53,35 +54,73 @@ CANONICAL_JOB_URL = "https://www.linkedin.com/jobs/view/{job_id}"
 #: into several hundred sequential HTTP calls.
 MAX_DESCRIPTION_FETCHES = 60
 
-# /comm/ is the tracking-wrapped variant LinkedIn puts in emails.
+# /comm/ is the tracking-wrapped variant LinkedIn puts in emails. `&` and `=`
+# are excluded from the slug because some alerts wrap the whole posting URL in
+# a `click.linkedin.com/?url=…` redirector, where the tracking parameters that
+# follow run straight into the id.
 _JOB_HREF_RE = re.compile(
-    r"linkedin\.com/(?:comm/)?jobs/view/(?P<slug>[^/?#\s\"'<>]+)", re.IGNORECASE
+    r"linkedin\.com/(?:comm/)?jobs/view/(?P<slug>[^/?#&=\s\"'<>]+)", re.IGNORECASE
 )
 # Slugs are either a bare id or "senior-backend-engineer-at-acme-3987654321".
 _TRAILING_ID_RE = re.compile(r"(\d{6,})\s*$")
 
 _REMOTE_RE = re.compile(r"\b(remote|hybrid|work from home|wfh|anywhere)\b", re.IGNORECASE)
 
-# "2 hours ago", "Just now", "Yesterday" — timestamps in prose, not content.
+# LinkedIn localises the alert but not its structure, so every filter below
+# has to be multilingual or it is not a filter at all: an English-only noise
+# list files "Anzeige" as the employer of the job above it. That is worse than
+# cosmetic — `Job.key` hashes the company for any posting with no ATS id, so a
+# badge in the company slot re-keys the job every day and the tracker offers it
+# again each morning.
+#
+# "2 hours ago", "Just now", "Yesterday", "vor 5 Stunden", "il y a 3 heures".
 _AGE_RE = re.compile(
-    r"^(?:just now|today|yesterday|"
-    r"\d+\s*\+?\s*(?:second|sec|minute|min|hour|hr|day|week|month|year)s?\s+ago)$",
+    r"^(?:just now|today|yesterday|gerade eben|heute|gestern|"
+    r"aujourd hui|aujourd'hui|hier|hoy|ayer|vandaag|gisteren|"
+    r"vor\s+\d+\s*\+?\s*(?:sekunde|minute|stunde|tag|woche|monat|jahr)\w*|"
+    r"il y a\s+\d+\s*\+?\s*(?:seconde|minute|heure|jour|semaine|mois|an)\w*|"
+    r"hace\s+\d+\s*\+?\s*(?:segundo|minuto|hora|d[ií]a|semana|mes|año|ano)\w*|"
+    r"\d+\s*\+?\s*(?:second|sec|minute|min|hour|hr|day|week|month|year)s?\s+ago|"
+    r"\d+\s*\+?\s*(?:uur|dag|dagen|week|weken|maand|maanden|jaar)\s+geleden)$",
     re.IGNORECASE,
 )
-# "12 applicants", "48 people clicked apply"
+# "12 applicants", "48 people clicked apply", "12 Bewerber"
 _COUNT_RE = re.compile(
-    r"^\d[\d,.]*\s+(?:applicants?|viewers?|people\b|connections?|alumni)", re.IGNORECASE
+    r"^\d[\d,.]*\s+(?:applicants?|viewers?|people\b|connections?|alumni|"
+    r"bewerber\w*|personen|kandidat\w*|candidat\w*|solicitantes?)",
+    re.IGNORECASE,
 )
 # Footer / call-to-action anchors that must never be mistaken for a company.
 _CTA_RE = re.compile(
     r"^(?:see all|see more|view (?:all|job|company)|apply|easy apply|unsubscribe|"
     r"help|manage|settings|sign in|download|about|privacy|terms|update your|"
-    r"stop receiving|jobs? you may|linkedin|this email|you are receiving)",
+    r"stop receiving|jobs? you may|linkedin|this email|you are receiving"
+    # German
+    r"|alle (?:jobs|stellen|anzeigen)|jobs? anzeigen|abmelden|abbestellen"
+    r"|einstellungen|hilfe|datenschutz|impressum|nutzungsbedingungen"
+    r"|jetzt bewerben|diese e[- ]?mail|sie erhalten"
+    # French
+    r"|voir (?:tout|tous|toutes)|se d[ée]sabonner|postuler|aide|confidentialit[ée]"
+    # Spanish / Portuguese
+    r"|ver (?:todos|todas)|darse de baja|cancelar|solicitar empleo|ayuda"
+    r"|ver todas as|cancelar subscri[çc][ãa]o"
+    # Dutch
+    r"|alle vacatures|bekijk alle|afmelden|solliciteer|instellingen)",
     re.IGNORECASE,
 )
 _NOISE_WORDS = {
     "promoted", "new", "actively recruiting", "be an early applicant",
     "easy apply", "your job alert", "job alert",
+    # German
+    "anzeige", "gesponsert", "beworben", "neu", "einfache bewerbung",
+    "wird aktiv rekrutiert", "ihr job-alert", "dein job-alert", "jobbenachrichtigung",
+    # French
+    "sponsorise", "sponsorisé", "nouveau", "candidature simplifiee",
+    "candidature simplifiée", "recrute activement",
+    # Spanish / Portuguese
+    "promocionado", "patrocinado", "nuevo", "novo", "solicitud sencilla",
+    # Dutch
+    "gepromoot", "gesponsord", "nieuw", "eenvoudig solliciteren",
 }
 # Separators LinkedIn sprinkles between fields.
 _SEPARATORS = " \t\r\n·•|-–—:,"
@@ -97,8 +136,16 @@ _CONTEXT_LOOKAHEAD = 6
 
 
 def _job_id_from_url(url: str) -> str | None:
-    """Pull the numeric LinkedIn job id out of any of its URL shapes."""
-    match = _JOB_HREF_RE.search(str(url or ""))
+    """Pull the numeric LinkedIn job id out of any of its URL shapes.
+
+    Some alerts route every link through `click.linkedin.com/r/?url=<posting>`,
+    and the wrapped URL is percent-encoded about half the time. Un-escaping
+    first is what makes both shapes yield the same id — and because one email
+    uses one link style throughout, getting this wrong drops *every* card in
+    that alert, silently.
+    """
+    text = str(url or "")
+    match = _JOB_HREF_RE.search(text) or _JOB_HREF_RE.search(unquote(text))
     if not match:
         return None
     slug = match.group("slug")
