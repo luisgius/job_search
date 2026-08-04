@@ -74,13 +74,43 @@ def normalize_company(value: str | None) -> str:
     return " ".join(tokens) if tokens else normalize_text(value)
 
 
+#: Parenthetical content that is decoration rather than identity. Stripping
+#: these lets "Backend Engineer" and "Backend Engineer (m/f/d)" collapse.
+#: Anything NOT matching stays, because "(Payments)" and "(Machine Learning)"
+#: are what distinguish two genuinely different requisitions — dropping them
+#: silently deletes one of the two jobs before it is ever scored.
+_NOISE_PARENTHETICAL_RE = re.compile(
+    r"""^\s*(?:
+        [mwfdhxu](?:\s*[/|]\s*[mwfdhxu])+          # m/f/d, w/m/d, h/f, m/f/x
+      | all\s+genders? | any\s+gender | gn | d\s*/\s*f\s*/\s*m
+      | remote\b.* | hybrid | on[\s-]?site | in[\s-]?office
+      | full[\s-]?time | part[\s-]?time | permanent | temporary
+      | contract | freelance | fixed[\s-]?term | interim
+      | [a-z]{2,3}\s*[/|]\s*[a-z]{2,3}             # de/en, en/fr
+      | \d+\s*%                                     # (80%)
+    )\s*$""",
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _strip_noise_parentheticals(raw: str) -> str:
+    """Drop only the decorative brackets, keep the meaningful ones."""
+    def _replace(match: "re.Match[str]") -> str:
+        inner = match.group(1)
+        return " " if _NOISE_PARENTHETICAL_RE.match(inner) else match.group(0)
+
+    raw = re.sub(r"\(([^()]*)\)", _replace, raw)
+    raw = re.sub(r"\[([^\[\]]*)\]", _replace, raw)
+    return raw
+
+
 def normalize_title(value: str | None) -> str:
-    """Normalise a job title, dropping req-id / location parentheticals."""
-    raw = str(value or "")
-    # "Backend Engineer (m/f/d)" / "Data Scientist [Berlin]" / "SWE - Remote"
-    raw = re.sub(r"\((?:[^()]*)\)", " ", raw)
-    raw = re.sub(r"\[[^\[\]]*\]", " ", raw)
-    return normalize_text(raw)
+    """Normalise a job title, dropping only decorative parentheticals.
+
+    "(m/f/d)", "(Remote)" and "(Full-time)" are noise on the same posting;
+    "(Payments)" and "(Machine Learning)" are two different jobs.
+    """
+    return normalize_text(_strip_noise_parentheticals(str(value or "")))
 
 
 def _short_hash(*parts: str, length: int = 16) -> str:
@@ -145,11 +175,18 @@ class Job:
     def key(self) -> str:
         """Stable identity for the tracker DB.
 
-        Prefers the ATS-assigned id (exact, survives title edits); otherwise
-        falls back to a hash of company + title + location.
+        Prefers the ATS-assigned id, which is globally unique within its
+        vendor and survives title edits, relocations and company renames.
+
+        The display name is deliberately NOT part of it: Greenhouse and Lever
+        payloads carry no company field, so it is derived from the board slug
+        or overridden in the watchlist. Mixing it in meant that adding the
+        documented `{slug: acme, company: ACME Technologies}` override re-keyed
+        every open requisition on that board — and re-keying is how an
+        already-applied job becomes eligible again.
         """
         if self.ats and self.ats_job_id:
-            return _short_hash(self.ats, normalize_company(self.company), str(self.ats_job_id))
+            return _short_hash(self.ats, str(self.ats_job_id))
         return _short_hash(
             normalize_company(self.company),
             normalize_title(self.title),
@@ -164,13 +201,23 @@ class Job:
         Deliberately ignores the ATS id and the free-text location tail so
         "Berlin, Germany" and "Berlin" collapse together.
         """
-        loc = normalize_text(self.location).split(" ")
-        loc_head = " ".join(loc[:2]) if loc else ""
         return _short_hash(
             normalize_company(self.company),
             normalize_title(self.title),
-            self.country or loc_head,
+            self.city or self.country or "",
         )
+
+    @property
+    def city(self) -> str:
+        """The city part of the location, normalised.
+
+        The first comma-segment, so "Berlin, Germany" and "Berlin" agree while
+        "Berlin" and "Munich" stay apart. Keying on the country instead merged
+        two genuinely different requisitions a company had open in two cities.
+        """
+        head = str(self.location or "").split(",")[0]
+        head = re.sub(r"\b(remote|hybrid|on[\s-]?site)\b", " ", head, flags=re.I)
+        return normalize_text(head)
 
     # -- convenience ------------------------------------------------------
 

@@ -77,14 +77,57 @@ def test_normalize_company_never_empties_a_name():
 @pytest.mark.parametrize(
     "raw,expected",
     [
+        # decoration -> dropped
         ("Backend Engineer (m/f/d)", "backend engineer"),
-        ("Data Scientist [Berlin]", "data scientist"),
+        ("Backend Engineer (w/m/d)", "backend engineer"),
         ("Senior Engineer (Remote, EU)", "senior engineer"),
+        ("Engineer (Full-time)", "engineer"),
+        ("Engineer (80%)", "engineer"),
         ("Backend Engineer", "backend engineer"),
+        # identity -> kept
+        ("Software Engineer (Payments)", "software engineer payments"),
+        ("Data Scientist [Berlin]", "data scientist berlin"),
     ],
 )
-def test_normalize_title_drops_parentheticals(raw, expected):
+def test_normalize_title_drops_only_decorative_parentheticals(raw, expected):
+    """"(m/f/d)" is noise on one posting; "(Payments)" and "(Machine Learning)"
+    are two different requisitions. Stripping both alike made `dedupe` delete
+    one of the two before it was ever scored."""
     assert normalize_title(raw) == expected
+
+
+def test_two_teams_at_one_company_are_two_jobs():
+    a = make_job(title="Software Engineer (Payments)", ats=None, ats_job_id=None)
+    b = make_job(title="Software Engineer (Machine Learning)", ats=None,
+                 ats_job_id=None)
+    assert a.key != b.key
+    assert a.dedupe_key != b.dedupe_key
+
+
+def test_the_ats_id_alone_carries_identity():
+    """The display name is derived from the board slug or overridden in the
+    watchlist, so mixing it into the key meant the documented `company:`
+    override re-keyed every requisition on that board — and re-keying is how
+    an already-applied job becomes eligible again."""
+    a = make_job(company="Spotify", ats="greenhouse", ats_job_id="4012345")
+    b = make_job(company="Spotify Technology S.A.", ats="greenhouse",
+                 ats_job_id="4012345")
+    assert a.key == b.key
+
+
+def test_the_same_title_in_two_cities_is_two_jobs():
+    a = make_job(title="Software Engineer", location="Berlin, Germany",
+                 country="DE", ats=None, ats_job_id=None)
+    b = make_job(title="Software Engineer", location="Munich, Germany",
+                 country="DE", ats=None, ats_job_id=None)
+    assert a.dedupe_key != b.dedupe_key
+
+
+def test_city_verbosity_still_collapses():
+    a = make_job(location="Berlin, Germany", country="DE", ats=None, ats_job_id=None)
+    b = make_job(location="Berlin", country="DE", ats=None, ats_job_id=None)
+    c = make_job(location="Berlin (Remote)", country="DE", ats=None, ats_job_id=None)
+    assert a.dedupe_key == b.dedupe_key == c.dedupe_key
 
 
 # ==========================================================================

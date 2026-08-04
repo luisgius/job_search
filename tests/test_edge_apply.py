@@ -719,11 +719,6 @@ def test_a_legal_suffix_appearing_in_the_company_name_does_not_reset_it(
     assert eligible(legal, apply_config(tmp_path), memory_tracker)[0] is False
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="a company rename re-keys every open requisition, so an "
-           "already-applied job becomes eligible again and is applied to twice",
-)
 def test_a_company_rename_does_not_reset_the_double_apply_guarantee(
         tmp_path: Path, memory_tracker):
     """`fetch_greenhouse` derives the company from the board slug unless the

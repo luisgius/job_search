@@ -922,11 +922,6 @@ def test_a_legal_suffix_merges_but_a_longer_trading_name_does_not():
     assert len(dedupe([plain, longer])) == 2
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="dedupe_key ignores the ATS id, so two distinct requisitions with the same "
-    "title in two cities of one country collapse into one and a real posting is lost",
-)
 def test_the_same_title_opened_in_berlin_and_munich_is_two_jobs():
     """A company opening one role per office publishes two requisitions with
     two ATS ids, two apply links and two hiring managers. Both resolve to DE,

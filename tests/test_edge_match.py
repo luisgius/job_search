@@ -880,29 +880,19 @@ def test_a_non_latin_company_name_degrades_to_untitled_but_stays_unique(tmp_path
     assert a != b
 
 
-def test_two_teams_at_one_company_are_saved_apart_by_the_slug_not_the_key(tmp_path: Path):
-    """"Senior Backend Engineer (Payments)" and "(Risk)" at the same company
-    normalise to the *same* `Job.key` — `normalize_title` drops parentheticals.
-    What keeps their tailored CVs apart is the human-readable slug, which is
-    built from the raw title. Worth knowing: shortening the slug, or building it
-    from the normalised title, would silently start overwriting one role's
-    documents with the other's."""
+def test_two_teams_at_one_company_get_separate_artifact_directories(tmp_path: Path):
+    """"Senior Backend Engineer (Payments)" and "(Risk)" are two requisitions,
+    not one. They must key apart AND write apart — a shared artifact directory
+    would have one role's tailored CV silently overwrite the other's, and the
+    user would send the wrong document."""
     cfg = tailor_config(tmp_path)
     payments = make_scored(score=90, ats=None, ats_job_id=None,
                            title="Senior Backend Engineer (Payments)")
     risk = make_scored(score=90, ats=None, ats_job_id=None,
                        title="Senior Backend Engineer (Risk)")
-    assert payments.key == risk.key          # one job as far as the tracker knows
 
-    cv_a = GOOD_CV.replace("Northwind", "Payments Team")
-    cv_b = GOOD_CV.replace("Northwind", "Risk Team")
-    tailor_jobs([payments, risk], BASE_CV, cfg,
-                client=llm_client([cv_a, GOOD_COVER, cv_b, GOOD_COVER]))
-
-    assert payments.artifacts.cv_md != risk.artifacts.cv_md
-    assert "Payments Team" in Path(payments.artifacts.cv_md).read_text(encoding="utf-8")
-    assert "Risk Team" in Path(risk.artifacts.cv_md).read_text(encoding="utf-8")
-
+    assert payments.key != risk.key
+    assert artifact_dir(payments.job, tmp_path) != artifact_dir(risk.job, tmp_path)
 
 def test_the_same_posting_tailored_twice_overwrites_its_own_documents(tmp_path: Path):
     """Tailoring has no identity check of its own — it trusts `filters.dedupe`.
