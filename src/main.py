@@ -65,8 +65,11 @@ cron (weekdays at 08:00 — `crontab -e`):
   0 8 * * 1-5 cd /path/to/job_search && .venv/bin/python -m src.main \\
       --no-browser >> output/cron.log 2>&1
 
-first run, before spending anything:
-  python -m src.main --validate-only
+before spending anything — prove the sources, then tune the filters:
+  python -m src.main --no-llm --validate-only
+  python -m src.main --no-llm             fetch + filter + digest, costs nothing
+
+then a cheap real run:
   python -m src.main --limit 3 --skip-apply
 """
 
@@ -170,6 +173,13 @@ def build_parser() -> argparse.ArgumentParser:
              "README section on auto-apply first)",
     )
 
+    parser.add_argument(
+        "--no-llm", action="store_true",
+        help="fetch and filter only: no scoring, no tailoring, no applying, "
+             "no API key and no CV needed. Everything that survives the "
+             "filters lands in the digest unscored. Costs nothing — use it to "
+             "prove your sources and tune your filters before spending.",
+    )
     parser.add_argument(
         "--skip-apply", action="store_true",
         help="skip the auto-apply stage entirely; everything lands in the digest",
@@ -472,6 +482,7 @@ def run_pipeline(
     sources: Iterable[str] | None = None,
     limit: int | None = None,
     skip_apply: bool = False,
+    skip_llm: bool = False,
 ) -> tuple[list[ScoredJob], RunStats]:
     """Run every stage and return `(scored_jobs, stats)`.
 
@@ -533,8 +544,8 @@ def run_pipeline(
     # -- 4. tracker gate --------------------------------------------------
     fresh = _gate_on_tracker(kept, rejected, tracker, config, stats, moment)
 
-    # -- 5. the CV (fatal when missing) -----------------------------------
-    cv_markdown = _read_cv(config)
+    # -- 5. the CV (fatal when missing, but only the LLM stages read it) ---
+    cv_markdown = "" if skip_llm else _read_cv(config)
 
     # -- 6. scoring -------------------------------------------------------
     if limit is not None and 0 <= limit < len(fresh):
@@ -542,14 +553,28 @@ def run_pipeline(
         fresh = fresh[:limit]
 
     scored_jobs: list[ScoredJob] = []
-    try:
-        scored_jobs = scoring.score_jobs(
-            fresh, cv_markdown, config, client=llm_client, errors=stats.errors
-        )
-    except Exception as exc:
-        logger.warning("scoring failed: %s", exc)
-        stats.errors.append(f"scoring failed: {exc}")
-    stats.scored = len(scored_jobs)
+    if skip_llm:
+        # Everything that survived the filters goes straight to the digest,
+        # unscored. `score=None` is a distinct state from "scored 0" and the
+        # digest renders it as such.
+        logger.info("--no-llm: %d job(s) to the digest unscored", len(fresh))
+        scored_jobs = [
+            ScoredJob(job=job, score=None, status=ApplyStatus.DIGEST,
+                      status_detail="not scored — this run used --no-llm")
+            for job in fresh
+        ]
+        stats.llm_skipped = True   # type: ignore[attr-defined]
+    else:
+        try:
+            scored_jobs = scoring.score_jobs(
+                fresh, cv_markdown, config, client=llm_client, errors=stats.errors
+            )
+        except Exception as exc:
+            logger.warning("scoring failed: %s", exc)
+            stats.errors.append(f"scoring failed: {exc}")
+    # Honest funnel: with --no-llm nothing was scored, however many jobs the
+    # digest ends up showing.
+    stats.scored = 0 if skip_llm else len(scored_jobs)
     # A "match" is anything the human now has to deal with: at or above the
     # threshold, plus anything the scorer could not judge (those reach the
     # digest unscored rather than being dropped). The apply stage only ever
@@ -560,7 +585,7 @@ def run_pipeline(
     )
 
     # -- 7. tailoring -----------------------------------------------------
-    if scored_jobs:
+    if scored_jobs and not skip_llm:
         try:
             scored_jobs = tailor.tailor_jobs(
                 scored_jobs, cv_markdown, config, client=llm_client, errors=stats.errors
@@ -577,7 +602,12 @@ def run_pipeline(
         stats.errors.append(f"PDF rendering failed: {exc}")
 
     # -- 9. auto-apply ----------------------------------------------------
-    if skip_apply:
+    if skip_llm:
+        # Nothing was scored and nothing was tailored, so there is no PDF and
+        # no score floor to clear. Saying so beats letting `eligible` refuse
+        # every job one at a time.
+        logger.info("--no-llm: auto-apply skipped, there is nothing to attach")
+    elif skip_apply:
         logger.info("--skip-apply: every match goes to the digest")
     elif not bool(_cfg(config, "apply.enabled", True)):
         logger.info("apply.enabled is false — every match goes to the digest")
@@ -666,7 +696,9 @@ def _run_cli(args: argparse.Namespace) -> int:
     # Re-apply now that the file (and -v) have had their say.
     setup_logging(str(_cfg(config, "logging.level", "INFO") or "INFO"))
 
-    problems = config.validate(require_llm=True)
+    # --no-llm means no scoring and no tailoring, so neither the API key nor
+    # the CV is required for the run to be meaningful.
+    problems = config.validate(require_llm=not args.no_llm)
     if problems:
         _print_problems(problems, str(args.config))
         return 1
@@ -687,6 +719,7 @@ def _run_cli(args: argparse.Namespace) -> int:
             sources=args.sources,
             limit=args.limit,
             skip_apply=bool(args.skip_apply),
+            skip_llm=bool(args.no_llm),
         )
         tracker.finish_run(run_id, stats.to_dict(), now=now)
 

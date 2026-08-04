@@ -679,3 +679,132 @@ def _scored(jobs):
                   score=Score(value=90, verdict="fits", model="test"))
         for job in jobs
     ]
+
+
+# ==========================================================================
+# --no-llm: fetch and filter only
+# ==========================================================================
+
+
+def no_llm_config(tmp_path: Path, **overrides):
+    """Deliberately no API key and NO CV — the point of the mode."""
+    base = {
+        "sources": {"greenhouse": True, "lever": False},
+        "output": {"dir": str(tmp_path / "output"), "open_browser": False},
+        "db": {"path": str(tmp_path / "output" / "tracker.sqlite3")},
+        "keys": {"anthropic": ""},
+    }
+    base.update(overrides or {})
+    return write_config(tmp_path, base, watchlist={"greenhouse": ["acme"]}, cv=None)
+
+
+def test_no_llm_needs_neither_a_key_nor_a_cv(tmp_path: Path, stub_sources,
+                                             memory_tracker):
+    """The whole point: prove the sources and tune the filters before paying
+    for anything, and before writing your CV."""
+    stub_sources.results["ats_boards"] = fresh_jobs(3)
+    scored, stats = run_pipeline(no_llm_config(tmp_path), tracker=memory_tracker,
+                                 now=NOW, skip_llm=True)
+    assert len(scored) == 3
+    assert Path(stats.digest_path).exists()
+
+
+def test_no_llm_makes_no_model_calls(tmp_path: Path, stub_sources, memory_tracker):
+    class Exploding:
+        def complete(self, **kw):
+            raise AssertionError("--no-llm called the model")
+
+        def complete_json(self, **kw):
+            raise AssertionError("--no-llm called the model")
+
+    stub_sources.results["ats_boards"] = fresh_jobs(2)
+    run_pipeline(no_llm_config(tmp_path), tracker=memory_tracker, now=NOW,
+                 skip_llm=True, llm_client=Exploding())
+
+
+def test_no_llm_leaves_jobs_unscored_rather_than_scored_zero(tmp_path: Path,
+                                                             stub_sources,
+                                                             memory_tracker):
+    """Rendering these as 0 would tell the reader "terrible fit" when the
+    truth is "nobody looked" — the opposite instruction."""
+    stub_sources.results["ats_boards"] = fresh_jobs(1)
+    scored, _ = run_pipeline(no_llm_config(tmp_path), tracker=memory_tracker,
+                             now=NOW, skip_llm=True)
+    assert scored[0].score is None
+    assert scored[0].status is ApplyStatus.DIGEST
+    assert "--no-llm" in scored[0].status_detail
+
+
+def test_the_digest_shows_an_unscored_job_as_a_dash(tmp_path: Path, stub_sources,
+                                                    memory_tracker):
+    from src.digest import build_context, render_html
+
+    stub_sources.results["ats_boards"] = fresh_jobs(1)
+    cfg = no_llm_config(tmp_path)
+    scored, stats = run_pipeline(cfg, tracker=memory_tracker, now=NOW, skip_llm=True)
+
+    item = build_context(scored, stats, cfg, now=NOW)["needs_click"][0]
+    assert item["unscored"] is True
+    assert item["score_label"] == "—"
+    assert item["score_class"] == "score-unscored"
+    assert "score-unscored" in render_html(build_context(scored, stats, cfg, now=NOW))
+
+
+def test_no_llm_reports_an_honest_funnel(tmp_path: Path, stub_sources,
+                                         memory_tracker):
+    """`scored` must read 0: nothing was scored, however many jobs the digest
+    ends up showing."""
+    stub_sources.results["ats_boards"] = fresh_jobs(4)
+    _, stats = run_pipeline(no_llm_config(tmp_path), tracker=memory_tracker,
+                            now=NOW, skip_llm=True)
+    assert stats.after_filters == 4
+    assert stats.scored == 0
+    assert stats.llm_skipped is True
+
+
+def test_no_llm_still_applies_the_hard_filters(tmp_path: Path, stub_sources,
+                                               memory_tracker):
+    """Otherwise it would not be a filter-tuning tool, which is its job."""
+    stub_sources.results["ats_boards"] = fresh_jobs(2) + [
+        make_job(company="US", location="San Francisco, CA", hours_old=1,
+                 ats_job_id="u"),
+        make_job(company="Stale", location="Berlin, Germany", hours_old=99,
+                 ats_job_id="s"),
+    ]
+    scored, stats = run_pipeline(no_llm_config(tmp_path), tracker=memory_tracker,
+                                 now=NOW, skip_llm=True)
+    assert len(scored) == 2
+    assert stats.filter_counts == {"stale": 1, "location_outside_eu": 1}
+
+
+def test_no_llm_never_applies(tmp_path: Path, stub_sources, memory_tracker):
+    """There is no score and no PDF, so there is nothing to submit."""
+    stub_sources.results["ats_boards"] = fresh_jobs(2)
+    cfg = no_llm_config(tmp_path, apply={"enabled": True, "dry_run": True})
+    scored, stats = run_pipeline(cfg, tracker=memory_tracker, now=NOW, skip_llm=True)
+    assert all(s.status is ApplyStatus.DIGEST for s in scored)
+    assert stats.auto_applied == 0 and stats.dry_run == 0
+
+
+def test_the_cli_accepts_no_llm_without_a_key_or_a_cv(tmp_path: Path, monkeypatch,
+                                                      capsys):
+    monkeypatch.setattr(main_module.ats_boards, "fetch",
+                        lambda config, **kw: fresh_jobs(2))
+    no_llm_config(tmp_path)
+    argv = ["--no-llm", "--no-browser", "--config", str(tmp_path / "config.yaml"),
+            "--watchlist", str(tmp_path / "watchlist.yaml")]
+
+    assert main(argv + ["--validate-only"]) == 0
+    assert main(argv) == 0
+    assert "digest:" in capsys.readouterr().out
+
+
+def test_without_no_llm_the_key_and_cv_are_still_required(tmp_path: Path, capsys):
+    """The mode relaxes validation; it must not relax it for everyone else."""
+    no_llm_config(tmp_path)
+    code = main(["--validate-only", "--config", str(tmp_path / "config.yaml"),
+                 "--watchlist", str(tmp_path / "watchlist.yaml")])
+    assert code == 1
+    err = capsys.readouterr().err
+    assert "API key" in err
+    assert "CV not found" in err

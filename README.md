@@ -222,10 +222,26 @@ remember that backup and sync clients do not honour `.gitignore`.
 
 ## Run
 
+**Start here — it costs nothing and needs no API key and no CV:**
+
 ```bash
-python -m src.main                    # the daily run; opens the digest when it finishes
-python -m src.main --no-browser       # same, opens nothing — use this in cron
-python -m src.main --limit 3 --skip-apply   # cheap smoke test, ~3 LLM calls
+python -m src.main --no-llm
+```
+
+Fetch, filter, digest. No scoring, no tailoring, no applying. Use it to prove
+your slugs actually return jobs and to tune `filters.countries` and
+`title_exclude` against real postings before you spend anything. Everything
+that survives the filters shows up in the digest marked `—` rather than a
+score, because "nobody looked" and "terrible fit" are opposite instructions to
+the reader.
+
+Once the digest looks like a list of jobs you would consider, add the key and
+the CV:
+
+```bash
+python -m src.main --limit 3 --skip-apply   # cheap real run, ~3 model calls
+python -m src.main                          # the daily run; opens the digest
+python -m src.main --no-browser             # same, opens nothing — for cron
 ```
 
 The digest lands at `output/digest_YYYY-MM-DD.html`, with a copy at
@@ -235,6 +251,7 @@ The digest lands at `output/digest_YYYY-MM-DD.html`, with a copy at
 |---|---|
 | `--config PATH` | path to `config.yaml` (default: `config.yaml`) |
 | `--watchlist PATH` | path to `watchlist.yaml` (default: `watchlist.yaml`) |
+| `--no-llm` | fetch + filter + digest only. No model calls, no key, no CV needed |
 | `--no-browser` | never open the digest when the run finishes |
 | `--dry-run` | force `apply.dry_run: true` — fill forms, submit nothing |
 | `--no-dry-run` | force `apply.dry_run: false` — really submit (read the section below) |

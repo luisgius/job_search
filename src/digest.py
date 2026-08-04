@@ -191,8 +191,12 @@ def _format_datetime(dt: datetime | None) -> str:
     return moment.strftime("%Y-%m-%d %H:%M UTC") if moment else ""
 
 
-def _score_class(value: int, failed: bool) -> str:
+def _score_class(value: int, failed: bool, unscored: bool = False) -> str:
     """Colour grade for the score badge. Kept out of the template on purpose."""
+    if unscored:
+        # Never grade an unscored job. Painting it red would say "bad fit"
+        # when the truth is "nobody looked".
+        return "score-unscored"
     if failed:
         return "score-error"
     if value >= 90:
@@ -248,6 +252,10 @@ def _item(scored: ScoredJob, *, digest_dir: Path, now: datetime) -> dict[str, An
     """
     job = scored.job
     score = scored.score
+    # No score at all is a third state, distinct from "scored 0" and from
+    # "the scorer failed": it is what `--no-llm` produces, and rendering it as
+    # 0 would tell the reader the exact opposite of the truth.
+    unscored = score is None
     failed = bool(score is not None and score.error)
     value = _int(getattr(score, "value", 0), 0)
 
@@ -291,8 +299,9 @@ def _item(scored: ScoredJob, *, digest_dir: Path, now: datetime) -> dict[str, An
         # say so rather than printing "posted —".
         "posted_label": f"posted {relative}" if job.posted_at else "no posting date",
         "score": value,
-        "score_label": "?" if failed else str(value),
-        "score_class": _score_class(value, failed),
+        "unscored": unscored,
+        "score_label": "—" if unscored else ("?" if failed else str(value)),
+        "score_class": _score_class(value, failed, unscored),
         "score_error": (score.error if failed else "") or "",
         "score_model": getattr(score, "model", "") or "",
         "verdict": (getattr(score, "verdict", "") or "").strip(),

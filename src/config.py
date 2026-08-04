@@ -343,7 +343,9 @@ class Config:
                         f"vendor-qualified — try 'anthropic/{model}'"
                     )
 
-        if not self.cv_path.exists():
+        # The CV only feeds scoring and tailoring, so it is required on the
+        # same terms as the API key: `--no-llm` needs neither.
+        if require_llm and not self.cv_path.exists():
             problems.append(f"CV not found at {self.cv_path} — paste your CV there")
 
         # `isinstance(True, int)` is True, and YAML turns a bare `yes` into a
