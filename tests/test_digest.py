@@ -175,6 +175,27 @@ def test_build_context_with_no_jobs_at_all(tmp_path: Path):
     assert ctx["funnel"]
 
 
+def test_filter_counts_ride_along_on_run_stats(tmp_path: Path):
+    """A cross-module contract worth pinning: `RunStats` has no
+    `filter_counts` field, so `main` attaches the FilterResult counts as a
+    dynamic attribute and the digest reads them off. Without them the funnel
+    shows 287 jobs vanishing with no explanation of why.
+    """
+    s = stats()
+    s.filter_counts = {"stale": 198, "location_outside_eu": 31, "undated": 12}
+    ctx = build_context([], s, digest_config(tmp_path), now=NOW)
+    assert ctx["filter_counts"]["stale"] == 198
+    # Displayed biggest-first, since that is the one worth acting on.
+    assert list(ctx["filter_counts"]) == ["stale", "location_outside_eu", "undated"]
+    assert "198" in render_html(ctx)
+
+
+def test_missing_filter_counts_is_not_an_error(tmp_path: Path):
+    ctx = build_context([], RunStats(), digest_config(tmp_path), now=NOW)
+    assert ctx["filter_counts"] == {}
+    assert render_html(ctx)
+
+
 # ==========================================================================
 # render_html — escaping
 # ==========================================================================
