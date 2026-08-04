@@ -24,7 +24,7 @@ from collections.abc import Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from .llm import LLMClient, LLMError
+from .llm import LLMError, client_from_config
 from .models import ApplyStatus, Job, Score, ScoredJob
 from .util import get_logger, truncate
 
@@ -309,10 +309,10 @@ def parse_score(payload: Mapping[str, Any] | Any) -> Score:
 
 
 def _resolve_client(config: Any, client: Any) -> Any:
-    """Return the injected client, or build one from `keys.anthropic`."""
+    """Return the injected client, or build the one `llm.provider` asks for."""
     if client is not None:
         return client
-    return LLMClient(str(_cfg(config, "keys.anthropic", "") or ""))
+    return client_from_config(config)
 
 
 def score_job(job: Job, cv_markdown: str, config: Any, *, client: Any = None) -> Score:

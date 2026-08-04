@@ -26,7 +26,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-from .llm import LLMClient, LLMError
+from .llm import LLMError, client_from_config
 from .models import ApplyStatus, Artifacts, Job, ScoredJob, normalize_text
 from .util import ensure_dir, get_logger, slugify, truncate
 
@@ -321,9 +321,10 @@ def validate_tailored_cv(
 
 
 def _resolve_client(config: Any, client: Any) -> Any:
+    """Return the injected client, or build the one `llm.provider` asks for."""
     if client is not None:
         return client
-    return LLMClient(str(_cfg(config, "keys.anthropic", "") or ""))
+    return client_from_config(config)
 
 
 def _write_job_json(path: Path, scored: ScoredJob) -> None:

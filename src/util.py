@@ -114,6 +114,57 @@ def http_get_json(url: str, **kwargs: Any) -> Any:
         raise HttpError(f"{url} did not return JSON: {exc}") from exc
 
 
+def http_post_json(
+    url: str,
+    *,
+    json: Any = None,
+    headers: dict[str, str] | None = None,
+    timeout: int = 120,
+    retries: int = 1,
+    backoff: float = 1.5,
+    session: Any = None,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Any:
+    """POST JSON, get JSON back.
+
+    Separate from `http_get` because a POST is not idempotent: retrying one
+    blind can mean paying for the same model call twice. The default is a
+    single attempt, and callers that own a retry loop (`llm.LLMClient`) keep
+    it that way. The generous default timeout is for the same reason — a
+    completion legitimately takes a minute.
+    """
+    import requests  # local import: keeps stdlib-only tests importable
+
+    sess = session or requests
+    merged = {"User-Agent": USER_AGENT, "Content-Type": "application/json"}
+    merged.update(headers or {})
+
+    last_error: Exception | None = None
+    for attempt in range(max(1, retries)):
+        if attempt:
+            sleep(backoff ** attempt)
+        try:
+            response = sess.post(url, json=json, headers=merged, timeout=timeout)
+        except Exception as exc:
+            last_error = exc
+            continue
+        status = getattr(response, "status_code", 0)
+        if status >= 400:
+            # The body usually explains *why*; surface a slice of it, since
+            # "HTTP 400" alone sends people to the wrong problem.
+            detail = ""
+            try:
+                detail = f" — {str(response.text)[:300]}"
+            except Exception:
+                pass
+            raise HttpError(f"{url} -> HTTP {status}{detail}")
+        try:
+            return response.json()
+        except Exception as exc:
+            raise HttpError(f"{url} did not return JSON: {exc}") from exc
+    raise HttpError(f"POST {url} failed after {retries} attempt(s): {last_error}")
+
+
 # --------------------------------------------------------------------------
 # text
 # --------------------------------------------------------------------------

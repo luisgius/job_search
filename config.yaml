@@ -12,10 +12,20 @@ applicant:
   github: ""
   website: ""
 
+llm:
+  # "anthropic" talks to the SDK directly.
+  # "openrouter" speaks the OpenAI chat-completions dialect over plain HTTP —
+  # which also covers any other OpenAI-compatible gateway (LiteLLM, a local
+  # vLLM, a corporate proxy) by setting base_url below.
+  provider: anthropic
+  base_url: ""             # only for a non-OpenRouter compatible gateway
+
 keys:
   # Environment variables ALWAYS win over anything written here, so you can
-  # leave these blank and export ANTHROPIC_API_KEY instead.
+  # leave these blank and export the key instead. Only the key belonging to
+  # llm.provider is used — the others are ignored.
   anthropic: ""            # or env ANTHROPIC_API_KEY
+  openrouter: ""           # or env OPENROUTER_API_KEY
   adzuna_app_id: ""        # or env ADZUNA_APP_ID
   adzuna_app_key: ""       # or env ADZUNA_APP_KEY
 
@@ -55,6 +65,9 @@ filters:
   min_description_chars: 0
 
 scoring:
+  # With provider: openrouter, model ids are vendor-qualified —
+  # "anthropic/claude-sonnet-5", "openai/gpt-5", "google/gemini-2.5-pro".
+  # A bare name is a 404 from OpenRouter; --validate-only catches that.
   model: claude-sonnet-5   # claude-haiku-4-5-20251001 is ~10x cheaper, a bit blunter
   threshold: 65            # 65 medium · 75 strict
   max_jobs: 40             # hard cap on LLM calls per run — your cost ceiling

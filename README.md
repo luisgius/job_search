@@ -77,6 +77,52 @@ Then trim `filters.countries` to the countries you can actually work in, and
 set `scoring.threshold` (65 is medium, 75 is strict). Every other key has a
 working default in `src/config.py`.
 
+#### Choosing a model provider
+
+Two providers, one behaviour — `scoring` and `tailoring` never learn which is
+in use, and the retry policy is identical either way.
+
+```yaml
+llm:
+  provider: anthropic        # the SDK, direct
+keys:
+  anthropic: ""              # or export ANTHROPIC_API_KEY
+```
+
+```yaml
+llm:
+  provider: openrouter       # one key, every model
+keys:
+  openrouter: ""             # or export OPENROUTER_API_KEY
+scoring:
+  model: anthropic/claude-sonnet-5
+tailoring:
+  model: anthropic/claude-sonnet-5
+```
+
+On OpenRouter, **model ids are vendor-qualified**: `anthropic/claude-sonnet-5`,
+`openai/gpt-5`, `google/gemini-2.5-pro`. A bare `claude-sonnet-5` is a 404 —
+`--validate-only` catches that before you spend anything.
+
+Only the key belonging to `llm.provider` is read. Leaving a stale
+`keys.anthropic` in place while running on OpenRouter cannot silently keep
+using it.
+
+`llm.base_url` points the same transport at any OpenAI-compatible gateway —
+LiteLLM, a local vLLM, a corporate proxy:
+
+```yaml
+llm:
+  provider: openrouter
+  base_url: "http://localhost:4000/v1"
+```
+
+A note on mixing: it is reasonable to score with something cheap and tailor
+with something strong, since tailoring is what you actually send. `scoring.model`
+and `tailoring.model` are independent.
+
+---
+
 ### 3. Name the companies in `watchlist.yaml`
 
 Slugs come out of the URL on a company's careers page:

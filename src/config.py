@@ -34,8 +34,16 @@ DEFAULTS: dict[str, Any] = {
     },
     "keys": {
         "anthropic": "",
+        "openrouter": "",
         "adzuna_app_id": "",
         "adzuna_app_key": "",
+    },
+    "llm": {
+        # "anthropic" talks to the SDK; "openrouter" speaks the OpenAI
+        # chat-completions dialect over plain HTTP, which also covers any
+        # other OpenAI-compatible gateway via `base_url`.
+        "provider": "anthropic",
+        "base_url": "",
     },
     "sources": {
         "greenhouse": True,
@@ -151,6 +159,7 @@ WATCHLIST_DEFAULTS: dict[str, Any] = {
 # config path -> environment variable that overrides it
 ENV_OVERRIDES: dict[tuple[str, ...], str] = {
     ("keys", "anthropic"): "ANTHROPIC_API_KEY",
+    ("keys", "openrouter"): "OPENROUTER_API_KEY",
     ("keys", "adzuna_app_id"): "ADZUNA_APP_ID",
     ("keys", "adzuna_app_key"): "ADZUNA_APP_KEY",
 }
@@ -257,7 +266,22 @@ class Config:
         return self.section("applicant")
 
     @property
+    def provider(self) -> str:
+        return str(self.get("llm.provider", "anthropic") or "anthropic").strip().lower()
+
+    @property
+    def llm_key(self) -> str:
+        """The key belonging to the *configured* provider.
+
+        Always ask via the provider, never by hard-coding `keys.anthropic`:
+        reading the wrong one is how a switched provider silently keeps using
+        the old credential.
+        """
+        return str(self.get(f"keys.{self.provider}") or "")
+
+    @property
     def anthropic_key(self) -> str:
+        # Kept for callers that genuinely mean Anthropic specifically.
         return str(self.get("keys.anthropic") or "")
 
     @property
@@ -294,11 +318,30 @@ class Config:
         elif "@" not in email or "." not in email.split("@")[-1]:
             problems.append(f"applicant.email does not look like an address: {email!r}")
 
-        if require_llm and not self.anthropic_key:
+        provider = self.provider
+        if provider not in ("anthropic", "openrouter"):
             problems.append(
-                "No Anthropic API key — set keys.anthropic in config.yaml "
-                "or export ANTHROPIC_API_KEY"
+                f"llm.provider must be 'anthropic' or 'openrouter', got {provider!r}"
             )
+        elif require_llm and not self.llm_key:
+            env = {"anthropic": "ANTHROPIC_API_KEY",
+                   "openrouter": "OPENROUTER_API_KEY"}[provider]
+            problems.append(
+                f"No {provider} API key — set keys.{provider} in config.yaml "
+                f"or export {env}"
+            )
+
+        # OpenRouter model ids are vendor-qualified. A bare "claude-sonnet-5"
+        # is a 404 from OpenRouter, and the run would burn a stage discovering
+        # that once per job.
+        if provider == "openrouter":
+            for path in ("scoring.model", "tailoring.model"):
+                model = str(self.get(path) or "")
+                if model and "/" not in model:
+                    problems.append(
+                        f"{path} is {model!r}, but OpenRouter model ids are "
+                        f"vendor-qualified — try 'anthropic/{model}'"
+                    )
 
         if not self.cv_path.exists():
             problems.append(f"CV not found at {self.cv_path} — paste your CV there")

@@ -49,8 +49,41 @@ _FENCE_RE = re.compile(r"```([A-Za-z0-9_+-]*)[ \t]*\r?\n?(.*?)(?:```|\Z)", re.DO
 _MAX_CANDIDATES = 40
 
 
+#: Providers `LLMClient` can talk to.
+PROVIDERS: tuple[str, ...] = ("anthropic", "openrouter")
+
+DEFAULT_PROVIDER = "anthropic"
+
+#: OpenRouter speaks the OpenAI chat-completions dialect, so this base URL also
+#: works for any other OpenAI-compatible gateway (LiteLLM, vLLM, Together...)
+#: via `llm.base_url`.
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+#: OpenRouter uses these for attribution on its public leaderboards. Optional,
+#: and deliberately generic — nothing here identifies the user.
+OPENROUTER_REFERER = "https://github.com/job-hunter"
+OPENROUTER_TITLE = "job-hunter"
+
+#: Where each provider's key comes from. Config path -> env var.
+PROVIDER_KEYS: dict[str, tuple[str, str]] = {
+    "anthropic": ("keys.anthropic", "ANTHROPIC_API_KEY"),
+    "openrouter": ("keys.openrouter", "OPENROUTER_API_KEY"),
+}
+
+
 class LLMError(RuntimeError):
-    """Any failure to get a usable answer out of the model."""
+    """Any failure to get a usable answer out of the model.
+
+    `status_code` and `transient` are optional and exist for the HTTP
+    transport, which has no SDK exception classes to classify by. Both default
+    to None, so every plain `LLMError("...")` behaves exactly as before.
+    """
+
+    def __init__(self, message: Any = "", *, status_code: int | None = None,
+                 transient: bool | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.transient = transient
 
 
 # --------------------------------------------------------------------------
@@ -58,8 +91,14 @@ class LLMError(RuntimeError):
 # --------------------------------------------------------------------------
 
 
+#: Last resort for statuses that only exist in an error's text — which is the
+#: case for every OpenRouter failure, since those arrive as an `HttpError`
+#: whose message embeds "-> HTTP 429" rather than an attribute.
+_TEXT_STATUS_RE = re.compile(r"\bHTTP[: ]+(\d{3})\b")
+
+
 def _status_code(exc: BaseException) -> int | None:
-    """Best-effort HTTP status from an SDK exception, or None."""
+    """Best-effort HTTP status from an exception, or None."""
     for candidate in (
         getattr(exc, "status_code", None),
         getattr(getattr(exc, "response", None), "status_code", None),
@@ -70,20 +109,31 @@ def _status_code(exc: BaseException) -> int | None:
             return int(candidate)
         except (TypeError, ValueError):
             continue
-    return None
+    found = _TEXT_STATUS_RE.search(str(exc))
+    return int(found.group(1)) if found else None
 
 
 def _is_transient(exc: BaseException) -> bool:
     """Should this failure be retried?
 
-    An explicit status wins over the class name: a 400 named
+    An explicit verdict wins over everything: the HTTP transport already knows
+    whether a failure was a status or a dead socket, and it has no SDK
+    exception classes to be classified by.
+
+    Otherwise an explicit status wins over the class name: a 400 named
     `InternalServerError` is still a malformed request, and retrying it just
     burns the budget. Only when there is no status do we fall back to the name
     (that is the `APIConnectionError` / socket-level case, which has none).
     """
+    verdict = getattr(exc, "transient", None)
+    if verdict is not None:
+        return bool(verdict)
+
     status = _status_code(exc)
     if status is not None:
-        return status in RETRYABLE_STATUS
+        # Any 5xx is worth one more try: gateways in front of both providers
+        # emit 504/520/524, which an explicit allow-list keeps missing.
+        return status in RETRYABLE_STATUS or 500 <= status < 600
     name = type(exc).__name__.lower()
     return any(token in name for token in _TRANSIENT_NAME_TOKENS)
 
@@ -97,6 +147,46 @@ def _block_text(block: Any) -> str:
     if str(getattr(block, "type", "text")) != "text":
         return ""
     return str(getattr(block, "text", "") or "")
+
+
+def _openrouter_text(payload: Any) -> str:
+    """Pull the assistant text out of an OpenAI-style chat completion.
+
+    Handles the three shapes seen in the wild: `content` as a plain string,
+    `content` as a list of `{"type": "text", "text": ...}` parts (some models
+    on OpenRouter answer this way), and a provider-level `error` object
+    returned with HTTP 200 — which is the one that would otherwise be read as
+    an empty answer and silently scored 0.
+    """
+    if not isinstance(payload, Mapping):
+        raise LLMError(f"openrouter returned {type(payload).__name__}, not an object")
+
+    error = payload.get("error")
+    if isinstance(error, Mapping) and error:
+        message = error.get("message") or error
+        raise LLMError(f"openrouter error: {message}")
+
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise LLMError(f"openrouter returned no choices: {str(payload)[:200]}")
+
+    message = choices[0].get("message") if isinstance(choices[0], Mapping) else None
+    if not isinstance(message, Mapping):
+        raise LLMError("openrouter choice carried no message")
+
+    content = message.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for part in content:
+            if isinstance(part, Mapping):
+                parts.append(str(part.get("text") or ""))
+            elif isinstance(part, str):
+                parts.append(part)
+        return "".join(parts)
+    # Reasoning models sometimes answer with only `reasoning` populated.
+    return str(message.get("reasoning") or "")
 
 
 def _message_text(message: Any) -> str:
@@ -117,11 +207,21 @@ def _message_text(message: Any) -> str:
 
 
 class LLMClient:
-    """Anthropic wrapper with retries, injectable for tests.
+    """Model wrapper with retries, injectable for tests.
 
-    `client=` is the seam: pass anything exposing `.messages.create(**kwargs)`
-    and no SDK import happens. Without it the real client is built lazily on
-    first use.
+    Two providers, one surface. `complete()` and `complete_json()` behave
+    identically whichever is in use, so `scoring` and `tailor` never learn
+    which one they are talking to.
+
+      anthropic   the SDK. Seam: `client=` — pass anything exposing
+                  `.messages.create(**kwargs)` and no SDK import happens.
+      openrouter  the OpenAI chat-completions dialect over plain HTTP, which
+                  also covers any OpenAI-compatible gateway via `base_url=`.
+                  Seam: `session=` — the same `FakeSession` the sources use.
+
+    Model names are passed through untouched. On OpenRouter they are
+    vendor-qualified (`anthropic/claude-sonnet-5`, `openai/gpt-5`); mapping
+    them automatically would silently send work to a model you did not choose.
     """
 
     def __init__(
@@ -129,20 +229,41 @@ class LLMClient:
         api_key: str,
         *,
         client: Any = None,
+        provider: str = DEFAULT_PROVIDER,
+        base_url: str | None = None,
+        session: Any = None,
         max_retries: int = DEFAULT_MAX_RETRIES,
         sleep: Callable[[float], None] | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
+        self.provider = str(provider or DEFAULT_PROVIDER).strip().lower()
+        if self.provider not in PROVIDERS:
+            raise LLMError(
+                f"unknown llm.provider {provider!r} — expected one of "
+                f"{', '.join(PROVIDERS)}"
+            )
         self.api_key = str(api_key or "")
         self.max_retries = max(0, int(max_retries))
         self._sleep = sleep or time.sleep
         self._injected = client
+        self._session = session
         self._real: Any = None
-        if client is None and not self.api_key:
+        self._extra_headers = dict(headers or {})
+        self.base_url = str(
+            base_url or (OPENROUTER_BASE_URL if self.provider == "openrouter" else "")
+        ).rstrip("/")
+
+        # A key is only dispensable when a seam replaces the transport.
+        has_seam = client is not None or (
+            self.provider == "openrouter" and session is not None
+        )
+        if not has_seam and not self.api_key:
             # Fail here rather than three stages later with a stack trace from
             # inside the SDK. `config.validate` catches this first in practice.
+            path, env = PROVIDER_KEYS[self.provider]
             raise LLMError(
-                "No Anthropic API key — set keys.anthropic in config.yaml or "
-                "export ANTHROPIC_API_KEY"
+                f"No {self.provider} API key — set {path} in config.yaml or "
+                f"export {env}"
             )
 
     # -- plumbing ---------------------------------------------------------
@@ -162,6 +283,71 @@ class LLMClient:
                 ) from exc
             self._real = anthropic.Anthropic(api_key=self.api_key)
         return self._real
+
+    # -- transports -------------------------------------------------------
+
+    def _call_anthropic(self, *, model: str, system: str, prompt: str,
+                        max_tokens: int, temperature: float) -> str:
+        response = self.client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system=system,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return _message_text(response)
+
+    def _call_openrouter(self, *, model: str, system: str, prompt: str,
+                         max_tokens: int, temperature: float) -> str:
+        """One OpenAI-style chat completion over plain HTTP.
+
+        Deliberately not the `openai` SDK: this is one POST, and going through
+        `util.http_post_json` keeps the retry/User-Agent behaviour identical to
+        every other network call in the project and makes `session=` the same
+        seam the sources already use.
+
+        The system prompt becomes a `system` role message, which is how the
+        chat-completions dialect expresses what Anthropic passes separately.
+        """
+        from .util import HttpError, http_post_json
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            # Attribution headers OpenRouter asks for; nothing user-identifying.
+            "HTTP-Referer": OPENROUTER_REFERER,
+            "X-Title": OPENROUTER_TITLE,
+        }
+        headers.update(self._extra_headers)
+
+        payload = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": (
+                ([{"role": "system", "content": system}] if system else [])
+                + [{"role": "user", "content": prompt}]
+            ),
+        }
+        try:
+            data = http_post_json(
+                f"{self.base_url}/chat/completions",
+                json=payload,
+                headers=headers,
+                session=self._session,
+                retries=1,           # LLMClient owns the retry loop, not util
+            )
+        except HttpError as exc:
+            # Translate into the vocabulary the retry loop understands. A
+            # status means the server answered and we can judge it; no status
+            # means the socket died, which is the same case the Anthropic SDK
+            # reports as APIConnectionError and retries.
+            status = _status_code(exc)
+            if status is None:
+                raise LLMError(f"openrouter request failed: {exc}",
+                               transient=True) from exc
+            raise LLMError(str(exc), status_code=status) from exc
+        return _openrouter_text(data)
 
     # -- calls ------------------------------------------------------------
 
@@ -189,15 +375,22 @@ class LLMClient:
             if attempt:
                 sleeper(RETRY_BASE_DELAY * (2 ** (attempt - 1)))
             try:
-                response = self.client.messages.create(
-                    model=model,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    system=system,
-                    messages=[{"role": "user", "content": prompt}],
+                call = (self._call_openrouter if self.provider == "openrouter"
+                        else self._call_anthropic)
+                text = call(model=model, system=system, prompt=prompt,
+                            max_tokens=max_tokens, temperature=temperature)
+            except LLMError as exc:
+                # An HTTP-layer LLMError can still be transient (429/5xx), so
+                # it is classified like any other failure rather than re-raised
+                # blind — otherwise OpenRouter would never retry at all.
+                last = exc
+                if not _is_transient(exc):
+                    raise
+                logger.warning(
+                    "transient LLM error from %s (attempt %d/%d): %s",
+                    model, attempt + 1, attempts, exc,
                 )
-            except LLMError:
-                raise
+                continue
             except Exception as exc:
                 last = exc
                 if not _is_transient(exc):
@@ -208,7 +401,6 @@ class LLMClient:
                 )
                 continue
 
-            text = _message_text(response)
             if not text.strip():
                 logger.warning("%s returned no text content", model)
             return text
@@ -386,3 +578,61 @@ def extract_json(text: str) -> dict[str, Any]:
 
     preview = raw.strip().replace("\n", " ")[:200]
     raise LLMError(f"no JSON object found in model response: {preview!r}")
+
+
+# --------------------------------------------------------------------------
+# building a client from config
+# --------------------------------------------------------------------------
+
+
+def _cfg(config: Any, dotted: str, default: Any = None) -> Any:
+    """Read a dotted key from a `Config` *or* a bare nested dict."""
+    if config is None:
+        return default
+    if isinstance(config, Mapping):
+        node: Any = config
+        for part in dotted.split("."):
+            if not isinstance(node, Mapping) or part not in node:
+                return default
+            node = node[part]
+        return node
+    getter = getattr(config, "get", None)
+    return getter(dotted, default) if callable(getter) else default
+
+
+def provider_of(config: Any) -> str:
+    """The configured provider name, normalised and validated."""
+    name = str(_cfg(config, "llm.provider", DEFAULT_PROVIDER) or DEFAULT_PROVIDER)
+    name = name.strip().lower()
+    if name not in PROVIDERS:
+        raise LLMError(
+            f"unknown llm.provider {name!r} — expected one of {', '.join(PROVIDERS)}"
+        )
+    return name
+
+
+def api_key_for(config: Any, provider: str | None = None) -> str:
+    """The key belonging to the configured provider.
+
+    Reading `keys.anthropic` while `llm.provider` is `openrouter` is how a
+    switched provider silently keeps using the old credential, so the lookup
+    is always driven by the provider rather than hard-coded.
+    """
+    name = provider or provider_of(config)
+    path, _env = PROVIDER_KEYS[name]
+    return str(_cfg(config, path, "") or "")
+
+
+def client_from_config(config: Any, **kwargs: Any) -> "LLMClient":
+    """Build the `LLMClient` the config asks for.
+
+    The single place that knows how provider, key and base URL fit together —
+    `scoring` and `tailor` just call this and stay provider-agnostic.
+    """
+    provider = provider_of(config)
+    return LLMClient(
+        api_key_for(config, provider),
+        provider=provider,
+        base_url=str(_cfg(config, "llm.base_url", "") or "") or None,
+        **kwargs,
+    )
