@@ -1,11 +1,32 @@
 # Testing
 
+**881 tests, ~37s, fully offline.**
+
 ```bash
 pytest -q                      # the whole suite, offline, no API key, no browser
 pytest -q tests/test_db.py     # one module
 pytest -q -k "double_apply or inspect_form"
 pytest --cov=src --cov-report=term-missing
 ```
+
+| File | Tests | Defends |
+|---|---:|---|
+| `test_geo.py` | 134 | US/EU city collisions — the expensive mistake |
+| `test_autoapply.py` | 133 | **the screener-bail guarantee** |
+| `test_ats_boards.py` | 71 | Greenhouse/Lever payload reality |
+| `test_util.py` | 59 | retries, HTML flattening, every ATS date shape |
+| `test_filters.py` | 58 | whole-word matching, dedupe richness |
+| `test_linkedin_email.py` | 52 | leniency under LinkedIn template change |
+| `test_scoring.py` | 49 | a job is never silently lost |
+| `test_models.py` | 45 | job identity — the tracker's primary key |
+| `test_llm.py` | 43 | JSON recovery, retry policy |
+| `test_tailor.py` | 42 | **the anti-fabrication guarantee** |
+| `test_db.py` | 40 | **the double-apply guarantee** |
+| `test_digest.py` | 36 | escaping, and legibility of failure |
+| `test_config.py` | 36 | env-beats-file, validate-everything-at-once |
+| `test_main.py` | 35 | the pipeline end to end, offline |
+| `test_adzuna.py` | 32 | snippets, duplicates, key redaction |
+| `test_pdf.py` | 16 | every half-failure of the user's hook |
 
 The suite runs with **PyYAML, Jinja2 and pytest** installed and nothing else.
 `anthropic`, `playwright`, `googleapiclient`, `requests` and `reportlab` are
