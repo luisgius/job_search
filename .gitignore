@@ -10,7 +10,9 @@ cv/*.md
 cv/*.pdf
 
 # --- pipeline output: regenerated every run ---
-output/
+# `output/*` rather than `output/`: git does not descend into an ignored
+# directory, so the negation below would never be reached.
+output/*
 !output/.gitkeep
 
 # --- your PDF hook is yours; the example stays tracked ---
