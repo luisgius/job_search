@@ -127,6 +127,37 @@ MARKETING_HINTS: tuple[str, ...] = (
     "future opportunities", "talent community", "mailing list",
 )
 
+#: Screener vocabulary in the languages an EU-focused search actually meets.
+#: An English-only trigger list is not a smaller safety net, it is a hole: the
+#: German Greenhouse form that asks "Gehaltsvorstellung" looked, to the
+#: classifier, exactly like a form that asked nothing at all.
+#:
+#: Matched against `_field_text`, which is accent-folded, so "Kündigungsfrist"
+#: arrives as "kuendigungsfrist"... except that folding gives "kundigungsfrist"
+#: (ü -> u), so both spellings are listed.
+_NON_ENGLISH_QUESTION_TERMS: tuple[str, ...] = (
+    # German
+    r"warum", r"weshalb", r"wieso", r"beschreiben", r"erzahlen", r"erzaehlen",
+    r"gehalt\w*", r"verguetung", r"vergutung", r"kundigungsfrist",
+    r"kuendigungsfrist", r"eintrittstermin", r"eintrittsdatum",
+    r"verfugbar\w*", r"verfuegbar\w*", r"berufserfahrung", r"aufmerksam geworden",
+    r"arbeitserlaubnis", r"visum", r"staatsangehorigkeit", r"geschlecht",
+    r"schwerbehind\w*",
+    # French
+    r"pourquoi", r"decrivez", r"decrire", r"pretentions?", r"remuneration",
+    r"salariales?", r"preavis", r"disponibilite", r"annees d experience",
+    r"autorisation de travail", r"nationalite",
+    # Spanish / Portuguese
+    r"por que", r"porque", r"describe", r"descreva", r"expectativas?",
+    r"salarial\w*", r"pretensao", r"preaviso", r"disponibilidad\w*",
+    r"anos de experiencia", r"permiso de trabajo", r"nacionalidad",
+    # Dutch
+    r"waarom", r"beschrijf", r"salaris\w*", r"opzegtermijn", r"beschikbaar\w*",
+    r"werkvergunning",
+    # Italian
+    r"perche", r"descrivi", r"retribuzione", r"preavviso", r"disponibilita",
+)
+
 #: Labels that mean the form is asking a question. Matched against the
 #: normalised label+name+id; a literal "?" is checked separately on the raw
 #: text because normalisation strips punctuation.
@@ -159,7 +190,7 @@ QUESTION_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
         r"\byears of experience\b",
         r"\bhow many years\b",
         r"\bportfolio required\b",
-    )
+    ) + tuple(rf"\b{term}\b" for term in _NON_ENGLISH_QUESTION_TERMS)
 )
 
 
@@ -718,11 +749,18 @@ def _find_submit(page: Any) -> str | None:
     return None
 
 
-def _confirmed(page: Any, timeout_ms: int) -> str | None:
+def _confirmed(page: Any, timeout_ms: int, before: str | None = None) -> str | None:
     """Wait for any confirmation signal. Returns the signal, or None.
 
     The per-selector budget is split so a form with no confirmation cannot
     stall the run for `len(CONFIRMATION_SELECTORS)` × the full timeout.
+
+    `before` is the page text captured *before* the submit click, and it is
+    what makes the text fallback mean anything. A plain substring search over
+    the whole page matches a posting whose own ad says "thanks for applying" —
+    and a false confirmation is the worst outcome in this module: the run
+    records APPLIED for an application that was never sent, and the tracker
+    then blocks the real one forever.
     """
     budget = max(1000, timeout_ms // max(1, len(CONFIRMATION_SELECTORS)))
     for selector in CONFIRMATION_SELECTORS:
@@ -735,10 +773,59 @@ def _confirmed(page: Any, timeout_ms: int) -> str | None:
         content = str(page.content() or "").lower()
     except Exception:
         return None
+    prior = str(before or "").lower()
     for phrase in CONFIRMATION_TEXTS:
-        if phrase in content:
+        if phrase in content and phrase not in prior:
             return phrase
     return None
+
+
+def _write_orphan_record(
+    scored: ScoredJob,
+    artifacts_dir: Path | None,
+    method: str,
+    now: datetime,
+    error: Exception,
+) -> None:
+    """Last-resort durable note that an application was really sent.
+
+    The tracker is the system of record; when writing to it fails, the fact
+    that a human sent an application must not evaporate with the process.
+    """
+    try:
+        target = Path(artifacts_dir) if artifacts_dir else Path.cwd()
+        ensure_dir(target)
+        (target / "APPLIED_BUT_UNRECORDED.txt").write_text(
+            f"An application WAS submitted and the tracker write failed.\n\n"
+            f"when:    {now.isoformat()}\n"
+            f"job:     {scored.job.label}\n"
+            f"url:     {scored.job.url}\n"
+            f"key:     {scored.job.key}\n"
+            f"method:  {method}\n"
+            f"error:   {error}\n\n"
+            "Record this by hand before the next run, or it will be sent again.\n",
+            encoding="utf-8",
+        )
+    except Exception as exc:  # pragma: no cover - nothing left to try
+        logger.error("could not even write the orphan record: %s", exc)
+
+
+def _form_still_present(page: Any) -> bool:
+    """Are there still form fields on screen after clicking submit?
+
+    Greenhouse and Lever both replace the form with a confirmation page that
+    has no application fields, so fields still being there means we are still
+    inside the flow — either validation rejected the submission, or that click
+    was a "Next" on a multi-page form and the screener is on page two. Either
+    way nothing was sent, and the job must stay eligible.
+
+    If the page cannot be read at all the honest answer is "no idea", and this
+    returns False so the caller takes the cautious branch and blocks a retry.
+    """
+    try:
+        return bool(collect_fields(page))
+    except Exception:
+        return False
 
 
 def _record(
@@ -776,6 +863,18 @@ def _record(
             now=now,
         )
     except Exception as exc:
+        if outcome.status in (ApplyStatus.APPLIED,
+                              ApplyStatus.SUBMITTED_UNCONFIRMED):
+            # An application really was sent and the only record of it just
+            # failed to save. Swallowing this makes the job invisible to
+            # tomorrow's run, which then sends a second one. Shout, and leave a
+            # file behind that survives the process.
+            logger.error(
+                "APPLIED to %s but could not record it (%s) — tomorrow's run "
+                "cannot see this. Recording it on disk instead.",
+                scored.job.url, exc,
+            )
+            _write_orphan_record(scored, artifacts_dir, method, now, exc)
         logger.warning("could not record %s for %s: %s",
                        outcome.status, scored.job.key, exc)
     return outcome
@@ -881,6 +980,11 @@ def apply_one(
                 except Exception as exc:
                     logger.warning("could not tick consent box: %s", exc)
 
+        try:
+            before_submit = str(page.content() or "")
+        except Exception:
+            before_submit = ""
+
         submit = _find_submit(page)
         if submit is None:
             return finish(
@@ -890,11 +994,26 @@ def apply_one(
             )
         page.click(submit)
 
-        signal = _confirmed(page, timeout_ms)
+        signal = _confirmed(page, timeout_ms, before=before_submit)
         if signal is None:
+            # Two very different situations look identical from here, and
+            # conflating them is expensive in both directions.
+            if _form_still_present(page):
+                # The form is still on screen: client-side validation rejected
+                # the submission and nothing left the machine. The job must
+                # stay eligible, or a fixable problem costs the application.
+                return finish(
+                    ApplyStatus.APPLY_FAILED,
+                    "submit was rejected by the form and nothing was sent — "
+                    f"check manually: {job.url}",
+                    shot,
+                )
+            # The page is gone or unreadable. The POST may well have landed.
+            # Blocking a possible duplicate beats sending one.
             return finish(
-                ApplyStatus.APPLY_FAILED,
-                f"clicked submit but saw no confirmation — check manually: {job.url}",
+                ApplyStatus.SUBMITTED_UNCONFIRMED,
+                "clicked submit but could not read a confirmation — treated as "
+                f"sent so it is never sent twice. CHECK MANUALLY: {job.url}",
                 shot,
             )
         logger.info("applied to %s via %s", job.label, method or "form")

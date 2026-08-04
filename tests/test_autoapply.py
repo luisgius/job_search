@@ -569,14 +569,37 @@ def test_a_live_run_submits_and_confirms(tmp_path: Path):
     assert page.submitted is True
 
 
-def test_a_live_run_without_a_confirmation_is_a_failure_not_a_success(tmp_path: Path):
-    """Reporting success on an unconfirmed submit would corrupt the tracker
-    and permanently block a real application."""
+def test_a_submission_the_form_rejected_stays_eligible(tmp_path: Path):
+    """The form is still on screen after the click, so nothing left the
+    machine — client-side validation refused it. Recording that as sent would
+    permanently block an application the user can still fix and make."""
     scored = with_pdf(tmp_path)
     page = FakePage(simple_form(), html="", confirmation=None)
     outcome = apply_one(scored, apply_config(tmp_path, dry_run=False), page=page)
     assert outcome.status is ApplyStatus.APPLY_FAILED
-    assert "check manually" in outcome.detail
+    assert "nothing was sent" in outcome.detail
+
+
+def test_a_submission_whose_page_vanished_blocks_a_retry(tmp_path: Path,
+                                                          memory_tracker):
+    """The other half: the browser navigated away and we cannot tell whether
+    the POST landed. "Unknown" is its own state — it blocks tomorrow's run
+    like `applied` does, and says so loudly instead of claiming success."""
+    class Vanished(FakePage):
+        def query_selector_all(self, selector):
+            if self.clicks:          # after submit, the form is gone
+                return []
+            return super().query_selector_all(selector)
+
+    scored = with_pdf(tmp_path)
+    memory_tracker.record_job(scored.job, now=NOW)
+    page = Vanished(simple_form(), html="", confirmation=None)
+    outcome = apply_one(scored, apply_config(tmp_path, dry_run=False), page=page,
+                        tracker=memory_tracker, now=NOW)
+
+    assert outcome.status is ApplyStatus.SUBMITTED_UNCONFIRMED
+    assert "CHECK MANUALLY" in outcome.detail
+    assert memory_tracker.has_applied(scored.job.key) is True
 
 
 def test_a_live_run_refuses_to_submit_without_the_cv_it_promised(tmp_path: Path):

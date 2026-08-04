@@ -74,13 +74,14 @@ MIGRATIONS: list[str] = [
 # `dry_run` is deliberately NOT here: a dry run submits nothing, so the job
 # must stay eligible for a real application later.
 TERMINAL_APPLY_STATUSES: frozenset[str] = frozenset(
-    {ApplyStatus.APPLIED.value}
+    {ApplyStatus.APPLIED.value, ApplyStatus.SUBMITTED_UNCONFIRMED.value}
 )
 
 # Statuses that mean "the user has already been shown / handled this".
 HANDLED_STATUSES: frozenset[str] = frozenset(
     {
         ApplyStatus.APPLIED.value,
+        ApplyStatus.SUBMITTED_UNCONFIRMED.value,
         ApplyStatus.DIGEST.value,
         ApplyStatus.DRY_RUN.value,
         ApplyStatus.APPLY_FAILED.value,

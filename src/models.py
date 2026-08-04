@@ -299,7 +299,13 @@ class ApplyStatus(str, Enum):
     SCORED_BELOW = "scored_below"        # scored under threshold
     DIGEST = "digest"                    # needs a human click
     DRY_RUN = "dry_run"                  # form filled + screenshotted, not submitted
-    APPLIED = "applied"                  # auto-submitted
+    APPLIED = "applied"                  # auto-submitted, confirmation seen
+    # Submit was clicked and the page could not be read afterwards. Whether
+    # the employer received it is genuinely unknown, and "unknown" is its own
+    # state: calling it `applied` is a lie that blocks the job forever, and
+    # calling it `apply_failed` re-sends it tomorrow. It blocks auto-apply
+    # like `applied` does, and the digest tells the user to check by hand.
+    SUBMITTED_UNCONFIRMED = "submitted_unconfirmed"
     APPLY_FAILED = "apply_failed"        # attempted, blew up -> also lands in digest
     SKIPPED_DUPLICATE = "skipped_duplicate"
 

@@ -678,6 +678,24 @@ footer code {
 </section>
 
 {# ---------------- 2. auto-applied ---------------- #}
+<section class="sec">
+  <h2>⚠️ Submitted — but unconfirmed <span class="count">{{ unconfirmed|length }}</span></h2>
+  {% if unconfirmed %}
+  <p class="note">The submit click landed and the page could not be read afterwards,
+     so it is unknown whether these reached the employer. They are blocked from being
+     sent again — <strong>open each one and check by hand.</strong></p>
+  {% for item in unconfirmed %}
+  <article class="card warn">
+    <span class="badge {{ item.score_class }}">{{ item.score_label }}</span>
+    <strong>{{ item.company }}</strong> — {{ item.title }}
+    <div class="meta">{{ item.location }} · {{ item.posted_label }}</div>
+    <div class="detail">{{ item.status_detail }}</div>
+    <a href="{{ item.url }}" target="_blank" rel="noopener">Open the posting →</a>
+  </article>
+  {% endfor %}
+  {% else %}<p class="empty">Nothing unconfirmed. Good.</p>{% endif %}
+</section>
+
 <section id="auto-applied">
   <div class="sec-head">
     <h2>Auto-applied</h2>

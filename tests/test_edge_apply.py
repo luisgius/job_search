@@ -348,9 +348,11 @@ def test_a_two_page_form_is_clicked_through_and_page_two_is_never_inspected(
 
     `inspect_form` runs once, before any click, so a form can pass inspection
     and *then* reveal its screener. The bot clicks Continue, finds no
-    confirmation and reports a failure — nothing is submitted and no question
-    is answered, which is the safe direction — but it never looks at page 2,
-    so it repeats the click on every subsequent run."""
+    confirmation, and then looks at what is on screen: page 2 still has form
+    fields, so nothing was submitted. That is reported as a failure rather
+    than as an unconfirmed submission, which matters — an unconfirmed
+    submission blocks the job forever, and this one is still applyable by
+    hand. No question is answered either way."""
     step_two = [
         FakeElement("input", type="text", name="salary",
                     label="Salary expectations", required=True),
@@ -369,10 +371,12 @@ def test_a_two_page_form_is_clicked_through_and_page_two_is_never_inspected(
 
     assert page.advanced is True, "the Continue button was clicked"
     assert outcome.status is ApplyStatus.APPLY_FAILED
-    assert "no confirmation" in outcome.detail
-    # Two reads of the form (inspect_form, then collect_fields for filling),
-    # both against page 1. Page 2's screener is never examined.
-    assert page.input_queries == 2
+    assert "nothing was sent" in outcome.detail
+    # Three reads: inspect_form and the fill pass against page 1, then one
+    # more after the click to establish that a form is still on screen. That
+    # third read is what distinguishes "rejected, still applyable" from
+    # "submitted, confirmation unreadable".
+    assert page.input_queries == 3
 
 
 @pytest.mark.xfail(
@@ -570,12 +574,6 @@ GERMAN_AND_FRENCH_SCREENERS = [
 ]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="question_trigger only knows English, so a German/French/Dutch "
-           "salary-expectation or notice-period screener is submitted rather "
-           "than bailed",
-)
 @pytest.mark.parametrize("label,name", GERMAN_AND_FRENCH_SCREENERS)
 def test_a_non_english_short_answer_screener_bails(label, name):
     """A Berlin or Paris startup runs an English-language Greenhouse form with
@@ -606,16 +604,15 @@ def test_a_non_english_question_that_kept_its_question_mark_is_still_caught(labe
     assert "question mark" in reason
 
 
-def test_a_required_german_salary_field_is_caught_by_the_required_unknown_rule():
-    """The pair to the xfail above. When the board does mark the German field
-    required, the unrecognised-required-field rule catches it — so the gap is
-    specifically "optional-looking non-English screener", not "non-English
-    anything"."""
+def test_a_required_german_salary_field_bails_and_names_itself():
+    """A German salary screener is caught whether or not the board marks it
+    required, and the reason names the field — that is how the user learns
+    what the safety rules are catching."""
     field = FakeElement("input", type="text", name="gehaltsvorstellung",
                         label="Gehaltsvorstellung", required=True)
     ok, reason = inspect_form(FakePage(form_with(field)))
     assert ok is False
-    assert "not one this bot can fill" in reason
+    assert "Gehaltsvorstellung" in reason
 
 
 def test_a_german_consent_checkbox_bails_instead_of_being_ticked():
@@ -884,12 +881,6 @@ def test_an_unconfirmed_submission_does_not_license_a_second_one_tomorrow(
     assert ok is False
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="the confirmation check is a substring search over the whole page, "
-           "so a posting whose own text says 'thank you for your interest' is "
-           "recorded APPLIED after a submission that failed validation",
-)
 def test_the_postings_own_text_cannot_fake_a_confirmation(tmp_path: Path,
                                                           memory_tracker):
     """"Thank you for your interest in Acme" is boilerplate at the bottom of

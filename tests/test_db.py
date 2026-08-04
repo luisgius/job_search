@@ -175,10 +175,29 @@ def test_applied_can_be_re_recorded_as_applied(memory_tracker):
     assert memory_tracker.get_application(job.key)["detail"] == "second"
 
 
-def test_terminal_statuses_are_exactly_applied():
-    # Widening this set silently changes what "already handled" means.
-    assert TERMINAL_APPLY_STATUSES == {ApplyStatus.APPLIED.value}
+def test_terminal_statuses_are_exactly_the_two_that_may_have_been_sent():
+    """Widening this set silently changes what "already handled" means, so it
+    is pinned by name rather than by count.
+
+    `submitted_unconfirmed` belongs here: the submit click happened and the
+    page could not be read afterwards, so the employer may well have received
+    it. Blocking a possible duplicate beats sending one. `dry_run` never
+    belongs — a dry run submits nothing, and blocking on it would prevent the
+    real application the user is rehearsing for.
+    """
+    assert TERMINAL_APPLY_STATUSES == {
+        ApplyStatus.APPLIED.value,
+        ApplyStatus.SUBMITTED_UNCONFIRMED.value,
+    }
     assert ApplyStatus.DRY_RUN.value not in TERMINAL_APPLY_STATUSES
+    assert ApplyStatus.APPLY_FAILED.value not in TERMINAL_APPLY_STATUSES
+
+
+def test_an_unconfirmed_submission_blocks_a_second_one(memory_tracker):
+    job = make_job()
+    memory_tracker.record_job(job, now=NOW)
+    memory_tracker.record_status(job.key, ApplyStatus.SUBMITTED_UNCONFIRMED, now=NOW)
+    assert memory_tracker.has_applied(job.key) is True
 
 
 # ==========================================================================

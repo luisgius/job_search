@@ -55,6 +55,7 @@ SOURCE_NAMES: tuple[str, ...] = ("greenhouse", "lever", "adzuna", "linkedin_emai
 #: Any status not listed here lands in `other`, so a new `ApplyStatus` shows up
 #: on the page instead of vanishing from it.
 SECTIONS: tuple[tuple[str, ApplyStatus], ...] = (
+    ("unconfirmed", ApplyStatus.SUBMITTED_UNCONFIRMED),
     ("needs_click", ApplyStatus.DIGEST),
     ("auto_applied", ApplyStatus.APPLIED),
     ("dry_run", ApplyStatus.DRY_RUN),
