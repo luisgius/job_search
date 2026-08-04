@@ -653,11 +653,13 @@ def is_remote(location: str | None, title: str = "", description: str = "") -> b
 
     if _any_phrase(surface, _STRONG_REMOTE_PHRASES):
         return True
-    if _any_phrase(desc_tokens, _STRONG_REMOTE_PHRASES):
-        return True
-    # A hybrid label with no explicit remote claim above means on-site days.
+    # A hybrid label on the location/title wins over anything the description
+    # says: the structured field is the authoritative statement of the
+    # arrangement, the prose is usually boilerplate about the company.
     if _any_phrase(surface, _HYBRID_PHRASES):
         return False
+    if _any_phrase(desc_tokens, _STRONG_REMOTE_PHRASES):
+        return True
     return _remote_word_hit(surface)
 
 
@@ -761,22 +763,24 @@ def resolve(job_like: Any) -> GeoResult:
     and the US marker all come back together.
     """
     if isinstance(job_like, str):
-        location, title, description = job_like, "", ""
+        location, title, description, declared = job_like, "", "", None
     else:
         location = _field(job_like, "location")
         title = _field(job_like, "title")
         description = _field(job_like, "description")
+        declared = (
+            job_like.get("remote") if isinstance(job_like, Mapping)
+            else getattr(job_like, "remote", None)
+        )
 
     country = country_of(location)
     if country is None and not looks_like_us(location):
-        # Some boards leave `location` empty and only say "Remote, Germany"
+        # Some boards leave `location` empty and only say "Remote - Germany"
         # in the title. Cheap second look; never overrides an explicit US.
         country = country_of(title)
 
-    explicit_remote = getattr(job_like, "remote", None) if not isinstance(job_like, (str, Mapping)) else None
-    if isinstance(job_like, Mapping):
-        explicit_remote = job_like.get("remote")
-    remote = bool(explicit_remote) if isinstance(explicit_remote, bool) else is_remote(
+    # A source that already decided (`Job.remote`) is trusted over guessing.
+    remote = declared if isinstance(declared, bool) else is_remote(
         location, title, description
     )
 
