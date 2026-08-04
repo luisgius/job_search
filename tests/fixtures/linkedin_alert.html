@@ -1,0 +1,70 @@
+<!-- Trimmed but structurally faithful LinkedIn "your job alert" email body.
+     LinkedIn wraps everything in nested tables and appends tracking params to
+     every href; both are the point of this fixture. -->
+<html>
+  <body>
+    <table role="presentation" width="100%">
+      <tr>
+        <td>
+          <p>Your job alert for <strong>backend engineer in European Union</strong></p>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <table role="presentation">
+            <tr>
+              <td>
+                <a href="https://www.linkedin.com/comm/jobs/view/3987654321/?trackingId=AbC123%3D%3D&amp;refId=xyz&amp;midToken=tok&amp;eid=abc-def&amp;otpToken=1"
+                   style="color:#0a66c2;">Senior Backend Engineer</a>
+                <p>Northwind</p>
+                <p>Berlin, Germany (Hybrid)</p>
+                <p>2 hours ago</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <a href="https://www.linkedin.com/comm/jobs/view/3987654322/?trackingId=DeF456%3D%3D&amp;refId=xyz"
+                   style="color:#0a66c2;">Staff Data Engineer</a>
+                <p>Globex</p>
+                <p>Amsterdam, North Holland, Netherlands (Remote)</p>
+                <p>5 hours ago</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <a href="https://www.linkedin.com/comm/jobs/view/3987654323?refId=zzz"
+                   style="color:#0a66c2;">Platform Engineer (Kubernetes)</a>
+                <p>Initech</p>
+                <p>Madrid, Community of Madrid, Spain</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <!-- Same job repeated further down the email, as LinkedIn does -->
+                <a href="https://www.linkedin.com/jobs/view/3987654321/?refId=dup"
+                   style="color:#0a66c2;">Senior Backend Engineer</a>
+                <p>Northwind</p>
+                <p>Berlin, Germany</p>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <!-- A malformed entry: a job link with no company/location block -->
+                <a href="https://www.linkedin.com/comm/jobs/view/3987654324/">Backend Engineer</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <a href="https://www.linkedin.com/comm/jobs/search/?keywords=backend">See all jobs</a>
+          &nbsp;·&nbsp;
+          <a href="https://www.linkedin.com/comm/psettings/email-unsubscribe?lipi=abc">Unsubscribe</a>
+          &nbsp;·&nbsp;
+          <a href="https://www.linkedin.com/help/linkedin/answer/67">Help</a>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

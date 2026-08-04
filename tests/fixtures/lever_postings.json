@@ -1,0 +1,70 @@
+[
+  {
+    "id": "9f2b1c4e-1111-4a2b-9d3e-000000000001",
+    "text": "Senior Python Engineer",
+    "hostedUrl": "https://jobs.lever.co/globex/9f2b1c4e-1111-4a2b-9d3e-000000000001",
+    "applyUrl": "https://jobs.lever.co/globex/9f2b1c4e-1111-4a2b-9d3e-000000000001/apply",
+    "createdAt": 1785826800000,
+    "workplaceType": "remote",
+    "categories": {
+      "commitment": "Full-time",
+      "department": "Engineering",
+      "location": "Remote - Europe",
+      "team": "Backend",
+      "allLocations": ["Remote - Europe", "Berlin"]
+    },
+    "descriptionPlain": "We are looking for a Senior Python Engineer to own our ingestion pipeline.",
+    "description": "<p>We are looking for a Senior Python Engineer to own our ingestion pipeline.</p>",
+    "lists": [
+      {
+        "text": "What you'll do",
+        "content": "<li>Design event-driven services in Python</li><li>Scale Kafka consumers past 100k msg/s</li>"
+      },
+      {
+        "text": "Requirements",
+        "content": "<li>6+ years of Python</li><li>Kafka or equivalent streaming experience</li><li>Based in the EU</li>"
+      }
+    ],
+    "additional": "",
+    "additionalPlain": ""
+  },
+  {
+    "id": "9f2b1c4e-2222-4a2b-9d3e-000000000002",
+    "text": "Engineering Manager, Payments",
+    "hostedUrl": "https://jobs.lever.co/globex/9f2b1c4e-2222-4a2b-9d3e-000000000002",
+    "applyUrl": "https://jobs.lever.co/globex/9f2b1c4e-2222-4a2b-9d3e-000000000002/apply",
+    "createdAt": 1783148400000,
+    "workplaceType": "onsite",
+    "categories": {
+      "commitment": "Full-time",
+      "department": "Engineering",
+      "location": "Paris, France",
+      "team": "Payments"
+    },
+    "descriptionPlain": "Lead a team of eight engineers on the payments platform.",
+    "description": "<p>Lead a team of eight engineers on the payments platform.</p>",
+    "lists": []
+  },
+  {
+    "id": "9f2b1c4e-3333-4a2b-9d3e-000000000003",
+    "text": "Backend Engineering Intern",
+    "hostedUrl": "https://jobs.lever.co/globex/9f2b1c4e-3333-4a2b-9d3e-000000000003",
+    "createdAt": 1785823200000,
+    "categories": {
+      "commitment": "Intern",
+      "location": "Lisbon, Portugal"
+    },
+    "descriptionPlain": "Six-month internship on the backend team.",
+    "lists": []
+  },
+  {
+    "id": "9f2b1c4e-4444-4a2b-9d3e-000000000004",
+    "text": "Site Reliability Engineer",
+    "hostedUrl": "https://jobs.lever.co/globex/9f2b1c4e-4444-4a2b-9d3e-000000000004",
+    "createdAt": null,
+    "categories": {},
+    "descriptionPlain": "",
+    "description": "",
+    "lists": []
+  }
+]

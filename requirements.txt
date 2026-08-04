@@ -1,0 +1,22 @@
+# --- core (always required) ---
+PyYAML>=6.0
+requests>=2.31
+Jinja2>=3.1
+python-dateutil>=2.8
+
+# --- LLM scoring + tailoring ---
+anthropic>=0.40
+
+# --- auto-apply (Greenhouse / Lever forms) ---
+playwright>=1.44
+
+# --- tailored CV -> PDF (used by your src/render_pdf.py hook) ---
+reportlab>=4.0
+
+# --- optional: LinkedIn job alerts via Gmail ---
+google-api-python-client>=2.120
+google-auth-httplib2>=0.2
+google-auth-oauthlib>=1.2
+
+# --- dev / tests ---
+pytest>=8.0

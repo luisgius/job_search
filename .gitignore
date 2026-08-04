@@ -1,0 +1,32 @@
+# --- secrets: never commit these ---
+gmail_credentials.json
+gmail_token.json
+config.local.yaml
+.env
+
+# --- your CV is personal data; keep the template, ignore real ones ---
+cv/*.md
+!cv/base_cv.md
+cv/*.pdf
+
+# --- pipeline output: regenerated every run ---
+output/
+!output/.gitkeep
+
+# --- your PDF hook is yours; the example stays tracked ---
+src/render_pdf.py
+
+# --- python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- os ---
+.DS_Store

@@ -1,0 +1,69 @@
+{
+  "__CLASS__": "Adzuna::API::Response::JobSearchResults",
+  "count": 1284,
+  "mean": 71234.5,
+  "results": [
+    {
+      "__CLASS__": "Adzuna::API::Response::Job",
+      "id": "5012345678",
+      "title": "Python Backend Engineer (f/m/d)",
+      "created": "2026-08-04T06:12:00Z",
+      "redirect_url": "https://www.adzuna.de/land/ad/5012345678?se=abc&utm_medium=api",
+      "company": { "__CLASS__": "Adzuna::API::Response::Company", "display_name": "Northwind GmbH" },
+      "location": {
+        "__CLASS__": "Adzuna::API::Response::Location",
+        "display_name": "Berlin, Berlin",
+        "area": ["Germany", "Berlin", "Berlin"]
+      },
+      "category": {
+        "__CLASS__": "Adzuna::API::Response::Category",
+        "label": "IT Jobs",
+        "tag": "it-jobs"
+      },
+      "description": "You will build and operate Python services handling 20k requests per second. Strong PostgreSQL and AWS experience required. We offer…",
+      "salary_min": 65000,
+      "salary_max": 85000,
+      "salary_is_predicted": "0",
+      "contract_time": "full_time"
+    },
+    {
+      "id": "5012345679",
+      "title": "Data Engineer",
+      "created": "2026-08-03T18:40:00Z",
+      "redirect_url": "https://www.adzuna.de/land/ad/5012345679",
+      "company": { "display_name": "Initech AG" },
+      "location": { "display_name": "München, Bayern", "area": ["Germany", "Bayern", "München"] },
+      "description": "dbt, Airflow, Snowflake. Hybrid from Munich…",
+      "salary_min": 70000,
+      "salary_max": 70000,
+      "salary_is_predicted": "1",
+      "contract_time": "full_time"
+    },
+    {
+      "id": "5012345680",
+      "title": "Werkstudent Data Science",
+      "created": "2026-08-04T07:55:00Z",
+      "redirect_url": "https://www.adzuna.de/land/ad/5012345680",
+      "company": { "display_name": "Umbrella SE" },
+      "location": { "display_name": "Hamburg", "area": ["Germany", "Hamburg"] },
+      "description": "20 Stunden pro Woche neben dem Studium…"
+    },
+    {
+      "id": "5012345678",
+      "title": "Python Backend Engineer (f/m/d)",
+      "created": "2026-08-04T06:12:00Z",
+      "redirect_url": "https://www.adzuna.de/land/ad/5012345678",
+      "company": { "display_name": "Northwind GmbH" },
+      "location": { "display_name": "Berlin, Berlin", "area": ["Germany", "Berlin", "Berlin"] },
+      "description": "Duplicate of the first result — Adzuna does this."
+    },
+    {
+      "id": "5012345681",
+      "created": "2026-08-04T05:00:00Z",
+      "redirect_url": "https://www.adzuna.de/land/ad/5012345681",
+      "company": {},
+      "location": {},
+      "description": "A result with no title and no company."
+    }
+  ]
+}

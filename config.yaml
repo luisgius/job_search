@@ -1,0 +1,97 @@
+# ---------------------------------------------------------------------------
+# Job Hunter — settings.  What to *search for* lives in watchlist.yaml.
+# Every key here is optional; anything you omit falls back to src/config.py.
+# ---------------------------------------------------------------------------
+
+applicant:
+  name: ""                 # REQUIRED — "Ada Lovelace"
+  email: ""                # REQUIRED — used on application forms
+  phone: ""                # REQUIRED before you turn dry_run off
+  location: ""             # "Berlin, Germany"
+  linkedin: ""             # "https://www.linkedin.com/in/you"
+  github: ""
+  website: ""
+
+keys:
+  # Environment variables ALWAYS win over anything written here, so you can
+  # leave these blank and export ANTHROPIC_API_KEY instead.
+  anthropic: ""            # or env ANTHROPIC_API_KEY
+  adzuna_app_id: ""        # or env ADZUNA_APP_ID
+  adzuna_app_key: ""       # or env ADZUNA_APP_KEY
+
+sources:
+  greenhouse: true
+  lever: true
+  adzuna: false            # needs free keys from developer.adzuna.com
+  linkedin_email: false    # needs gmail_credentials.json (see README)
+
+freshness:
+  max_age_hours: 24
+  # Postings with no trustworthy date can't be proven fresh. Dropping them is
+  # the honest default — set false to keep them and accept some staleness.
+  skip_undated: true
+
+filters:
+  # ISO-3166 alpha-2. Trim this to the countries you can actually work in.
+  countries: [DE, NL, ES, FR, IE, PT, SE, DK, FI, NO, PL, AT, BE, IT, CH, CZ, GB]
+  allow_remote: true
+  # "Remote" with no European hint anywhere is usually a US role.
+  remote_requires_eu_hint: true
+
+  # Empty = allow any title. Whole-word, case-insensitive matching.
+  title_include: []
+  title_exclude:
+    - intern
+    - internship
+    - working student
+    - werkstudent
+    - praktikum
+    - apprentice
+    - graduate program
+  description_exclude:
+    - security clearance
+    - must be a us citizen
+  require_keywords_any: []
+  min_description_chars: 0
+
+scoring:
+  model: claude-sonnet-5   # claude-haiku-4-5-20251001 is ~10x cheaper, a bit blunter
+  threshold: 65            # 65 medium · 75 strict
+  max_jobs: 40             # hard cap on LLM calls per run — your cost ceiling
+  max_tokens: 1500
+  temperature: 0.0
+  concurrency: 4
+
+tailoring:
+  enabled: true
+  model: claude-sonnet-5
+  max_per_run: 10
+  max_tokens: 4000
+  temperature: 0.2
+
+apply:
+  enabled: true
+  # KEEP THIS TRUE for a few days. Dry run fills the form, screenshots it to
+  # output/applications/<slug>/form_filled.png, and submits nothing.
+  dry_run: true
+  max_per_run: 5
+  min_score: 80            # deliberately stricter than scoring.threshold
+  headless: true
+  timeout_seconds: 60
+  require_pdf: true        # no tailored PDF -> digest instead of auto-apply
+
+output:
+  dir: output
+  open_browser: true
+
+db:
+  path: output/tracker.sqlite3
+  # Don't re-surface a job you've already been shown within this many days.
+  # Jobs you actually applied to are never surfaced again, window or not.
+  skip_seen_days: 30
+
+cv:
+  path: cv/base_cv.md
+
+logging:
+  level: INFO

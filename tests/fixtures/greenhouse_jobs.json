@@ -1,0 +1,74 @@
+{
+  "jobs": [
+    {
+      "id": 4012345,
+      "internal_job_id": 3012345,
+      "title": "Senior Backend Engineer (m/f/d)",
+      "updated_at": "2026-08-04T07:30:00-04:00",
+      "first_published": "2026-08-04T03:00:00-04:00",
+      "requisition_id": "REQ-101",
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/4012345",
+      "location": { "name": "Berlin, Germany" },
+      "offices": [
+        { "id": 11, "name": "Berlin", "location": "Berlin, Germany" }
+      ],
+      "departments": [
+        { "id": 1, "name": "Engineering", "parent_id": null, "child_ids": [] }
+      ],
+      "metadata": [],
+      "content": "&lt;p&gt;We are hiring a &lt;strong&gt;Senior Backend Engineer&lt;/strong&gt; for our payments platform.&lt;/p&gt;&lt;h3&gt;What you&amp;#39;ll do&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;Design and ship Python services on AWS&lt;/li&gt;&lt;li&gt;Own PostgreSQL schema design and query performance&lt;/li&gt;&lt;li&gt;Mentor engineers across two squads&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Requirements&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;5+ years backend experience&lt;/li&gt;&lt;li&gt;Strong Python and SQL&lt;/li&gt;&lt;li&gt;EU work authorisation&lt;/li&gt;&lt;/ul&gt;"
+    },
+    {
+      "id": 4012346,
+      "internal_job_id": 3012346,
+      "title": "Staff Data Engineer",
+      "updated_at": "2026-08-04T08:00:00-04:00",
+      "first_published": "2026-07-20T09:00:00-04:00",
+      "requisition_id": "REQ-102",
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/4012346",
+      "location": { "name": "Amsterdam, Netherlands" },
+      "offices": [
+        { "id": 12, "name": "Amsterdam", "location": "Amsterdam, Netherlands" }
+      ],
+      "departments": [{ "id": 2, "name": "Data", "parent_id": null, "child_ids": [] }],
+      "metadata": [],
+      "content": "&lt;p&gt;Own the lakehouse. Spark, dbt, Airflow.&lt;/p&gt;"
+    },
+    {
+      "id": 4012347,
+      "internal_job_id": 3012347,
+      "title": "Backend Engineer",
+      "updated_at": "2026-08-04T06:00:00-04:00",
+      "first_published": "2026-08-04T05:00:00-04:00",
+      "requisition_id": "REQ-103",
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/4012347",
+      "location": { "name": "San Francisco, CA" },
+      "offices": [],
+      "departments": [],
+      "metadata": [],
+      "content": "&lt;p&gt;Join us in SF. Remote (US) considered.&lt;/p&gt;"
+    },
+    {
+      "id": 4012348,
+      "internal_job_id": 3012348,
+      "title": "Platform Engineer",
+      "updated_at": null,
+      "first_published": null,
+      "requisition_id": "REQ-104",
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/4012348",
+      "location": null,
+      "offices": [],
+      "departments": [],
+      "metadata": [],
+      "content": "&lt;p&gt;Kubernetes, Terraform, Go.&lt;/p&gt;"
+    },
+    {
+      "id": 4012349,
+      "title": null,
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/4012349",
+      "location": { "name": "Madrid, Spain" },
+      "content": "&lt;p&gt;A posting with no title at all.&lt;/p&gt;"
+    }
+  ],
+  "meta": { "total": 5 }
+}

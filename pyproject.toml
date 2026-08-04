@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "job-hunter"
+version = "1.0.0"
+description = "Daily EU job pipeline: fetch, filter, LLM fit-score, tailor, auto-apply, digest."
+requires-python = ">=3.10"
+
+[tool.setuptools]
+packages = ["src", "src.sources", "src.apply"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-q --strict-markers --strict-config"
+filterwarnings = ["error::DeprecationWarning:src.*"]
+markers = [
+    "network: touches the real internet — deselected by default (-m 'not network')",
+    "slow: takes more than a second",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["src/render_pdf.example.py", "src/render_pdf.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    'if __name__ == "__main__":',
+]

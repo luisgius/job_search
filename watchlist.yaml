@@ -1,0 +1,40 @@
+# ---------------------------------------------------------------------------
+# What to search.  Verify any slug before trusting it:
+#     python -m src.sources.ats_boards --check greenhouse spotify
+#     python -m src.sources.ats_boards --check lever plaid
+#     python -m src.sources.ats_boards --check-all        # everything below
+#
+# Finding a slug: open a company's careers page and look at the job link.
+#   boards.greenhouse.io/SLUG/jobs/123     -> greenhouse: SLUG
+#   jobs.lever.co/SLUG/uuid                -> lever: SLUG
+# ---------------------------------------------------------------------------
+
+greenhouse:
+  # Replace with the companies you actually want. These are only examples and
+  # slugs do change — run --check-all after editing.
+  - spotify
+  - datadog
+  - gitlab
+
+lever:
+  - plaid
+
+adzuna:
+  # Lowercase ISO country codes supported by Adzuna: gb de nl fr es it at be
+  # ch pl pt se no dk (among others).
+  countries: [de, nl, es]
+  queries:
+    - "python engineer"
+    - "backend engineer"
+    - "data engineer"
+  max_days_old: 1          # Adzuna's own freshness filter
+  results_per_page: 50
+  distance_km: 0
+
+linkedin_email:
+  # Create daily job alerts in LinkedIn, then let the pipeline read them.
+  gmail_query: "from:jobalerts-noreply@linkedin.com newer_than:2d"
+  max_messages: 25
+  credentials_file: gmail_credentials.json
+  token_file: gmail_token.json
+  fetch_descriptions: true
