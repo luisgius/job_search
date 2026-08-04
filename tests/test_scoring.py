@@ -1,0 +1,337 @@
+"""Tests for src/scoring.py — the LLM fit-scoring stage.
+
+Two properties matter more than the arithmetic:
+
+  * **A job is never silently lost.** If the model is down, or returns
+    nonsense, or the key is missing, the job must still reach the digest with
+    an explanation. Dropping it would hide a real match behind an outage, and
+    the user would never know it happened.
+  * **The cost ceiling is real.** `scoring.max_jobs` bounds spend, and a cap
+    that truncates silently reads as "there was nothing else today".
+
+The prompt itself is tested for the instructions that change behaviour —
+strict JSON, the hard-requirement penalty, the no-inventing rule — not for
+its prose.
+"""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from src.models import ApplyStatus, Score
+from src.scoring import (
+    RESPONSE_KEYS,
+    SYSTEM_PROMPT,
+    build_prompt,
+    parse_score,
+    score_job,
+    score_jobs,
+)
+from tests.conftest import (
+    BASE_CV,
+    FakeAnthropic,
+    TransientAPIError,
+    llm_client,
+    make_job,
+    write_config,
+)
+
+
+def payload(score=82, **extra):
+    body = {"score": score, "verdict": "Strong fit",
+            "reasons": ["8y Python vs 5+ asked"], "strengths": ["Python"],
+            "gaps": ["No Kafka"]}
+    body.update(extra)
+    return json.dumps(body)
+
+
+# ==========================================================================
+# build_prompt
+# ==========================================================================
+
+
+def test_prompt_contains_the_cv_verbatim():
+    """The CV is the only source of truth about the candidate; truncating it
+    would silently change every score."""
+    prompt = build_prompt(make_job(), BASE_CV, {})
+    assert BASE_CV in prompt
+
+
+def test_prompt_contains_the_job_facts():
+    job = make_job(company="Northwind", title="Senior Backend Engineer",
+                   location="Berlin, Germany", salary="€70k–€90k")
+    prompt = build_prompt(job, BASE_CV, {})
+    for fragment in ("Northwind", "Senior Backend Engineer", "Berlin, Germany",
+                     "€70k–€90k", job.url):
+        assert fragment in prompt
+
+
+def test_prompt_says_when_the_posting_has_no_date():
+    prompt = build_prompt(make_job(hours_old=None), BASE_CV, {})
+    assert "unknown" in prompt.lower()
+
+
+def test_prompt_truncates_a_huge_description_but_keeps_the_cv():
+    job = make_job(description="x " * 20000)
+    prompt = build_prompt(job, BASE_CV, {})
+    assert "truncated" in prompt
+    assert BASE_CV in prompt
+
+
+def test_prompt_warns_when_only_a_snippet_is_available():
+    """Adzuna descriptions are teasers. Without this the model confidently
+    scores requirements it has not seen."""
+    job = make_job(source="adzuna", raw={"snippet_only": True})
+    assert "snippet" in build_prompt(job, BASE_CV, {}).lower()
+
+
+def test_prompt_handles_a_missing_description():
+    prompt = build_prompt(make_job(description=""), BASE_CV, {})
+    assert "no description" in prompt.lower()
+
+
+def test_prompt_demands_strict_json_with_the_exact_keys():
+    prompt = build_prompt(make_job(), BASE_CV, {})
+    assert "STRICT JSON" in prompt
+    for key in RESPONSE_KEYS:
+        assert f'"{key}"' in prompt or key in prompt
+
+
+def test_prompt_carries_the_instructions_that_change_the_score():
+    prompt = build_prompt(make_job(), BASE_CV, {})
+    lowered = prompt.lower()
+    assert "penalise hard" in lowered or "penalize hard" in lowered
+    assert "work authorisation" in lowered or "work authorization" in lowered
+    assert "never invent" in lowered
+    assert "concrete evidence" in lowered
+
+
+def test_prompt_includes_the_applicant_header_when_given():
+    prompt = build_prompt(make_job(), BASE_CV,
+                          {"name": "Ada Lovelace", "location": "Berlin, Germany"})
+    assert "Ada Lovelace" in prompt
+
+
+def test_system_prompt_asks_for_calibration_not_enthusiasm():
+    lowered = SYSTEM_PROMPT.lower()
+    assert "recruiter" in lowered or "calibrated" in lowered
+    assert "under-score" in lowered or "under score" in lowered or "strict" in lowered
+
+
+# ==========================================================================
+# parse_score
+# ==========================================================================
+
+
+def test_parse_score_happy_path():
+    score = parse_score({"score": 82, "verdict": "good", "reasons": ["a"],
+                         "strengths": ["b"], "gaps": ["c"]})
+    assert score.value == 82
+    assert score.ok is True
+    assert score.reasons == ["a"]
+    assert score.strengths == ["b"]
+    assert score.gaps == ["c"]
+    assert score.verdict == "good"
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [(82, 82), (82.4, 82), (82.6, 83), ("82", 82), ("82.5", 82),
+     ("82/100", 82), (" 82 ", 82), ("score: 82", 82)],
+)
+def test_parse_score_coerces_the_shapes_models_emit(raw, expected):
+    assert parse_score({"score": raw}).value == expected
+
+
+@pytest.mark.parametrize("raw,expected", [(150, 100), (-20, 0), (101, 100)])
+def test_parse_score_clamps_to_the_range(raw, expected):
+    assert parse_score({"score": raw}).value == expected
+
+
+@pytest.mark.parametrize("raw", [None, "", "high", {}, [], "n/a"])
+def test_a_missing_score_is_an_error_not_a_zero(raw):
+    """A real zero means "terrible fit"; an error means "we do not know".
+    They route differently — the second still reaches the digest."""
+    score = parse_score({"score": raw})
+    assert score.value == 0
+    assert score.ok is False
+    assert score.error
+
+
+def test_parse_score_keeps_the_reasons_from_a_scoreless_payload():
+    score = parse_score({"reasons": ["seniority mismatch"], "verdict": "no"})
+    assert score.error
+    assert score.reasons == ["seniority mismatch"]
+    assert score.verdict == "no"
+
+
+def test_parse_score_coerces_a_string_reason_to_a_list():
+    assert parse_score({"score": 80, "reasons": "just the one"}).reasons == ["just the one"]
+
+
+def test_parse_score_drops_non_string_list_entries():
+    score = parse_score({"score": 80, "reasons": ["ok", None, 42, {"a": 1}, "fine"]})
+    assert score.reasons == ["ok", "fine"] or all(isinstance(r, str) for r in score.reasons)
+    assert all(isinstance(r, str) for r in score.reasons)
+
+
+def test_parse_score_tolerates_missing_lists():
+    score = parse_score({"score": 80})
+    assert score.reasons == [] and score.strengths == [] and score.gaps == []
+
+
+def test_parse_score_rejects_a_non_mapping():
+    for value in ("a string", ["a", "list"], None, 42):
+        assert parse_score(value).ok is False
+
+
+# ==========================================================================
+# score_job
+# ==========================================================================
+
+
+def test_score_job_returns_the_parsed_score(tmp_path):
+    cfg = write_config(tmp_path)
+    score = score_job(make_job(), BASE_CV, cfg, client=llm_client([payload(88)]))
+    assert score.value == 88
+    assert score.ok is True
+
+
+def test_score_job_records_the_model_used(tmp_path):
+    cfg = write_config(tmp_path, {"scoring": {"model": "claude-haiku-4-5-20251001"}})
+    score = score_job(make_job(), BASE_CV, cfg, client=llm_client([payload()]))
+    assert score.model == "claude-haiku-4-5-20251001"
+
+
+def test_score_job_honours_the_configured_model_and_limits(tmp_path):
+    cfg = write_config(tmp_path, {"scoring": {"model": "test-model", "max_tokens": 999,
+                                              "temperature": 0.4}})
+    fake = FakeAnthropic([payload()])
+    from src.llm import LLMClient
+
+    score_job(make_job(), BASE_CV, cfg, client=LLMClient("k", client=fake))
+    assert fake.calls[0]["model"] == "test-model"
+    assert fake.calls[0]["max_tokens"] == 999
+    assert fake.calls[0]["temperature"] == 0.4
+
+
+def test_score_job_never_raises_on_an_api_failure(tmp_path):
+    cfg = write_config(tmp_path)
+    client = llm_client([TransientAPIError()] * 5)
+    score = score_job(make_job(), BASE_CV, cfg, client=client)
+    assert score.ok is False
+    assert score.error
+
+
+def test_score_job_never_raises_on_unparseable_output(tmp_path):
+    cfg = write_config(tmp_path)
+    score = score_job(make_job(), BASE_CV, cfg, client=llm_client(["I decline."]))
+    assert score.ok is False
+
+
+def test_score_job_survives_a_completely_broken_client(tmp_path):
+    class Broken:
+        def complete_json(self, **kwargs):
+            raise RuntimeError("not an LLMError at all")
+
+    score = score_job(make_job(), BASE_CV, write_config(tmp_path), client=Broken())
+    assert score.ok is False
+    assert "not an LLMError" in score.error
+
+
+# ==========================================================================
+# score_jobs
+# ==========================================================================
+
+
+def test_score_jobs_scores_everything_and_sorts_by_score(tmp_path):
+    cfg = write_config(tmp_path)
+    jobs = [make_job(ats_job_id=str(i)) for i in range(3)]
+    client = llm_client([payload(50), payload(90), payload(70)])
+    scored = score_jobs(jobs, BASE_CV, cfg, client=client)
+    assert [s.score_value for s in scored] == [90, 70, 50]
+
+
+def test_score_jobs_classifies_against_the_threshold(tmp_path):
+    cfg = write_config(tmp_path, {"scoring": {"threshold": 75, "concurrency": 1}})
+    jobs = [make_job(ats_job_id="a"), make_job(ats_job_id="b")]
+    scored = score_jobs(jobs, BASE_CV, cfg, client=llm_client([payload(80), payload(60)]))
+    by_status = {s.status for s in scored}
+    assert ApplyStatus.DIGEST in by_status
+    assert ApplyStatus.SCORED_BELOW in by_status
+    below = next(s for s in scored if s.status is ApplyStatus.SCORED_BELOW)
+    assert "below threshold 75" in below.status_detail
+
+
+def test_a_score_exactly_at_the_threshold_is_a_match(tmp_path):
+    cfg = write_config(tmp_path, {"scoring": {"threshold": 75}})
+    scored = score_jobs([make_job()], BASE_CV, cfg, client=llm_client([payload(75)]))
+    assert scored[0].status is ApplyStatus.DIGEST
+
+
+def test_a_failed_score_still_reaches_the_digest(tmp_path):
+    """The property that keeps an API outage from hiding a real match: an
+    unscored job is a job the human has to judge, not a job to drop."""
+    cfg = write_config(tmp_path)
+    scored = score_jobs([make_job()], BASE_CV, cfg, client=llm_client(["nonsense"]))
+    assert len(scored) == 1
+    assert scored[0].status is ApplyStatus.DIGEST
+    assert "scorer failed" in scored[0].status_detail
+
+
+def test_max_jobs_caps_spend_and_says_so(tmp_path, caplog):
+    """Silent truncation reads as "nothing else was posted today"."""
+    import logging
+
+    cfg = write_config(tmp_path, {"scoring": {"max_jobs": 2, "concurrency": 1}})
+    jobs = [make_job(ats_job_id=str(i)) for i in range(10)]
+    fake = FakeAnthropic([payload()])
+    from src.llm import LLMClient
+
+    with caplog.at_level(logging.WARNING):
+        scored = score_jobs(jobs, BASE_CV, cfg, client=LLMClient("k", client=fake))
+    assert len(scored) == 2
+    assert len(fake.calls) == 2
+    assert "max_jobs" in caplog.text
+    assert "8 not scored" in caplog.text
+
+
+def test_a_missing_api_key_costs_one_error_not_one_per_job(tmp_path):
+    cfg = write_config(tmp_path, {"keys": {"anthropic": ""}})
+    jobs = [make_job(ats_job_id=str(i)) for i in range(5)]
+    errors: list[str] = []
+    scored = score_jobs(jobs, BASE_CV, cfg, client=None, errors=errors)
+    assert len(scored) == 5
+    assert all(s.status is ApplyStatus.DIGEST for s in scored)
+    assert len(errors) == 1
+
+
+def test_score_jobs_records_per_job_failures_in_errors(tmp_path):
+    cfg = write_config(tmp_path, {"scoring": {"concurrency": 1}})
+    errors: list[str] = []
+    score_jobs([make_job()], BASE_CV, write_config(tmp_path), client=llm_client(["junk"]),
+               errors=errors)
+    assert len(errors) == 1
+
+
+def test_score_jobs_on_an_empty_batch(tmp_path):
+    assert score_jobs([], BASE_CV, write_config(tmp_path), client=llm_client()) == []
+
+
+def test_concurrency_preserves_a_deterministic_result(tmp_path):
+    """Threads must not reshuffle the digest between two runs over the same
+    input — a digest that reorders for no reason is a digest you stop reading."""
+    cfg = write_config(tmp_path, {"scoring": {"concurrency": 4}})
+    jobs = [make_job(company=f"C{i}", ats_job_id=str(i)) for i in range(8)]
+    scores = [payload(50 + i) for i in range(8)]
+    first = score_jobs(jobs, BASE_CV, cfg, client=llm_client(list(scores)))
+    second = score_jobs(jobs, BASE_CV, cfg, client=llm_client(list(scores)))
+    assert [s.key for s in first] == [s.key for s in second]
+
+
+def test_concurrency_of_one_takes_the_plain_loop(tmp_path):
+    cfg = write_config(tmp_path, {"scoring": {"concurrency": 1}})
+    jobs = [make_job(ats_job_id=str(i)) for i in range(3)]
+    assert len(score_jobs(jobs, BASE_CV, cfg, client=llm_client([payload()]))) == 3

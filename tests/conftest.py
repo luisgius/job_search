@@ -28,7 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.models import Job, Score, ScoredJob  # noqa: E402
+from src.models import ApplyStatus, Job, Score, ScoredJob  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
@@ -107,11 +107,18 @@ def make_scored(
     score: int = 82,
     reasons: Sequence[str] = ("Python + PostgreSQL match", "Seniority aligns"),
     error: str | None = None,
+    status: ApplyStatus = ApplyStatus.DIGEST,
     **job_kwargs: Any,
 ) -> ScoredJob:
+    """A scored job, defaulting to the state it is in when it leaves scoring.
+
+    `DIGEST` rather than `NEW`: by the time anything downstream (tailoring,
+    apply, digest) sees a `ScoredJob`, `score_jobs` has already classified it.
+    """
     job = job or make_job(**job_kwargs)
     return ScoredJob(
         job=job,
+        status=status,
         score=Score(
             value=score,
             reasons=list(reasons),
