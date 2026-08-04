@@ -216,18 +216,16 @@ def _artifact_href(raw: str | None, digest_dir: Path) -> str | None:
     if not raw:
         return None
     path = Path(str(raw))
-    if path.is_absolute() and digest_dir.is_absolute():
+    if not path.is_absolute():
+        return quote(path.as_posix())
+    if digest_dir.is_absolute():
         try:
             relative = os.path.relpath(path, digest_dir)
         except ValueError:  # different drive on Windows — no relative form
             relative = ".."
         if not relative.startswith(".."):
             return quote(Path(relative).as_posix())
-        try:
-            return path.as_uri()
-        except ValueError:  # pragma: no cover - as_uri only fails when relative
-            return quote(path.as_posix())
-    return quote(path.as_posix())
+    return path.as_uri()
 
 
 # --------------------------------------------------------------------------
@@ -347,7 +345,8 @@ def build_context(
     *,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Build everything the template needs. Pure: no I/O, no ambient clock.
+    """Build everything the template needs. No filesystem, no network; `now`
+    is the only clock it consults and it is injectable.
 
     Splits the run's jobs into the five outcome buckets the page is organised
     around (plus `other` for anything unclassified), formats every value the
@@ -448,10 +447,39 @@ def _environment() -> Environment:
     return _env
 
 
+def _skeleton() -> dict[str, Any]:
+    """Empty-but-complete context.
+
+    `render_html` merges the caller's context onto this so a hand-built or
+    partial context (a test fixture, the fallback path) still renders every
+    section instead of dying on a missing key halfway down the page.
+    """
+    sections = {name: [] for name, _ in SECTIONS}
+    sections["other"] = []
+    return {
+        "title": "Job Hunter",
+        "generated_at": None,
+        "generated_at_str": "",
+        "date_str": "",
+        "weekday": "",
+        "applicant": {},
+        "config_summary": _config_summary(None),
+        "stats": {},
+        "funnel": [],
+        "source_counts": {},
+        "filter_counts": {},
+        "errors": [],
+        "totals": {name: 0 for name in list(sections) + ["all"]},
+        **sections,
+    }
+
+
 def render_html(context: Mapping[str, Any]) -> str:
     """Render the digest template with `context`. Returns the full HTML page."""
+    data = _skeleton()
+    data.update(dict(context or {}))
     template = _environment().get_template(TEMPLATE_NAME)
-    return template.render(**dict(context or {}))
+    return template.render(**data)
 
 
 def _fallback_html(context: Mapping[str, Any], error: Exception) -> str:
@@ -546,8 +574,3 @@ def write_digest(
         context["totals"]["below"],
     )
     return path
-
-
-#: `docs/ARCHITECTURE.md` names this stage `digest.render` in the pipeline
-#: diagram and `write_digest` in the module contract. They are the same call.
-render = write_digest

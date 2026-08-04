@@ -560,7 +560,7 @@ footer code {
       <span>{{ item.location or 'location unstated' }}</span>
       {% if item.country %}<span class="tag">{{ item.country }}</span>{% endif %}
       {% if item.source %}<span class="tag src">{{ item.source }}</span>{% endif %}
-      <span>posted {{ item.posted_relative }}</span>
+      <span>{{ item.posted_label }}</span>
       {% if item.salary %}<span>{{ item.salary }}</span>{% endif %}
     </div>
   </div>
