@@ -360,6 +360,9 @@ def score_job(job: Job, cv_markdown: str, config: Any, *, client: Any = None) ->
             # ad does not, which is what keeps the plant from being read as
             # the verdict.
             require_keys=RESPONSE_KEYS,
+            # The posting itself, so an object quoted out of it can never be
+            # mistaken for the model's verdict.
+            forbid_verbatim=job.description,
             prompt=build_prompt(job, cv_markdown, _applicant(config)),
             max_tokens=max_tokens,
             temperature=temperature,

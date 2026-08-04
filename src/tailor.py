@@ -46,12 +46,23 @@ DEFAULT_THRESHOLD = 65
 #: emphasis — the model started writing new experience.
 MAX_LENGTH_RATIO = 2.0
 
+#: How much of a reply a fenced block must cover before it counts as a wrapper
+#: around the document rather than as content inside it.
+WRAPPER_COVERAGE = 0.6
+
 #: Template leftovers a truncated or lazy generation leaves behind. Matched
 #: case-insensitively against the tailored CV.
+#: `(?!\()` is what keeps a markdown link out of this. `[DATEV eG](https://…)`
+#: and `[Cityblock Health](…)` are real employers, and without the lookahead
+#: the bracket alternation matched them on a prefix ("date" inside "DATEV"),
+#: rejecting a perfectly good CV and silently falling back to the base one.
+#: The keywords are also anchored now, so a placeholder must BE the phrase
+#: rather than merely start with it.
 _PLACEHOLDER_RE = re.compile(
     r"""(
         \[(?:company|job|role|position|team|title|city|location|date|
-             your\s+\w+|insert[^\]]*|x{2,}|todo|tbd)[^\]]*\]
+             your\s+\w+|insert[^\]]*|x{2,}|todo|tbd)
+           (?:\s+(?:name|title|here|goes\s+here|of\s+\w+))*\s*\](?!\()
       | \{\{[^}]+\}\}
       | \bXX+\+?\s*(?:years?|yrs?|months?|%)
       | \bYYYY\b | \bMM/YYYY\b
@@ -320,16 +331,29 @@ def _strip_fences(text: str) -> str:
     old prefix-only strip left both a literal ``` and a line of the model
     talking to the user inside the CV that then got rendered and uploaded.
 
-    When a fenced block exists anywhere, the largest one IS the document and
-    everything outside it is commentary. With no fence, the reply is returned
-    as-is — the model obeyed.
+    A fence is only treated as a WRAPPER when it covers essentially the whole
+    reply. Taking the largest block wherever it sits looked equivalent and is
+    not: a CV that legitimately contains a fenced code sample or an ASCII
+    architecture diagram would have everything outside that fence thrown away,
+    and the mutilated document is what gets rendered to PDF and uploaded.
+    Below the coverage threshold the fences are content, and the reply is
+    returned untouched.
     """
     stripped = (text or "").strip()
     if "```" not in stripped:
         return stripped
-    blocks = _FENCED_BLOCK_RE.findall(stripped)
-    if blocks:
-        return max(blocks, key=len).strip()
+    #: A wrapper has to account for most of the reply. A preamble line or a
+    #: trailing "let me know if you'd like me to adjust" is small; a CV's own
+    #: code sample is not most of the CV.
+    matches = list(_FENCED_BLOCK_RE.finditer(stripped))
+    if matches:
+        # Measured on the whole fenced span, markers included — that is what
+        # "this fence wraps the reply" actually means. Measuring the content
+        # alone made a genuine wrapper plus a one-line sign-off fall short.
+        widest = max(matches, key=lambda m: len(m.group(0)))
+        if len(widest.group(0)) >= WRAPPER_COVERAGE * len(stripped):
+            return widest.group(1).strip()
+        return stripped
     # An opening fence with no closing one: drop the opener, keep the rest.
     lines = stripped.splitlines()
     start = next((i for i, l in enumerate(lines) if l.strip().startswith("```")), None)

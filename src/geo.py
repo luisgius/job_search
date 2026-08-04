@@ -348,6 +348,44 @@ US_STATE_CODES: frozenset[str] = frozenset(
 # it means a US posting passes an EU-only filter.
 AMBIGUOUS_STATE_CODES: frozenset[str] = frozenset({"DE", "MT"})
 
+#: Delaware and Montana are small states with a knowable town list. Germany
+#: and Malta are not — Germany alone has thousands of towns, and the city
+#: table here holds ~34 of them.
+#:
+#: So the enumeration goes on the SMALL side. Deciding "is this Delaware?" by
+#: asking "is the head a German city I happen to know?" got the asymmetry
+#: exactly backwards: it bought four Delaware towns and lost every German city
+#: off the list — Duisburg, Bochum, Wuppertal, Bielefeld, Mainz, Rostock and
+#: a dozen more, all silently, all invisible forever.
+_DELAWARE_CITIES: frozenset[str] = frozenset(
+    normalize_text(name)
+    for name in (
+        "Wilmington", "Dover", "Newark", "Middletown", "Smyrna", "Milford",
+        "Seaford", "Georgetown", "Elsmere", "New Castle", "Bear", "Glasgow",
+        "Brookside", "Hockessin", "Pike Creek", "Claymont", "Lewes",
+        "Rehoboth Beach", "Newport", "Camden", "Clayton", "Delaware City",
+        "Harrington", "Laurel", "Milton", "Selbyville", "Townsend", "Wyoming",
+        "Bridgeville", "Millsboro", "Ocean View", "Greenville", "Christiana",
+    )
+)
+
+_MONTANA_CITIES: frozenset[str] = frozenset(
+    normalize_text(name)
+    for name in (
+        "Billings", "Missoula", "Great Falls", "Bozeman", "Butte", "Helena",
+        "Kalispell", "Havre", "Anaconda", "Miles City", "Belgrade",
+        "Livingston", "Laurel", "Whitefish", "Sidney", "Lewistown",
+        "Glendive", "Dillon", "Hamilton", "Polson", "Columbia Falls",
+        "Hardin", "Deer Lodge", "Cut Bank", "Libby", "Conrad", "Baker",
+        "Wolf Point", "Red Lodge", "Bigfork", "Big Sky",
+    )
+)
+
+_AMBIGUOUS_STATE_CITIES: dict[str, frozenset[str]] = {
+    "DE": _DELAWARE_CITIES,
+    "MT": _MONTANA_CITIES,
+}
+
 #: Location heads that name no city at all, so an ambiguous trailing code has
 #: to be read as the country: "Remote, DE" is Germany.
 _PLACELESS_HEADS: frozenset[str] = frozenset({
@@ -542,15 +580,16 @@ def _trailing_ambiguous_code_is_us(parts: list[str]) -> bool:
         return False
 
     head_tokens = " ".join(cleaned[:-1]).split()
-    if not head_tokens or " ".join(head_tokens) in _PLACELESS_HEADS:
+    if not head_tokens:
         return False
     if _ngram_hit(head_tokens, CITY_TO_COUNTRY, _CITY_MAX_NGRAM):
         return False                      # a European city -> the country
     if _ngram_hit(head_tokens, COUNTRY_ALIASES, _ALIAS_MAX_NGRAM):
         return False                      # "Germany, DE"
-    # A named place we do not recognise as European, next to a code that is
-    # also a US state. That is the Newark/Dover case.
-    return True
+    # Only a town of that actual US state makes this the state. Anything else
+    # — including a European city we simply do not know — reads as the
+    # country, because the list that can be complete is the small one.
+    return _ngram_hit(head_tokens, _AMBIGUOUS_STATE_CITIES[tail], 3)
 
 
 def looks_like_us(location: str | None) -> bool:
@@ -887,7 +926,11 @@ def resolve(job_like: Any) -> GeoResult:
         # the user as the country the job is in.
         stated = stated if len(stated) == 2 and stated.isalpha() else None
 
-    us = looks_like_us(location)
+    # The veto reads the title too. Reading only the location while the EU
+    # rescue reads location + title + description is half a check: a posting
+    # with location "Remote" and title "Backend Engineer (Remote - US)" was
+    # rescued by any European city mentioned in its description.
+    us = looks_like_us(location) or looks_like_us(title)
     countries = countries_of(location)
     if not countries and not us:
         # Some boards leave `location` empty and only say "Remote - Germany"

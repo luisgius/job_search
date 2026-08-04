@@ -143,7 +143,19 @@ MARKETING_HINTS: tuple[str, ...] = (
 _NON_ENGLISH_QUESTION_TERMS: tuple[str, ...] = (
     # German
     r"warum", r"weshalb", r"wieso", r"beschreiben", r"erzahlen", r"erzaehlen",
-    r"gehalt\w*", r"verguetung", r"vergutung", r"kundigungsfrist",
+    # German puts the head noun LAST, so a \b-anchored "gehalt" catches
+    # "Gehaltsvorstellung" and misses "Wunschgehalt", "Jahresgehalt",
+    # "Zielgehalt", "Bruttojahresgehalt". Allow the compound prefix too.
+    r"\w*gehalt\w*", r"\w*verguetung\w*", r"\w*vergutung\w*",
+    r"\w*kundigungsfrist\w*", r"\w*kuendigungsfrist\w*",
+    r"\w*eintritt\w*", r"\w*verfugbar\w*", r"\w*verfuegbar\w*",
+    r"wie ?viel\w* jahre", r"\w*erfahrung",
+    # Polish / Swedish / Danish salary fields, honestly outside the six
+    # languages first claimed but just as common on EU boards.
+    r"\w*wynagrodzeni\w*", r"oczekiwania", r"okres wypowiedzenia",
+    r"\w*loneanspr\w*", r"\w*lonekrav\w*", r"\w*loneonske\w*",
+    r"\w*opsigelsesvarsel\w*",
+    r"kundigungsfrist_legacy",
     r"kuendigungsfrist", r"eintrittstermin", r"eintrittsdatum",
     r"verfugbar\w*", r"verfuegbar\w*", r"berufserfahrung", r"aufmerksam geworden",
     r"arbeitserlaubnis", r"visum", r"staatsangehorigkeit", r"geschlecht",
@@ -867,23 +879,44 @@ def _find_submit(page: Any) -> str | None:
     return None
 
 
-def _confirmation_selector(page: Any, timeout_ms: int) -> str | None:
-    """Wait for a confirmation *element*. Returns the selector, or None.
+def _confirmation_selector(page: Any, timeout_ms: int,
+                           before: frozenset[str] = frozenset()) -> str | None:
+    """First confirmation selector that resolves — and was not already there.
 
-    The per-selector budget is split so a form with no confirmation cannot
-    stall the run for `len(CONFIRMATION_SELECTORS)` × the full timeout.
-
-    An element the ATS only renders after a successful POST is the strong
-    signal; the text search below is the weak one.
+    `before` is the set of these selectors that matched BEFORE the submit
+    click. Without it this is the same hole the text check already closed, one
+    door along: `.confirmation` is an ordinary class name, and Playwright's
+    `text=` is a case-insensitive substring search over the whole page, so a
+    posting whose own ad says "Thank you for your interest" was recorded as a
+    submitted application that was never sent — and then blocked forever.
     """
     budget = max(1000, timeout_ms // max(1, len(CONFIRMATION_SELECTORS)))
     for selector in CONFIRMATION_SELECTORS:
+        if selector in before:
+            continue
         try:
             if page.wait_for_selector(selector, timeout=budget) is not None:
                 return selector
         except Exception:
             continue
     return None
+
+
+def _confirmation_selectors_present(page: Any) -> frozenset[str]:
+    """Which confirmation selectors already match. Cheap, no waiting."""
+    found = set()
+    for selector in CONFIRMATION_SELECTORS:
+        try:
+            if page.query_selector_all(selector):
+                found.add(selector)
+        except Exception:
+            continue
+        try:
+            if selector.startswith("text=") and selector[5:].lower() in _page_text(page).lower():
+                found.add(selector)
+        except Exception:
+            continue
+    return frozenset(found)
 
 
 def _page_text(page: Any) -> str | None:
@@ -996,7 +1029,26 @@ def _form_still_present(page: Any) -> bool:
     returns False so the caller takes the cautious branch and blocks a retry.
     """
     try:
-        return bool(collect_fields(page))
+        # A resume upload, or a submit control, is evidence of the application
+        # form. Any-input-at-all was too broad: a search box or a cookie
+        # checkbox on a localized confirmation page read as "still on the
+        # form", so a real submission was recorded as never sent and applied
+        # to again the next day.
+        for field in collect_fields(page):
+            if str(field.get("type", "")).lower() == "file":
+                return True
+            # A required field still on screen means the flow is not finished:
+            # either validation rejected the submission, or this is page two
+            # of a multi-page form. A confirmation page asks for nothing.
+            if field.get("required"):
+                return True
+        for selector in SUBMIT_SELECTORS:
+            try:
+                if page.query_selector_all(selector):
+                    return True
+            except Exception:
+                continue
+        return False
     except Exception:
         return False
 
@@ -1172,6 +1224,9 @@ def apply_one(
             before_submit = str(page.content() or "")
         except Exception:
             before_submit = ""
+        # Both confirmation channels are compared against the pre-click page.
+        # A signal that was already on screen is not evidence of anything.
+        before_selectors = _confirmation_selectors_present(page)
 
         submit = _find_submit(page)
         if submit is None:
@@ -1189,7 +1244,7 @@ def apply_one(
         _note_submit_attempt(tracker, scored, method=method, now=now)
         page.click(submit)
 
-        selector_signal = _confirmation_selector(page, timeout_ms)
+        selector_signal = _confirmation_selector(page, timeout_ms, before_selectors)
         after = _page_text(page)
         signal = selector_signal or _confirmation_text(after, before_submit)
         still_a_form = _form_still_present(page)

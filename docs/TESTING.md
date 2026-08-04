@@ -1,6 +1,6 @@
 # Testing
 
-**958 tests, ~37s, fully offline.**
+**1316 tests, ~39s, fully offline.**
 
 ```bash
 pytest -q                      # the whole suite, offline, no API key, no browser

@@ -185,6 +185,14 @@ class Tracker:
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(key) DO UPDATE SET
                 last_seen_at = excluded.last_seen_at,
+                -- Refreshed on every sighting, not frozen at the first one.
+                -- `dedupe_key` is derived from company/title/city, so a
+                -- location filled in on day two — or a relocation — changes
+                -- it. `has_applied_similar` reads this column, so a stale
+                -- value meant a repost under a new ATS id sailed through the
+                -- gate and a second application went out.
+                dedupe_key   = CASE WHEN excluded.dedupe_key != ''
+                                    THEN excluded.dedupe_key ELSE jobs.dedupe_key END,
                 url          = excluded.url,
                 location     = CASE WHEN excluded.location != ''
                                     THEN excluded.location ELSE jobs.location END,

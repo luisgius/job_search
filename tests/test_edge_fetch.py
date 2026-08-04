@@ -991,3 +991,27 @@ def test_one_pathological_posting_never_costs_the_batch(tmp_path):
     result = apply_filters([broken, good], cfg(tmp_path), now=NOW)
     assert good in result.kept
     assert len(result.kept) + len(result.rejected) == 2
+
+
+def test_a_us_only_role_declared_in_the_title_is_not_rescued(tmp_path):
+    """The US veto read only `location` while the EU rescue read location,
+    title and description — half a check. A posting whose location is a bare
+    "Remote" and whose *title* says "(Remote - US)" was kept by any European
+    city its description happened to mention."""
+    conf = fresh_cfg(tmp_path)
+    for title in ("Backend Engineer (Remote - US)",
+                  "Backend Engineer — US Only",
+                  "Backend Engineer (United States)"):
+        job = make_job(location="Remote", title=title,
+                       description="Our engineering team sits in Berlin and Madrid.")
+        ok, reason = passes_location(job, conf)
+        assert ok is False, f"{title!r} was kept: {reason}"
+
+
+def test_a_remote_eu_role_is_still_kept(tmp_path):
+    """The neighbouring case — widening the veto must not start dropping the
+    remote European roles this whole tool exists to find."""
+    conf = fresh_cfg(tmp_path)
+    job = make_job(location="Remote", title="Backend Engineer (Remote - EU)",
+                   description="Our engineering team sits in Berlin and Madrid.")
+    assert passes_location(job, conf)[0] is True

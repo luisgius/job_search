@@ -41,6 +41,7 @@ from src.apply.autoapply import (
     detect_ats,
     eligible,
     inspect_form,
+    question_trigger,
     run,
 )
 from src.db import Tracker
@@ -1298,3 +1299,110 @@ def test_the_tracker_is_consulted_last_so_the_actionable_reason_wins(
     assert ok is False
     assert "Greenhouse or Lever" in reason
     assert "already applied" not in reason
+
+
+# ==========================================================================
+# regressions the validator found — every one of these was reproduced
+# ==========================================================================
+
+
+def test_a_confirmation_selector_already_on_the_page_is_not_a_confirmation(
+        tmp_path: Path, memory_tracker):
+    """The faked-confirmation fix was reopened one door along.
+
+    Comparing only the page *text* against the pre-click page left
+    `CONFIRMATION_SELECTORS` unguarded — and `.confirmation` is an ordinary
+    class name while Playwright's `text=` is a substring search over the whole
+    page. A posting whose own ad said "Thank you for your interest" was
+    recorded as an application that was never sent, and then blocked forever.
+    """
+    class AlreadyThanking(FakePage):
+        def wait_for_selector(self, selector, **kwargs):
+            if selector.startswith("text=Thank"):
+                return FakeElement("div", text="Thank you for your interest in Acme")
+            raise TimeoutError(selector)
+
+        def content(self):
+            return "<p>Thank you for your interest in Acme</p>" + (self.html or "")
+
+    scored = with_pdf(tmp_path)
+    memory_tracker.record_job(scored.job, now=NOW)
+    page = AlreadyThanking(simple_form(), confirmation=None)
+    outcome = apply_one(scored, apply_config(tmp_path, dry_run=False), page=page,
+                        tracker=memory_tracker, now=NOW)
+
+    assert outcome.status is not ApplyStatus.APPLIED
+    assert memory_tracker.has_applied(scored.job.key) is False
+
+
+def test_a_stray_input_on_a_confirmation_page_is_not_the_form(tmp_path: Path):
+    """A localized confirmation page matches none of the English selectors, so
+    the decision falls to "is the form still up?". Counting *any* input made a
+    site search box or a cookie checkbox read as the form, so a real
+    submission was recorded as never sent and applied to again the next day.
+    """
+    class Submits(FakePage):
+        """A real form that becomes a confirmation page carrying a search box."""
+
+        def query_selector_all(self, selector):
+            if self.clicks:
+                self.elements = [FakeElement("input", type="search", name="q",
+                                             label="Suchen")]
+            return super().query_selector_all(selector)
+
+        def content(self):
+            if self.clicks:
+                return "<h1>Vielen Dank für Ihre Bewerbung</h1><input name=q>"
+            return self.html or ""
+
+    page = Submits(simple_form(), html="", confirmation=None)
+    outcome = apply_one(with_pdf(tmp_path), apply_config(tmp_path, dry_run=False),
+                        page=page)
+
+    assert page.submitted is True, "the test never reached the submit path"
+    assert outcome.status is not ApplyStatus.APPLY_FAILED
+
+
+@pytest.mark.parametrize(
+    "label",
+    ["Gehaltsvorstellung", "Wunschgehalt", "Jahresgehalt", "Zielgehalt",
+     "Bruttojahresgehalt", "Gehaltswunsch", "Kündigungsfrist",
+     "Verfügbarkeit ab", "Frühestmöglicher Eintrittstermin",
+     "Wieviel Jahre Erfahrung", "Oczekiwania finansowe", "Löneanspråk"],
+)
+def test_a_german_compound_screener_bails(label):
+    """German puts the head noun last, so a word-anchored "gehalt" caught
+    "Gehaltsvorstellung" and missed "Wunschgehalt" — ten of twelve optional
+    screener probes were being submitted blank."""
+    assert question_trigger({"label": label, "tag": "input", "type": "text"})
+
+
+@pytest.mark.parametrize(
+    "label", ["Vorname", "Nachname", "Telefon", "E-Mail", "Lebenslauf", "Website"],
+)
+def test_ordinary_german_fields_still_pass(label):
+    """The neighbouring case: widening the vocabulary must not make a plain
+    German application form unfillable."""
+    assert question_trigger({"label": label, "tag": "input", "type": "text"}) is None
+
+
+def test_a_dedupe_key_that_drifts_still_blocks_a_repost(tmp_path: Path,
+                                                         memory_tracker):
+    """`has_applied_similar` reads the stored `dedupe_key`, which is derived
+    from company/title/city. A location filled in on day two — or a plain
+    relocation — changes it, and the row was frozen at first sighting. The
+    repost under a new ATS id then sailed through the gate."""
+    day_one = make_scored(score=95, ats="greenhouse", ats_job_id="1", location="")
+    memory_tracker.record_job(day_one.job, now=NOW)
+
+    day_two = make_scored(score=95, ats="greenhouse", ats_job_id="1",
+                          location="Berlin, Germany")
+    memory_tracker.record_job(day_two.job, now=NOW)
+    memory_tracker.record_status(day_two.job.key, ApplyStatus.APPLIED, now=NOW)
+
+    repost = with_pdf(tmp_path, make_scored(score=95, ats="greenhouse",
+                                            ats_job_id="9999",
+                                            location="Berlin, Germany"))
+    ok, reason = eligible(repost, apply_config(tmp_path), memory_tracker)
+    assert ok is False, "the repost was applied to a second time"
+    assert "already applied" in reason

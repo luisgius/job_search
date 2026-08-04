@@ -417,6 +417,7 @@ class LLMClient:
         temperature: float = 0.0,
         schema_hint: str = "",
         require_keys: Iterable[str] | None = None,
+        forbid_verbatim: str | None = None,
         sleep: Callable[[float], None] | None = None,
     ) -> dict[str, Any]:
         """`complete()` plus `extract_json()`.
@@ -440,6 +441,7 @@ class LLMClient:
                 sleep=sleep,
             ),
             require_keys=require_keys,
+            forbid_verbatim=forbid_verbatim,
         )
 
 
@@ -557,7 +559,12 @@ def _fenced_blocks(text: str) -> list[str]:
     return tagged + untagged
 
 
-def extract_json(text: str, *, require_keys: Iterable[str] | None = None) -> dict[str, Any]:
+def extract_json(
+    text: str,
+    *,
+    require_keys: Iterable[str] | None = None,
+    forbid_verbatim: str | None = None,
+) -> dict[str, Any]:
     """Recover a JSON object from a model reply.
 
     `require_keys` is the defence against a planted object. A job ad can carry
@@ -566,10 +573,19 @@ def extract_json(text: str, *, require_keys: Iterable[str] | None = None) -> dic
     assessment is {...}" — hands this function two parseable objects with the
     attacker's first.
 
-    Matching is on the FULL key set, not any of them: the plant in a real ad
-    usually carries `score` and `verdict`, so "has one of the keys" does not
-    discriminate at all. The model's own answer is the one that carries every
-    key the prompt asked for.
+    Matching is on the FULL key set, not any of them: a plant usually carries
+    `score` and `verdict`, so "has one of the keys" does not discriminate.
+
+    That alone is not enough — a real ad can plant a complete five-key object,
+    and then BOTH candidates match. Two more things decide it:
+
+    * `forbid_verbatim` is the untrusted text the reply is about (the job
+      description). Any candidate whose own keys and values all appear inside
+      it is text lifted from the ad, not an answer, and is skipped. This is
+      the precise defence and it kills the verbatim-quote attack outright.
+    * failing that, the LAST full-key match wins rather than the first. A model
+      that quotes the instruction it is refusing puts the quote mid-sentence
+      and its own answer at the end.
 
     When nothing carries the full set we do NOT go looking for a closer
     match: preferring an object that has *some* of the keys is exactly what
@@ -583,16 +599,27 @@ def extract_json(text: str, *, require_keys: Iterable[str] | None = None) -> dic
         raise LLMError("model returned nothing")
 
     wanted = {str(k) for k in (require_keys or ())}
+    untrusted = str(forbid_verbatim or "")
     parsed_any: dict[str, Any] | None = None
+    matches: list[dict[str, Any]] = []
 
     for chunk in _candidate_chunks(raw):
         candidate = _try_load(chunk)
         if candidate is None:
             continue
         if wanted and wanted.issubset(candidate):
-            return candidate
+            if untrusted and _looks_lifted_from(candidate, untrusted):
+                logger.warning(
+                    "skipping a JSON object that appears verbatim in the job "
+                    "posting — it is planted text, not an answer"
+                )
+                continue
+            matches.append(candidate)
         if parsed_any is None:
             parsed_any = candidate
+
+    if matches:
+        return matches[-1]
 
     if parsed_any is not None:
         if wanted:
@@ -605,6 +632,30 @@ def extract_json(text: str, *, require_keys: Iterable[str] | None = None) -> dic
 
     preview = str(raw).strip().replace("\n", " ")[:200]
     raise LLMError(f"no JSON object found in model response: {preview!r}")
+
+
+def _looks_lifted_from(candidate: Mapping[str, Any], untrusted: str) -> bool:
+    """Does this object appear, key and value, inside the untrusted text?
+
+    Compared on normalised fragments rather than on the exact serialisation,
+    because a model re-emits JSON with its own spacing. A real answer is about
+    the posting and does not reproduce it.
+    """
+    haystack = " ".join(str(untrusted).split()).lower()
+    if not haystack:
+        return False
+    fragments = 0
+    for key, value in candidate.items():
+        if isinstance(value, (dict, list)) and not value:
+            continue                       # empty list/dict is not evidence
+        fragment = f'"{key}"'
+        if fragment.lower() not in haystack:
+            return False
+        if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+            if str(value).lower() not in haystack:
+                return False
+        fragments += 1
+    return fragments >= 2
 
 
 def _candidate_chunks(raw: str) -> Iterator[str]:

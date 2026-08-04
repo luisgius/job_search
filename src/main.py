@@ -51,7 +51,8 @@ MIN_CV_CHARS = 200
 
 #: Statuses the apply stage produces, i.e. "we touched a form for this one".
 _APPLY_STATUSES: frozenset[ApplyStatus] = frozenset(
-    {ApplyStatus.APPLIED, ApplyStatus.DRY_RUN, ApplyStatus.APPLY_FAILED}
+    {ApplyStatus.APPLIED, ApplyStatus.DRY_RUN, ApplyStatus.APPLY_FAILED,
+     ApplyStatus.SUBMITTED_UNCONFIRMED}
 )
 
 EPILOG = """\
@@ -437,6 +438,13 @@ def _count_outcomes(scored_jobs: list[ScoredJob], stats: RunStats) -> None:
     stats.digest_items = sum(
         1 for s in scored_jobs if _status_of(s) == ApplyStatus.DIGEST.value
     )
+    # Carried as a dynamic attribute, like filter_counts: RunStats is a
+    # foundation type. Without it the jobs that most need a human look were
+    # the only ones missing from the summary line cron writes to the log.
+    stats.unconfirmed = sum(  # type: ignore[attr-defined]
+        1 for s in scored_jobs
+        if _status_of(s) == ApplyStatus.SUBMITTED_UNCONFIRMED.value
+    )
     stats.tailored = sum(
         1 for s in scored_jobs if s.artifacts and s.artifacts.cv_md
     )
@@ -669,6 +677,11 @@ def format_summary(stats: RunStats) -> str:
     ])
     if stats.apply_failed:
         outcomes += f"{dot}apply failed {stats.apply_failed}"
+    unconfirmed = int(getattr(stats, "unconfirmed", 0) or 0)
+    if unconfirmed:
+        # Loud on purpose: these were clicked, not confirmed, and are blocked
+        # from a retry. They are the ones a human has to go and look at.
+        outcomes += f"{dot}UNCONFIRMED — CHECK BY HAND {unconfirmed}"
 
     lines = [funnel, outcomes]
     path = getattr(stats, "digest_path", None)
