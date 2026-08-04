@@ -197,12 +197,44 @@ def test_looks_like_us_is_false_for_europe(location):
     assert looks_like_us(location) is False
 
 
-def test_germany_is_not_mistaken_for_delaware():
-    """`DE` is both Germany's ISO code and Delaware's state code — the single
-    nastiest collision in the table."""
-    assert country_of("Munich, DE") == "DE"
-    assert country_of("Berlin, Germany") == "DE"
-    assert country_of("Wilmington, DE") not in EU_COUNTRIES
+@pytest.mark.parametrize(
+    "location",
+    ["Munich, DE", "Berlin, DE", "Hamburg, DE", "Köln, DE", "Frankfurt, DE",
+     "Remote, DE", "Germany, DE"],
+)
+def test_a_trailing_de_after_a_european_city_is_germany(location):
+    assert country_of(location) == "DE"
+
+
+@pytest.mark.parametrize(
+    "location",
+    ["Wilmington, DE", "Newark, DE", "Dover, DE", "Smyrna, DE", "Middletown, DE"],
+)
+def test_a_trailing_de_after_an_unknown_city_is_delaware(location):
+    """`DE` is both Germany and Delaware — the nastiest collision in the table,
+    and the one my first attempt got wrong. It was decided by a hand-written
+    list of Delaware towns, which meant every town not on the list (Newark,
+    Dover) resolved to Germany and walked straight through an EU-only filter.
+    It is now decided by whether the city in front of it is a European one we
+    recognise, which does not need the list to be complete."""
+    assert country_of(location) not in EU_COUNTRIES
+
+
+@pytest.mark.parametrize(
+    "location,expected",
+    [("Valletta, MT", "MT"), ("Malta, MT", "MT"),
+     ("Bozeman, MT", None), ("Billings, MT", None), ("Missoula, MT", None)],
+)
+def test_malta_and_montana_are_told_apart_the_same_way(location, expected):
+    assert country_of(location) == expected
+
+
+def test_an_unrecognised_city_before_de_still_reads_as_germany_when_placeless():
+    """The deliberate default. An unknown *named* place next to DE reads as
+    Delaware; a placeless head ("Remote, DE") reads as Germany, because that
+    is how those postings are actually written."""
+    assert country_of("Remote, DE") == "DE"
+    assert country_of("Hybrid, DE") == "DE"
 
 
 def test_substring_matching_is_never_used():

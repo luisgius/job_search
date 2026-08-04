@@ -342,10 +342,19 @@ US_STATE_CODES: frozenset[str] = frozenset(
 )
 
 # Codes that are simultaneously a US state and an EU country: Delaware/Germany
-# and Montana/Malta. "Munich, DE" must stay German, so these are NOT treated
-# as state codes. The handful of US cities that pair with them (Wilmington DE,
-# Bozeman MT ...) are listed in `_US_CITY_HINTS` instead.
+# and Montana/Malta. Which one is meant is decided by the city in front of it
+# (see `_ambiguous_code_is_us`) rather than by an ever-growing list of US
+# cities — enumerating every town in Delaware is a race you lose, and losing
+# it means a US posting passes an EU-only filter.
 AMBIGUOUS_STATE_CODES: frozenset[str] = frozenset({"DE", "MT"})
+
+#: Location heads that name no city at all, so an ambiguous trailing code has
+#: to be read as the country: "Remote, DE" is Germany.
+_PLACELESS_HEADS: frozenset[str] = frozenset({
+    "", "remote", "remote work", "hybrid", "on site", "onsite", "office",
+    "anywhere", "flexible", "multiple", "multiple locations", "various",
+    "eu", "europe", "emea", "home", "home office", "distributed",
+})
 
 _US_STATE_NAMES: frozenset[str] = frozenset(
     normalize_text(name)
@@ -470,13 +479,11 @@ def _part_looks_us(raw_part: str, *, index: int) -> bool:
     words = [t for t in tokens if not _ZIP_RE.match(t)]
     if words:
         tail = words[-1].upper()
-        if (
-            len(tail) == 2
-            and tail in US_STATE_CODES
-            and tail not in AMBIGUOUS_STATE_CODES
-            and (index > 0 or len(words) == 1)
-        ):
-            return True
+        if len(tail) == 2 and tail in US_STATE_CODES and (index > 0 or len(words) == 1):
+            if tail not in AMBIGUOUS_STATE_CODES:
+                return True
+            # A bare ambiguous code is resolved at phrase level, where the
+            # city that disambiguates it is visible.
     return False
 
 
@@ -484,7 +491,46 @@ def _phrase_looks_us(phrase: str) -> bool:
     if _US_ABBREV_RE.search(phrase):
         return True
     parts = phrase.split(",")
-    return any(_part_looks_us(part, index=i) for i, part in enumerate(parts))
+    if any(_part_looks_us(part, index=i) for i, part in enumerate(parts)):
+        return True
+    # "Newark, DE" — the ambiguous code and the city that disambiguates it sit
+    # in different comma parts, so this decision cannot be made part by part.
+    return _trailing_ambiguous_code_is_us(parts)
+
+
+def _trailing_ambiguous_code_is_us(parts: list[str]) -> bool:
+    """Is a trailing DE/MT Delaware/Montana rather than Germany/Malta?
+
+    Decided by the city in front of it: "Munich, DE" is Germany because Munich
+    is a European city we know, "Newark, DE" and "Dover, DE" are Delaware
+    because they are not. Enumerating every town in Delaware is a race you
+    lose, and losing it means a US posting passes an EU-only filter.
+
+    An unknown head is read as the *country*, deliberately. The cost of that
+    is one US posting reaching the scorer, which reads the location and marks
+    it down. The opposite default would silently delete real German jobs from
+    any board whose location strings we do not recognise, and a deleted job is
+    invisible forever.
+    """
+    cleaned = [normalize_text(part) for part in parts]
+    cleaned = [part for part in cleaned if part]
+    if len(cleaned) < 2:
+        return False
+
+    tail = cleaned[-1].upper()
+    if tail not in AMBIGUOUS_STATE_CODES:
+        return False
+
+    head_tokens = " ".join(cleaned[:-1]).split()
+    if not head_tokens or " ".join(head_tokens) in _PLACELESS_HEADS:
+        return False
+    if _ngram_hit(head_tokens, CITY_TO_COUNTRY, _CITY_MAX_NGRAM):
+        return False                      # a European city -> the country
+    if _ngram_hit(head_tokens, COUNTRY_ALIASES, _ALIAS_MAX_NGRAM):
+        return False                      # "Germany, DE"
+    # A named place we do not recognise as European, next to a code that is
+    # also a US state. That is the Newark/Dover case.
+    return True
 
 
 def looks_like_us(location: str | None) -> bool:
