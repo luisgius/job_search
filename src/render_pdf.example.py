@@ -191,16 +191,21 @@ def render(cv_markdown: str, out_path: str) -> None:
             flowables.append(HRFlowable(width="100%", thickness=0.6,
                                         color="#bbbbbb", spaceAfter=6))
         elif kind in ("bullets", "ordered"):
-            entries = [
-                ListItem(Paragraph(inline_markup(text), styles["item"]),
-                         leftIndent=12, value=index + 1)
-                for index, text in enumerate(payload or [])  # type: ignore[arg-type]
-            ]
+            ordered = kind == "ordered"
+            entries = []
+            for index, text in enumerate(payload or []):  # type: ignore[arg-type]
+                item = Paragraph(inline_markup(text), styles["item"])
+                # `value=` is the *number* of an ordered item; passing it for a
+                # bullet list replaces "•" with an int and ReportLab crashes.
+                entries.append(
+                    ListItem(item, leftIndent=12, value=index + 1) if ordered
+                    else ListItem(item, leftIndent=12)
+                )
             if entries:
                 flowables.append(ListFlowable(
                     entries,
-                    bulletType="bullet" if kind == "bullets" else "1",
-                    start="•" if kind == "bullets" else 1,
+                    bulletType="1" if ordered else "bullet",
+                    start=1 if ordered else "•",
                     bulletFontSize=BODY_SIZE,
                     leftIndent=12,
                     spaceAfter=5,

@@ -253,6 +253,13 @@ def _item(scored: ScoredJob, *, digest_dir: Path, now: datetime) -> dict[str, An
     failed = bool(score is not None and score.error)
     value = _int(getattr(score, "value", 0), 0)
 
+    detail = (scored.status_detail or "").strip()
+    # The card already shows the scorer error in its own alert; scoring's
+    # status_detail quotes that same error, and printing it twice makes a
+    # one-line problem look like two.
+    if failed and score.error and score.error in detail:
+        detail = ""
+
     artifacts = scored.artifacts
     cv_md = _artifact_href(getattr(artifacts, "cv_md", None), digest_dir)
     cover_md = _artifact_href(getattr(artifacts, "cover_md", None), digest_dir)
@@ -267,6 +274,7 @@ def _item(scored: ScoredJob, *, digest_dir: Path, now: datetime) -> dict[str, An
         (scored.cover_letter_md or "").strip(), COVER_PREVIEW_CHARS, suffix=" …"
     )
 
+    relative = relative_time(job.posted_at, now)
     return {
         "key": job.key,
         "company": job.company or "Unknown company",
@@ -280,7 +288,10 @@ def _item(scored: ScoredJob, *, digest_dir: Path, now: datetime) -> dict[str, An
         "ats": job.ats or "",
         "posted_at": _format_datetime(job.posted_at),
         "posted_at_iso": job.posted_at.isoformat() if job.posted_at else "",
-        "posted_relative": relative_time(job.posted_at, now),
+        "posted_relative": relative,
+        # Undated postings are common (LinkedIn alerts carry no per-job date);
+        # say so rather than printing "posted —".
+        "posted_label": f"posted {relative}" if job.posted_at else "no posting date",
         "score": value,
         "score_label": "?" if failed else str(value),
         "score_class": _score_class(value, failed),
@@ -291,7 +302,7 @@ def _item(scored: ScoredJob, *, digest_dir: Path, now: datetime) -> dict[str, An
         "strengths": _strings(getattr(score, "strengths", None)),
         "gaps": _strings(getattr(score, "gaps", None)),
         "status": _status_value(scored.status),
-        "status_detail": (scored.status_detail or "").strip(),
+        "status_detail": detail,
         "artifacts_dir": _artifact_href(getattr(artifacts, "dir", None), digest_dir),
         "cv_md": cv_md,
         "cover_md": cover_md,

@@ -241,6 +241,11 @@ def detect_ats(url: str | None) -> str | None:
         return None
     # Tolerate scheme-less input ("boards.greenhouse.io/acme/jobs/1").
     parts = urlsplit(raw if "//" in raw else f"//{raw}", scheme="https")
+    # An application form is served over HTTP(S) and nothing else. Without
+    # this, "ftp://boards.greenhouse.io/..." reaches the browser on the
+    # strength of its hostname alone.
+    if (parts.scheme or "").lower() not in ("http", "https"):
+        return None
     host = (parts.hostname or "").lower().strip(".")
     if not host:
         return None
@@ -750,6 +755,16 @@ def _record(
         scored.artifacts.screenshot = outcome.screenshot
     if tracker is None:
         return outcome
+    # `applications.key` is a foreign key onto `jobs.key`, so the posting has
+    # to exist before an outcome can be written. `record_job` is an upsert, so
+    # doing it here costs nothing when the pipeline already recorded it.
+    record_job = getattr(tracker, "record_job", None)
+    if callable(record_job):
+        try:
+            record_job(scored.job, now=now)
+        except Exception as exc:
+            logger.debug("could not upsert %s before its status: %s",
+                         scored.job.key, exc)
     try:
         tracker.record_status(
             scored.job.key,

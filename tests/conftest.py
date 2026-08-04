@@ -547,8 +547,16 @@ class FakeElement:
     # -- playwright-ish surface ---------------------------------------
 
     def get_attribute(self, name: str) -> str | None:
-        value = self.attrs.get(name)
-        return None if value in (None, "") else str(value)
+        """Absent attribute -> None; present-but-valueless -> "".
+
+        The distinction is load-bearing: a real DOM returns `""` for
+        `<input required>`, so collapsing it to None would make the fake
+        unable to express a required field at all.
+        """
+        if name not in self.attrs:
+            return None
+        value = self.attrs[name]
+        return None if value is None else str(value)
 
     def inner_text(self) -> str:
         return self.text
