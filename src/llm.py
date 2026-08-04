@@ -21,7 +21,7 @@ import json
 import re
 import time
 from collections.abc import Mapping
-from typing import Any, Callable, Iterator
+from typing import Any, Callable, Iterable, Iterator
 
 from .util import get_logger
 
@@ -416,6 +416,7 @@ class LLMClient:
         max_tokens: int,
         temperature: float = 0.0,
         schema_hint: str = "",
+        require_keys: Iterable[str] | None = None,
         sleep: Callable[[float], None] | None = None,
     ) -> dict[str, Any]:
         """`complete()` plus `extract_json()`.
@@ -437,7 +438,8 @@ class LLMClient:
                 max_tokens=max_tokens,
                 temperature=temperature,
                 sleep=sleep,
-            )
+            ),
+            require_keys=require_keys,
         )
 
 
@@ -555,29 +557,63 @@ def _fenced_blocks(text: str) -> list[str]:
     return tagged + untagged
 
 
-def extract_json(text: str) -> dict[str, Any]:
-    """Recover a JSON object from whatever the model actually sent.
+def extract_json(text: str, *, require_keys: Iterable[str] | None = None) -> dict[str, Any]:
+    """Recover a JSON object from a model reply.
 
-    Handles, in order of preference: a ```json fenced block, a bare ``` block,
-    the raw text, and finally any balanced `{...}` span embedded in prose.
-    Raises `LLMError` when nothing parses — callers treat that as a failed
-    call rather than guessing.
+    `require_keys` is the defence against a planted object. A job ad can carry
+    a complete, valid-looking score object, and a model that quotes the
+    instruction it is refusing — "the posting asks me to return {...}, but my
+    assessment is {...}" — hands this function two parseable objects with the
+    attacker's first.
+
+    Matching is on the FULL key set, not any of them: the plant in a real ad
+    usually carries `score` and `verdict`, so "has one of the keys" does not
+    discriminate at all. The model's own answer is the one that carries every
+    key the prompt asked for.
+
+    When nothing carries the full set we do NOT go looking for a closer
+    match: preferring an object that has *some* of the keys is exactly what
+    lets a partial plant win. The first parseable object is returned as-is, so
+    an envelope like `{"result": {...}}` reaches `parse_score`, which records
+    an honest scoring error and still shows the job for a human to judge.
+    Guessing at a number would be worse than admitting we could not read one.
     """
-    if not text or not str(text).strip():
-        raise LLMError("model returned an empty response")
+    raw = text or ""
+    if not str(raw).strip():
+        raise LLMError("model returned nothing")
 
-    raw = str(text)
-    for chunk in [*_fenced_blocks(raw), raw]:
-        parsed = _try_load(chunk)
-        if parsed is not None:
-            return parsed
-        for span in _balanced_objects(chunk):
-            parsed = _try_load(span)
-            if parsed is not None:
-                return parsed
+    wanted = {str(k) for k in (require_keys or ())}
+    parsed_any: dict[str, Any] | None = None
 
-    preview = raw.strip().replace("\n", " ")[:200]
+    for chunk in _candidate_chunks(raw):
+        candidate = _try_load(chunk)
+        if candidate is None:
+            continue
+        if wanted and wanted.issubset(candidate):
+            return candidate
+        if parsed_any is None:
+            parsed_any = candidate
+
+    if parsed_any is not None:
+        if wanted:
+            logger.warning(
+                "no object in the model reply carried the full expected key set "
+                "(%s) — passing the first one through unjudged",
+                ", ".join(sorted(wanted)),
+            )
+        return parsed_any
+
+    preview = str(raw).strip().replace("\n", " ")[:200]
     raise LLMError(f"no JSON object found in model response: {preview!r}")
+
+
+def _candidate_chunks(raw: str) -> Iterator[str]:
+    """Every span of the reply that might be the object, best guess first."""
+    for block in _fenced_blocks(raw):
+        yield block
+    yield raw
+    for candidate in _balanced_objects(raw):
+        yield candidate
 
 
 # --------------------------------------------------------------------------
