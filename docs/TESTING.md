@@ -145,15 +145,36 @@ actually occur in production payloads:
   an argument. And one channel's failure never stops the others: a notifier
   that breaks the run it was meant to warn about is worse than none.
 
-## Markers
+## Markers — and the limit of an offline suite
 
 ```bash
-pytest -m "not network"    # the default; nothing in the suite hits the network
+pytest -q                  # the default; excludes network (see pyproject addopts)
+pytest -m network -q       # the live contract tests, run deliberately
 ```
 
-`@pytest.mark.network` exists for tests you may want to add against the real
-Greenhouse/Lever endpoints. None are shipped: a suite that fails because
-someone else's API had a bad afternoon trains you to ignore failures.
+**Be clear about what the offline suite proves.** It proves our parsers handle
+the payloads in `tests/fixtures/`. It does not prove the live APIs still emit
+those payloads. If Greenhouse renamed a field tomorrow, the fixture and the
+parser would agree with each other and both be wrong, and every test would
+stay green.
+
+`tests/test_live_contract.py` closes that gap and is the one place that talks
+to the real internet. It asserts the specific things the parsers bet on:
+
+- the fields each parser reads are still present;
+- Greenhouse `content` is still *double* entity-escaped (we unescape exactly
+  once — if they stop, that unescape starts corrupting real text);
+- `first_published` still exists, so freshness does not silently fall back to
+  the inflated `updated_at`;
+- Lever `createdAt` is still a **millisecond** epoch (seconds would date every
+  posting to 1970 and drop them all as stale, silently);
+- Lever still splits requirements into `lists`;
+- and the offline fixtures do not claim fields the live API no longer returns.
+
+It is excluded from the default run on purpose — a suite that goes red because
+someone else's API had a bad afternoon trains you to ignore failures — and each
+test **skips** rather than fails when the network is simply unreachable. Run it
+on setup, and again whenever a source mysteriously returns nothing.
 
 ## Adding a test
 

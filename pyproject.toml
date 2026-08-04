@@ -14,7 +14,11 @@ packages = ["src", "src.sources", "src.apply"]
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
-addopts = "-q --strict-markers --strict-config"
+# `-m "not network"` is what actually keeps the live-API contract tests out of
+# the default run. Without it they are collected, spend the retry budget
+# against a blocked or slow network, and turn a 37s suite into minutes.
+# Run them deliberately with `pytest -m network`.
+addopts = "-q --strict-markers --strict-config -m 'not network'"
 filterwarnings = ["error::DeprecationWarning:src.*"]
 markers = [
     "network: touches the real internet — deselected by default (-m 'not network')",
