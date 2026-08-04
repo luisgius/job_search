@@ -137,6 +137,36 @@ def test_remote_can_be_disallowed_entirely(tmp_path):
     assert passes_location(make_job(location="Berlin, Germany"), conf)[0] is True
 
 
+def test_allow_remote_false_still_keeps_a_job_in_an_allowed_country(tmp_path):
+    """A deliberate asymmetry, pinned here because it is easy to read as a bug.
+
+    `allow_remote: false` rejects postings that are *only* remote. A posting
+    that names an allowed country is kept even if it also offers remote work,
+    because "Berlin, Germany (Remote)" overwhelmingly means a Berlin role with
+    flexibility — rejecting it would throw away most hybrid postings.
+    """
+    conf = cfg(tmp_path, allow_remote=False)
+    assert passes_location(
+        make_job(location="Berlin, Germany (Remote)", remote=True), conf
+    )[0] is True
+
+
+def test_location_rejection_says_which_country_it_resolved_to(tmp_path):
+    """The digest has to distinguish "wrong country" from "unparseable" —
+    they call for completely different fixes."""
+    conf = cfg(tmp_path, countries=["DE"])
+    _, wrong_country = passes_location(make_job(location="Madrid, Spain"), conf)
+    _, unparseable = passes_location(make_job(location="Somewhereville"), conf)
+    assert "Spain" in wrong_country and "ES" in wrong_country
+    assert "could not be resolved" in unparseable
+
+
+def test_location_check_stamps_remote_when_the_source_left_it_unknown(tmp_path):
+    job = make_job(location="Remote - Europe", remote=None)
+    passes_location(job, cfg(tmp_path))
+    assert job.remote is True
+
+
 def test_unresolvable_location_is_rejected_with_a_clear_reason(tmp_path):
     ok, reason = passes_location(make_job(location="Somewhereville"), cfg(tmp_path))
     assert ok is False
