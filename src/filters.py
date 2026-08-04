@@ -17,9 +17,10 @@ description length.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Iterable, Mapping, NamedTuple
+from typing import Any, NamedTuple
 
 from . import geo
 from .models import Job, ensure_utc, normalize_text, utcnow

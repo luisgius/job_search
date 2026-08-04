@@ -26,8 +26,9 @@ Pure stdlib, no network, no config: everything is a lookup table.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from .models import normalize_text
 
