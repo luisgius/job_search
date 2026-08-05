@@ -1163,7 +1163,8 @@ def fetch_smartrecruiters(
     if isinstance(total, (int, float)) and not isinstance(total, bool) \
             and total > len(jobs):
         logger.info(
-            "smartrecruiters/%s: %d of %d postings (single page of %d)",
+            "smartrecruiters/%s: %d posting(s) parsed; the company reports %d "
+            "(one page of at most %d is fetched)",
             clean, len(jobs), int(total), SMARTRECRUITERS_PAGE_LIMIT,
         )
 
@@ -1195,9 +1196,10 @@ def _load_smartrecruiters_descriptions(
     if len(jobs) > budget:
         logger.info(
             "smartrecruiters/%s: fetching descriptions for %d of %d postings "
-            "(cap: SMARTRECRUITERS_MAX_DESCRIPTIONS=%d) — the remainder are "
-            "scored on title, company and location alone",
-            slug, budget, len(jobs), budget,
+            "(cap %d, default SMARTRECRUITERS_MAX_DESCRIPTIONS=%d) — the "
+            "remaining %d are scored on title, company and location alone",
+            slug, budget, len(jobs), budget, SMARTRECRUITERS_MAX_DESCRIPTIONS,
+            len(jobs) - budget,
         )
 
     fetched = 0
