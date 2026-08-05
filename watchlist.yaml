@@ -1,12 +1,26 @@
 # ---------------------------------------------------------------------------
 # What to search.  Verify any slug before trusting it:
 #     python -m src.sources.ats_boards --check greenhouse spotify
-#     python -m src.sources.ats_boards --check lever plaid
+#     python -m src.sources.ats_boards --check personio acme
 #     python -m src.sources.ats_boards --check-all        # everything below
 #
 # Finding a slug: open a company's careers page and look at the job link.
-#   boards.greenhouse.io/SLUG/jobs/123     -> greenhouse: SLUG
-#   jobs.lever.co/SLUG/uuid                -> lever: SLUG
+# The slug is the path segment (or, for Personio, the subdomain) — never the
+# company's display name.
+#
+#   boards.greenhouse.io/SLUG/jobs/123        -> greenhouse:      SLUG
+#   jobs.lever.co/SLUG/uuid                   -> lever:           SLUG
+#   apply.workable.com/SLUG/j/ABC123/         -> workable:        SLUG
+#   jobs.ashbyhq.com/SLUG/uuid                -> ashby:           SLUG
+#   jobs.smartrecruiters.com/SLUG/74399...    -> smartrecruiters: SLUG
+#   SLUG.jobs.personio.de/job/12345           -> personio:        SLUG
+#
+# Pasting the whole URL works too — it is reduced to the slug for you.
+#
+# WHICH ONE IS A COMPANY ON?  Open their careers page and look at where the
+# "Apply" link goes. Greenhouse and Lever are where American companies post;
+# Workable, Ashby, SmartRecruiters and Personio are where European ones do, and
+# Personio in particular is the default for German, Spanish and Italian SMBs.
 # ---------------------------------------------------------------------------
 
 greenhouse:
@@ -18,6 +32,39 @@ greenhouse:
 
 lever:
   - plaid
+
+# ---------------------------------------------------------------------------
+# The four European boards.
+#
+# They are switched OFF in config.yaml until you put your own companies here:
+# there is no useful default list of "mid-size employers hiring in Valencia",
+# and an enabled board with an empty watchlist returns nothing every morning
+# while looking exactly like a quiet market. `--validate-only` says so.
+#
+# The examples below are each vendor's own careers board — the likeliest slug
+# to still exist, and something to prove the plumbing against — but they were
+# written without network access and NONE of them has been verified. Check
+# before you trust them, and replace them with companies you would work for:
+#
+#     python -m src.sources.ats_boards --check-all
+# ---------------------------------------------------------------------------
+
+workable:
+  - workable
+
+ashby:
+  - ashby
+
+smartrecruiters:
+  # Case-sensitive on this vendor: the slug is spelled exactly as it appears in
+  # the jobs.smartrecruiters.com URL, capitals and all.
+  - smartrecruiters
+
+personio:
+  # Bare tenant name -> {tenant}.jobs.personio.de, with an automatic retry on
+  # .personio.com for the minority of tenants provisioned there. Write the full
+  # host (acme.jobs.personio.com) to skip the guess.
+  - personio
 
 adzuna:
   # Adzuna's European coverage, lowercase: at be ch de es fr gb it nl pl.

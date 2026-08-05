@@ -129,24 +129,83 @@ The employment-type stage reads only what a source states as structured data
 
 ### `src/sources/ats_boards.py`
 ```python
-GREENHOUSE_BOARD_URL = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
-LEVER_POSTINGS_URL   = "https://api.lever.co/v0/postings/{slug}"
+GREENHOUSE_BOARD_URL         = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
+LEVER_POSTINGS_URL           = "https://api.lever.co/v0/postings/{slug}"
+WORKABLE_ACCOUNT_URL         = "https://apply.workable.com/api/v1/widget/accounts/{slug}"
+ASHBY_JOB_BOARD_URL          = "https://api.ashbyhq.com/posting-api/job-board/{slug}"
+SMARTRECRUITERS_POSTINGS_URL = "https://api.smartrecruiters.com/v1/companies/{slug}/postings"
+SMARTRECRUITERS_POSTING_URL  = ".../postings/{posting_id}"
+PERSONIO_XML_URL             = "https://{host}/xml"   # host = {slug}.jobs.personio.de
+
+BOARDS: tuple[str, ...] = ("greenhouse", "lever", "workable", "ashby",
+                           "smartrecruiters", "personio")
 
 def fetch_greenhouse(slug, *, session=None, content=True) -> list[Job]
 def fetch_lever(slug, *, session=None) -> list[Job]
+def fetch_workable(slug, *, session=None, details=True) -> list[Job]
+def fetch_ashby(slug, *, session=None) -> list[Job]
+def fetch_smartrecruiters(slug, *, session=None, details=True,
+                          max_descriptions=SMARTRECRUITERS_MAX_DESCRIPTIONS) -> list[Job]
+def fetch_personio(slug, *, session=None) -> list[Job]
 def fetch(config, *, session=None, errors=None) -> list[Job]
 def check_slug(board: str, slug: str, *, session=None) -> tuple[bool, str]
 def main(argv=None) -> int          # supports: --check greenhouse spotify
 ```
-- Greenhouse: `?content=true`, description in `content` (HTML-escaped),
+Every `fetch_<board>` raises on transport/HTTP failure; `fetch` isolates each
+slug so one dead board costs that company and nothing else, and never raises.
+`session=` is the only network seam, always via `util.http_get` /
+`util.http_get_json`.
+
+- **Greenhouse**: `?content=true`, description in `content` (HTML-escaped),
   date in `updated_at` / `first_published`, location in `location.name`,
   id in `id`, url in `absolute_url`. Company = the slug (title-cased) unless
   the payload carries a better name.
-- Lever: list of postings; `text`, `hostedUrl`, `categories.location`,
+- **Lever**: list of postings; `text`, `hostedUrl`, `categories.location`,
   `categories.commitment`, `createdAt` (ms epoch), `descriptionPlain` or
   `description`, `id`.
+- **Workable**: `?details=true`; `{name, jobs: [...]}`. `shortcode` is the
+  stable id, `code` is the customer's own and is not. `description`,
+  `requirements` and `benefits` are three separate HTML blocks and all three
+  are concatenated — same reasoning as Lever's `lists`. `location` is
+  structured parts (`city`, `region`, `country`, `countryCode` *or*
+  `country_code`, `telecommuting`) and `Job.location` is assembled from them.
+  `state` is checked against an allow-list of *closures* only.
+- **Ashby**: `?includeCompensation=true`; `{apiVersion, jobs: [...]}`.
+  `isListed: false` is skipped (a missing field is not). `secondaryLocations`
+  is merged into `Job.location` the way Lever's `allLocations` is, because
+  `filters.passes_location` gates on `geo.countries_of` of that one string.
+  Date from `publishedAt` only — never `updatedAt`.
+- **SmartRecruiters**: `?limit=100`; `{totalFound, content: [...]}`. **The
+  listing carries no description**; it lives behind one request *per posting*
+  at `.../postings/{id}` under
+  `jobAd.sections.{companyDescription,jobDescription,qualifications,additionalInformation}.text`.
+  Capped by `SMARTRECRUITERS_MAX_DESCRIPTIONS` with an INFO log line when the
+  cap bites; a posting past it still reaches the digest with an empty
+  description. Apply URL is built as
+  `https://jobs.smartrecruiters.com/{company}/{id}` — the payload's `ref` is
+  the API URL and is useless to a human.
+- **Personio**: **XML, not JSON**, via `util.http_get` + stdlib
+  `xml.etree.ElementTree` (which does not resolve external entities — that is
+  what makes it acceptable on a third-party feed, and why no `defusedxml`
+  dependency is added). Root must be `<workzag-jobs>`, because an HTML error
+  page is well-formed XML and would otherwise parse into zero jobs silently.
+  Each `<position>` carries `id`, `office`, `department`, `name`,
+  `employmentType`, `createdAt` and titled `<jobDescription>` sections that are
+  concatenated. The slug is the **subdomain**, not a path segment; a bare slug
+  tries `.jobs.personio.de` then falls back to `.jobs.personio.com` on 404/410.
+
+**No new board may claim an `ats` value in `autoapply.SUPPORTED_ATS`.** Each
+sets `ats=` to its own vendor name (`"workable"`, `"ashby"`,
+`"smartrecruiters"`, `"personio"`), which keeps `Job.key` stable and unique per
+vendor while guaranteeing `eligible()` sends the job to the digest — only
+Greenhouse and Lever have been through the screener-bail work.
+`posted_at` is `None` rather than a guess when no publication date exists, so
+`freshness.skip_undated` stays meaningful, and `remote` is only ever asserted
+positively.
+
 - `--check` prints `OK <board>/<slug> — N postings` or a clear failure and
   returns exit code 0/1. Runnable as `python -m src.sources.ats_boards`.
+  `_CHEAP_CHECK_KWARGS` skips the expensive half of a fetch per vendor.
 
 ### `src/sources/adzuna.py`
 ```python

@@ -10,15 +10,22 @@ single HTML page with a link per job so your part of the work is one click,
 not an hour of tab management. It never applies to the same job twice.
 
 ```text
-sources ──┬─ Greenhouse boards ─┐
-          ├─ Lever boards       │
-          ├─ Adzuna (optional)  ├──▶ dedupe ──▶ hard filters ──▶ tracker gate
-          └─ LinkedIn email     ┘     (title · location · freshness · keywords)
-                                                                      │
-                                                                      ▼
+sources ──┬─ Greenhouse boards ────┐
+          ├─ Lever boards          │
+          ├─ Workable boards       │
+          ├─ Ashby boards          ├──▶ dedupe ──▶ hard filters ──▶ tracker gate
+          ├─ SmartRecruiters       │     (title · location · freshness · keywords)
+          ├─ Personio (XML)        │                               │
+          ├─ Adzuna (optional)     │                               │
+          └─ LinkedIn email        ┘                               ▼
    digest.html ◀── auto-apply ◀── PDF ◀── tailor CV + cover ◀── LLM fit score
    (needs your click · auto-applied · dry-run · below threshold · run stats)
 ```
+
+**Greenhouse and Lever are American.** If you are searching in Spain, Germany
+or Italy, Workable, Ashby, SmartRecruiters and Personio are where the mid-size
+local employers actually post — Personio in particular is the default ATS for
+German, Spanish and Italian SMBs. All six need no key and no scraping.
 
 ---
 
@@ -125,12 +132,19 @@ and `tailoring.model` are independent.
 
 ### 3. Name the companies in `watchlist.yaml`
 
-Slugs come out of the URL on a company's careers page:
+Slugs come out of the URL on a company's careers page. Open the company's
+"Apply" link and read the host — that tells you which board they are on:
 
 ```text
-boards.greenhouse.io/SLUG/jobs/123    ->  greenhouse: SLUG
-jobs.lever.co/SLUG/uuid               ->  lever: SLUG
+boards.greenhouse.io/SLUG/jobs/123        ->  greenhouse: SLUG
+jobs.lever.co/SLUG/uuid                   ->  lever: SLUG
+apply.workable.com/SLUG/j/ABC123/         ->  workable: SLUG
+jobs.ashbyhq.com/SLUG/uuid                ->  ashby: SLUG
+jobs.smartrecruiters.com/SLUG/74399...    ->  smartrecruiters: SLUG
+SLUG.jobs.personio.de/job/12345           ->  personio: SLUG
 ```
+
+Pasting the whole URL works too — it is reduced to the slug for you.
 
 ```yaml
 greenhouse:
@@ -138,6 +152,28 @@ greenhouse:
   - datadog
 lever:
   - plaid
+workable:
+  - some-valencia-company
+personio:
+  - some-madrid-company        # or the full host: acme.jobs.personio.com
+```
+
+Two vendor quirks worth knowing: **SmartRecruiters slugs are case-sensitive**
+(copy the capitalisation out of the URL), and **Personio's slug is the
+subdomain** rather than a path segment — a bare name tries
+`{slug}.jobs.personio.de` and falls back to `.personio.com`.
+
+The four European boards ship **switched off** in `config.yaml`, because an
+enabled board with an empty watchlist quietly returns nothing every morning.
+Put your companies in `watchlist.yaml` first, then turn them on:
+
+```yaml
+# config.yaml
+sources:
+  workable: true
+  ashby: true
+  smartrecruiters: true
+  personio: true
 ```
 
 Slugs change and a wrong one fails silently as "0 postings today", so check
@@ -145,6 +181,7 @@ them:
 
 ```bash
 python -m src.sources.ats_boards --check greenhouse spotify
+python -m src.sources.ats_boards --check personio acme
 python -m src.sources.ats_boards --check-all       # everything in the watchlist
 ```
 
@@ -360,8 +397,11 @@ a real application later; only a genuine submission blocks it forever.
 
 The hard rules, all enforced in code and pinned by tests:
 
-- **Greenhouse and Lever only.** Every other ATS goes to the digest for a
-  manual click. No exceptions, no "close enough" URL matching.
+- **Greenhouse and Lever only.** Every other ATS — Workable, Ashby,
+  SmartRecruiters, Personio, anything reached through Adzuna or LinkedIn —
+  goes to the digest for a manual click. No exceptions, no "close enough" URL
+  matching. Those sources deliberately do not even *claim* an ATS name the
+  apply stage recognises, so the refusal does not depend on URL parsing alone.
 - **Basic fields only:** first/last/full name, email, phone, résumé upload,
   LinkedIn/website URL, and a legally-required consent checkbox.
 - **Any screener question and it bails to the digest.** Any `<textarea>`, any
@@ -429,6 +469,26 @@ you care about always lands there.
 but nothing obliges them to stay that way, and a format change degrades into
 "that company returned nothing today" — which is quiet. Watch the per-source
 counts in the digest, not just the total.
+
+**The four European boards have never been run against a live API.** Workable,
+Ashby, SmartRecruiters and Personio were written from published vendor
+documentation on a machine with no outbound network. Their offline tests prove
+the parsers agree with fixtures that were written the same way, which means a
+wrong field name would be wrong in both places and every test would still pass.
+Before you trust a posting from one of them, run the contract tests that
+actually talk to the vendors:
+
+```bash
+python -m src.sources.ats_boards --check-all     # do the slugs exist?
+pytest -m network -q                             # is the payload what we think?
+```
+
+**SmartRecruiters costs one extra HTTP request per posting.** Its listing
+endpoint carries no description at all, so the ad is fetched job by job, capped
+at `SMARTRECRUITERS_MAX_DESCRIPTIONS` (60). Past the cap, postings still reach
+the digest but are scored on title, company and location alone — the run log
+says how many. A company with hundreds of open roles is a company worth putting
+on its own watchlist line and watching that count for.
 
 **LinkedIn's guest description endpoint breaks and rate-limits.** When it
 does, the scorer sees a title and a company and little else. Treat a high
@@ -512,7 +572,8 @@ job_search/
 │   ├── render_pdf.example.py copy to src/render_pdf.py and edit
 │   ├── digest.py             the HTML page
 │   ├── templates/            digest.html.j2
-│   ├── sources/              ats_boards.py · adzuna.py · linkedin_email.py
+│   ├── sources/              ats_boards.py (6 vendors) · adzuna.py
+│   │                         linkedin_email.py
 │   └── apply/autoapply.py    Greenhouse/Lever form filling + the safety core
 ├── tests/                    offline suite — no network, no API key, no browser
 ├── docs/                     ARCHITECTURE.md · TESTING.md · EVALUATION.md
@@ -548,6 +609,12 @@ python -m src.sources.ats_boards --check-all
 
 Remember the slug is the path segment, not the company name:
 `boards.greenhouse.io/reallyacme/jobs/1` is `reallyacme`, not `Really Acme`.
+Two exceptions: **SmartRecruiters** slugs are case-sensitive, and **Personio**
+slugs are the *subdomain* (`acme.jobs.personio.de` is `acme`).
+
+**A company moved off Greenhouse and you cannot find them** — check the other
+five. European companies migrate to Personio and Workable more often than the
+other way round, and the give-away is where their "Apply" button points.
 
 **"0 jobs found" on a run that fetched hundreds** — almost always freshness.
 Look at the filter breakdown in the digest: a large `stale` or `undated` count

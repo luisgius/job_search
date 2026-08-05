@@ -689,7 +689,8 @@ def _parse_workable_posting(
     if not url:
         return None
 
-    location, remote = _workable_location(posting.get("location"))
+    location_node = posting.get("location")
+    location, remote = _workable_location(location_node)
 
     # Description, requirements and benefits are three separate HTML blocks and
     # all three matter: "requirements" is where the years-of-experience and the
@@ -732,8 +733,10 @@ def _parse_workable_posting(
             # is what lets `employment_type_exclude` drop an internship whose
             # title says nothing at all.
             "employment_type": posting.get("employment_type"),
-            "telecommuting": (posting.get("location") or {}).get("telecommuting")
-            if isinstance(posting.get("location"), Mapping) else None,
+            "telecommuting": (
+                location_node.get("telecommuting")
+                if isinstance(location_node, Mapping) else None
+            ),
             "apply_url": posting.get("application_url"),
             "created_at": posting.get("created_at"),
         },

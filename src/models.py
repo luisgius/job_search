@@ -169,7 +169,9 @@ class Job:
     ever sees `Job`, never a source-specific payload.
     """
 
-    source: str                       # "greenhouse" | "lever" | "adzuna" | "linkedin_email"
+    # "greenhouse" | "lever" | "workable" | "ashby" | "smartrecruiters"
+    # | "personio" | "adzuna" | "linkedin_email"
+    source: str
     company: str
     title: str
     url: str
@@ -179,7 +181,11 @@ class Job:
     remote: bool | None = None
     salary: str | None = None
     country: str | None = None            # ISO-3166 alpha-2, filled by filters.geo
-    ats: str | None = None                # "greenhouse" | "lever" | None
+    # The ATS vendor, or None for an aggregator with no stable id. Only
+    # "greenhouse" and "lever" are in `autoapply.SUPPORTED_ATS`; every other
+    # vendor name here is a deliberate statement that the job goes to the
+    # digest for a human click.
+    ats: str | None = None
     ats_job_id: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 

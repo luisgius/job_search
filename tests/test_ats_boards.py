@@ -96,6 +96,33 @@ def test_empty_slug_raises_rather_than_hitting_the_network(bad):
         fetch_lever(bad, session=FakeSession())
 
 
+@pytest.mark.parametrize(
+    "pasted,expected",
+    [
+        ("https://boards.greenhouse.io/spotify", "spotify"),
+        ("boards.greenhouse.io/spotify/jobs/1", "spotify"),
+        ("jobs.lever.co/plaid", "plaid"),
+        ("apply.workable.com/contoso/j/ABC/", "contoso"),
+        ("jobs.ashbyhq.com/initech/uuid", "initech"),
+        ("jobs.smartrecruiters.com/Umbrella/74399", "Umbrella"),
+        ("https://apply.workable.com/contoso?lang=en", "contoso"),
+        ("www.example.com/acme", "acme"),
+        # A bare hostname is a slug, not a URL: nothing follows it to keep.
+        ("booking.com", "booking.com"),
+        ("acme-corp", "acme-corp"),
+    ],
+)
+def test_the_host_is_recognised_by_shape_not_by_a_list_of_domains(pasted, expected):
+    """The host-stripping rule used to be a literal check for `.io/` and
+    `.co/` — Greenhouse and Lever, and nothing else. A pasted
+    `apply.workable.com/contoso` fell straight through it and was requested
+    verbatim as a slug, producing a 404 that reads exactly like a dead company.
+    """
+    from src.sources.ats_boards import _clean_slug
+
+    assert _clean_slug(pasted) == expected
+
+
 # ==========================================================================
 # Greenhouse
 # ==========================================================================
@@ -424,6 +451,122 @@ def test_fetch_does_not_filter_by_date_or_location(tmp_path: Path):
     assert all(j.country is None for j in jobs)   # geo stamps this later
 
 
+def test_all_six_vendors_come_back_from_one_fetch_call(tmp_path: Path):
+    """`main._fetch_all` calls `ats_boards.fetch` exactly once and keeps the
+    jobs whose `source` is in `BOARD_SOURCES`. If a vendor stamped a `source`
+    string nobody else uses, its postings would be fetched over the network and
+    then silently discarded — and the per-source counts in the digest, which
+    are how a broken board is spotted, would never show it."""
+    import re as _re
+
+    from tests.conftest import load_fixture, xml_response
+
+    cfg = write_config(
+        tmp_path,
+        {"sources": {"greenhouse": True, "lever": True, "workable": True,
+                     "ashby": True, "smartrecruiters": True, "personio": True}},
+        watchlist={"greenhouse": ["acme"], "lever": ["globex"],
+                   "workable": ["contoso"], "ashby": ["initech"],
+                   "smartrecruiters": ["Umbrella"], "personio": ["vandelay"]},
+    )
+    session = FakeSession([
+        ("boards-api.greenhouse.io", json_response(GREENHOUSE)),
+        ("api.lever.co", json_response(LEVER)),
+        ("apply.workable.com", json_response(load_json_fixture("workable_jobs.json"))),
+        ("api.ashbyhq.com", json_response(load_json_fixture("ashby_jobs.json"))),
+        (_re.compile(r"/postings/\S+"),
+         json_response(load_json_fixture("smartrecruiters_posting_detail.json"))),
+        ("api.smartrecruiters.com",
+         json_response(load_json_fixture("smartrecruiters_postings.json"))),
+        ("jobs.personio.de", xml_response(load_fixture("personio_positions.xml"))),
+    ])
+    errors: list[str] = []
+    jobs = fetch(cfg, session=session, errors=errors)
+
+    assert errors == []
+    assert {j.source for j in jobs} == set(ats_boards.BOARDS)
+    from src.main import BOARD_SOURCES
+
+    assert {j.source for j in jobs} <= BOARD_SOURCES
+
+
+def test_keys_never_collide_across_vendors(tmp_path: Path):
+    """`Job.key` is the tracker's primary key and is now the ATS id *alone*.
+    Two vendors that happened to issue the same id would merge into one row —
+    and a job merged into an `applied` row is a job the user never sees again.
+    The vendor name is mixed into the hash, which is what prevents that."""
+    import re as _re
+
+    from tests.conftest import load_fixture, xml_response
+
+    cfg = write_config(
+        tmp_path,
+        {"sources": {"greenhouse": True, "lever": True, "workable": True,
+                     "ashby": True, "smartrecruiters": True, "personio": True}},
+        watchlist={"greenhouse": ["acme"], "lever": ["globex"],
+                   "workable": ["contoso"], "ashby": ["initech"],
+                   "smartrecruiters": ["Umbrella"], "personio": ["vandelay"]},
+    )
+    session = FakeSession([
+        ("boards-api.greenhouse.io", json_response(GREENHOUSE)),
+        ("api.lever.co", json_response(LEVER)),
+        ("apply.workable.com", json_response(load_json_fixture("workable_jobs.json"))),
+        ("api.ashbyhq.com", json_response(load_json_fixture("ashby_jobs.json"))),
+        (_re.compile(r"/postings/\S+"),
+         json_response(load_json_fixture("smartrecruiters_posting_detail.json"))),
+        ("api.smartrecruiters.com",
+         json_response(load_json_fixture("smartrecruiters_postings.json"))),
+        ("jobs.personio.de", xml_response(load_fixture("personio_positions.xml"))),
+    ])
+    jobs = fetch(cfg, session=session)
+    keys = [j.key for j in jobs]
+    assert len(set(keys)) == len(keys)
+
+    # Same id, different vendor, must not be the same job.
+    from tests.conftest import make_job
+
+    a = make_job(source="ashby", ats="ashby", ats_job_id="12345")
+    b = make_job(source="personio", ats="personio", ats_job_id="12345")
+    assert a.key != b.key
+
+
+def test_no_board_claims_an_ats_the_apply_stage_would_act_on(tmp_path: Path):
+    """The safety property, stated once for every vendor at once.
+
+    `autoapply` has only ever been hardened against Greenhouse and Lever forms.
+    A new board that claimed `ats="greenhouse"` — or served a greenhouse.io
+    URL — would put the form-filler in front of markup no test has ever seen,
+    and the failure mode there is a wrong application sent under the user's
+    name."""
+    from src.apply.autoapply import SUPPORTED_ATS, detect_ats
+
+    import re as _re
+
+    from tests.conftest import load_fixture, xml_response
+
+    cfg = write_config(
+        tmp_path,
+        {"sources": {"greenhouse": False, "lever": False, "workable": True,
+                     "ashby": True, "smartrecruiters": True, "personio": True}},
+        watchlist={"workable": ["contoso"], "ashby": ["initech"],
+                   "smartrecruiters": ["Umbrella"], "personio": ["vandelay"]},
+    )
+    session = FakeSession([
+        ("apply.workable.com", json_response(load_json_fixture("workable_jobs.json"))),
+        ("api.ashbyhq.com", json_response(load_json_fixture("ashby_jobs.json"))),
+        (_re.compile(r"/postings/\S+"),
+         json_response(load_json_fixture("smartrecruiters_posting_detail.json"))),
+        ("api.smartrecruiters.com",
+         json_response(load_json_fixture("smartrecruiters_postings.json"))),
+        ("jobs.personio.de", xml_response(load_fixture("personio_positions.xml"))),
+    ])
+    jobs = fetch(cfg, session=session)
+    assert jobs
+    for job in jobs:
+        assert job.ats not in SUPPORTED_ATS, f"{job.ats} claims to be auto-appliable"
+        assert detect_ats(job.url) is None, f"{job.url} would be auto-applied to"
+
+
 # ==========================================================================
 # check_slug
 # ==========================================================================
@@ -523,6 +666,48 @@ def test_cli_check_all_walks_the_watchlist(stub_boards, tmp_path: Path, capsys):
     assert set(stub_boards.calls) == {("greenhouse", "acme"), ("greenhouse", "globex"),
                                       ("lever", "plaid")}
     assert "3/3 slugs OK" in capsys.readouterr().out
+
+
+def test_cli_check_all_walks_every_vendor(stub_boards, tmp_path: Path, capsys):
+    """`--check-all` is the one command that answers "are my slugs real?", and
+    a vendor missing from `BOARDS` is a vendor whose slugs it silently never
+    checks — which is how a board rots for months looking like a quiet
+    company."""
+    write_config(
+        tmp_path,
+        watchlist={"greenhouse": ["acme"], "lever": ["plaid"],
+                   "workable": ["contoso"], "ashby": ["initech"],
+                   "smartrecruiters": ["Umbrella"], "personio": ["vandelay"]},
+    )
+    code = main(["--check-all", "--config", str(tmp_path / "config.yaml"),
+                 "--watchlist", str(tmp_path / "watchlist.yaml")])
+    assert code == 0
+    assert set(stub_boards.calls) == {
+        ("greenhouse", "acme"), ("lever", "plaid"), ("workable", "contoso"),
+        ("ashby", "initech"), ("smartrecruiters", "Umbrella"),
+        ("personio", "vandelay"),
+    }
+    assert "6/6 slugs OK" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "board,slug",
+    [("workable", "contoso"), ("ashby", "initech"),
+     ("smartrecruiters", "Umbrella"), ("personio", "vandelay")],
+)
+def test_cli_check_accepts_every_new_board(stub_boards, capsys, board, slug):
+    assert main(["--check", board, slug]) == 0
+    assert f"OK {board}/{slug}" in capsys.readouterr().out
+
+
+def test_cli_check_all_keeps_a_personio_host_intact(stub_boards, tmp_path: Path):
+    """The generic slug rule would reduce `acme.jobs.personio.com` to nothing
+    usable. `--check` has to test the same string the daily run will fetch, or
+    it certifies a slug the pipeline never uses."""
+    write_config(tmp_path, watchlist={"personio": ["acme.jobs.personio.com"]})
+    main(["--check-all", "--config", str(tmp_path / "config.yaml"),
+          "--watchlist", str(tmp_path / "watchlist.yaml")])
+    assert ("personio", "acme.jobs.personio.com") in stub_boards.calls
 
 
 def test_cli_check_all_is_independent_of_sources_being_enabled(stub_boards, tmp_path: Path):

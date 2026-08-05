@@ -113,6 +113,30 @@ PERSONIO_EXPECTED = ("office", "employmentType", "createdAt", "jobDescriptions")
 _STATUS_RE = re.compile(r"\bHTTP (\d{3})\b")
 
 
+#: One cheap probe answers "is there a network at all?" for the whole file.
+#: Without it, every test in here pays `util.http_get`'s full retry budget —
+#: three attempts with exponential backoff — before concluding what the first
+#: one already knew, and `pytest -m network` on a train takes minutes to tell
+#: you it has nothing to say. `retries=1` because a probe that retries is
+#: measuring the retry policy, not the network.
+_PROBE_URL = "https://boards-api.greenhouse.io/v1/boards/gitlab/jobs"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _network_or_skip():
+    """Skip this whole file, fast, when nothing is reachable.
+
+    A *single* blocked host is still reported per test by `_reachable` — this
+    only short-circuits the case where there is no route to anywhere.
+    """
+    from src.util import http_get
+
+    try:
+        http_get(_PROBE_URL, params={"content": "false"}, retries=1, timeout=10)
+    except Exception as exc:
+        pytest.skip(f"network unreachable: {exc}")
+
+
 def _reachable(fn, *args, **kwargs):
     """Run a fetch, skipping the test when the network is the problem.
 

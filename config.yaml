@@ -30,8 +30,20 @@ keys:
   adzuna_app_key: ""       # or env ADZUNA_APP_KEY
 
 sources:
+  # Greenhouse and Lever are where US companies post. If you are searching in
+  # Spain, Germany or Italy, the four below are where the mid-size local
+  # employers actually are — turning them on is the single biggest change you
+  # can make to how many relevant postings you see each morning.
   greenhouse: true
   lever: true
+  # Each needs companies in watchlist.yaml first; an enabled board with an
+  # empty watchlist fetches nothing and looks exactly like a quiet market
+  # (--validate-only will tell you). Prove your slugs, then flip these:
+  #     python -m src.sources.ats_boards --check-all
+  workable: false          # EU/Greek-founded — very common for mid-size
+  ashby: false             # modern start-ups
+  smartrecruiters: false   # large EU employers (DE/FR/ES)
+  personio: false          # the German/Spanish/Italian SMB default
   adzuna: false            # needs free keys from developer.adzuna.com
   linkedin_email: false    # needs gmail_credentials.json (see README)
 

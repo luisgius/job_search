@@ -1,6 +1,7 @@
 # Testing
 
-**1316 tests, ~39s, fully offline.**
+**1539 tests, ~43s, fully offline** (plus 40 network-only contract tests,
+deselected by default).
 
 ```bash
 pytest -q                      # the whole suite, offline, no API key, no browser
@@ -11,22 +12,31 @@ pytest --cov=src --cov-report=term-missing
 
 | File | Tests | Defends |
 |---|---:|---|
-| `test_geo.py` | 134 | US/EU city collisions — the expensive mistake |
-| `test_autoapply.py` | 133 | **the screener-bail guarantee** |
-| `test_ats_boards.py` | 71 | Greenhouse/Lever payload reality |
+| `test_geo.py` | 178 | US/EU city collisions — the expensive mistake |
+| `test_autoapply.py` | 134 | **the screener-bail guarantee** |
+| `test_edge_apply.py` | 111 | the apply leg against real 2026 form markup |
+| `test_ats_boards.py` | 90 | Greenhouse/Lever payload reality; slug + `--check` for all six |
+| `test_edge_fetch.py` | 86 | the shapes a real European job week produces |
+| `test_edge_match.py` | 76 | prompt injection; a model reply is untrusted input |
+| `test_main.py` | 60 | the pipeline end to end, offline |
 | `test_util.py` | 59 | retries, HTML flattening, every ATS date shape |
 | `test_filters.py` | 58 | whole-word matching, dedupe richness |
+| `test_models.py` | 53 | job identity — the tracker's primary key |
 | `test_linkedin_email.py` | 52 | leniency under LinkedIn template change |
-| `test_scoring.py` | 49 | a job is never silently lost |
-| `test_models.py` | 45 | job identity — the tracker's primary key |
+| `test_scoring.py` | 52 | a job is never silently lost |
+| `test_llm_openrouter.py` | 50 | provider equivalence — same behaviour either way |
+| `test_config.py` | 48 | env-beats-file, validate-everything-at-once |
+| `test_health.py` | 44 | a quiet day vs a broken pipeline |
 | `test_llm.py` | 43 | JSON recovery, retry policy |
 | `test_tailor.py` | 42 | **the anti-fabrication guarantee** |
-| `test_main.py` | 42 | the pipeline end to end, offline |
-| `test_db.py` | 40 | **the double-apply guarantee** |
-| `test_health.py` | 39 | a quiet day vs a broken pipeline |
+| `test_db.py` | 41 | **the double-apply guarantee** |
+| `test_workable.py` | 40 | split description/requirements/benefits; assembled locations |
+| `test_live_contract.py` | 40 | **the live APIs still emit what we parse** (network-only) |
+| `test_ashby.py` | 38 | `secondaryLocations`; unlisted drafts stay hidden |
+| `test_smartrecruiters.py` | 38 | the two-call shape — and its cap |
 | `test_digest.py` | 36 | escaping, and legibility of failure |
-| `test_config.py` | 36 | env-beats-file, validate-everything-at-once |
 | `test_adzuna.py` | 32 | snippets, duplicates, key redaction |
+| `test_personio.py` | 32 | XML, subdomain slugs, no external entities |
 | `test_notify.py` | 31 | no shell injection; one channel's death is contained |
 | `test_pdf.py` | 16 | every half-failure of the user's hook |
 
@@ -114,6 +124,33 @@ actually occur in production payloads:
   exactly once, `first_published` preferred over the freshness-inflating
   `updated_at`, Lever's `lists` blocks kept (that is where requirements
   live), and one dead board never costing more than that company.
+- **`test_workable.py` / `test_ashby.py` / `test_smartrecruiters.py` /
+  `test_personio.py`** — the four European boards, one file each. Every file
+  covers the same seven shapes (happy path, null location, null date, titleless
+  posting, junk list entries, a 404, and one dead board not costing the others)
+  plus what is peculiar to that vendor:
+  - **Workable** assembles `Job.location` from structured parts, so a dropped
+    country is an unresolvable job; and `description` / `requirements` /
+    `benefits` are three fields, of which the second is the one that decides
+    scores. Both spellings of the country key (`countryCode` and
+    `country_code`) are read, because the widget and v3 APIs disagree.
+  - **Ashby** hides drafts behind `isListed: false` — and a *missing*
+    `isListed` must not be read as `false`, or the board empties the day they
+    stop sending it. `secondaryLocations` is merged in, for the same reason
+    Lever's `allLocations` is: a Valencia+Berlin role must not be pinned to one.
+  - **SmartRecruiters** is the two-call vendor: the listing has no description
+    at all. The cap on per-posting detail calls is asserted, as is the property
+    that a failed detail call costs the description and *not* the job.
+  - **Personio** is XML and is addressed by subdomain, so the generic
+    "drop the host, keep the path segment" slug rule is exactly backwards. An
+    HTML error page is well-formed XML, so the root tag is checked — otherwise
+    a login wall parses into zero jobs and reads as a quiet company. External
+    entities are asserted *not* to resolve, which is why the stdlib parser is
+    enough and no `defusedxml` dependency exists.
+  - All four are asserted never to claim an `ats` value in
+    `autoapply.SUPPORTED_ATS`, and `detect_ats` is asserted to reject every URL
+    they produce. Only Greenhouse and Lever have been through the screener-bail
+    work; anything else must reach a human.
 - **`test_adzuna.py`** — snippet-only descriptions flagged, duplicate results
   collapsed, a rejected key abandoning its country instead of collecting the
   same 401 once per query, and API keys redacted out of error strings before
@@ -161,7 +198,7 @@ stay green.
 `tests/test_live_contract.py` closes that gap and is the one place that talks
 to the real internet. It asserts the specific things the parsers bet on:
 
-- the fields each parser reads are still present;
+- the fields each parser reads are still present, for all six boards;
 - Greenhouse `content` is still *double* entity-escaped (we unescape exactly
   once — if they stop, that unescape starts corrupting real text);
 - `first_published` still exists, so freshness does not silently fall back to
@@ -169,12 +206,33 @@ to the real internet. It asserts the specific things the parsers bet on:
 - Lever `createdAt` is still a **millisecond** epoch (seconds would date every
   posting to 1970 and drop them all as stale, silently);
 - Lever still splits requirements into `lists`;
+- Workable's `?details=true` is still what produces a description at all, and
+  `requirements` is still a separate block;
+- Ashby's `secondaryLocations` entries still carry a readable name, and
+  `publishedAt` still exists (without it, `skip_undated` drops the whole board);
+- the SmartRecruiters *listing* still carries no description — i.e. the
+  expensive per-posting detail call is still necessary — and the detail payload
+  still exposes `jobAd.sections.*.text`;
+- Personio still serves `<workzag-jobs>` XML with `<jobDescription>` sections,
+  and its colon-less `+0200` offsets are still parseable;
+- no live board produces a URL `autoapply.detect_ats` would accept;
 - and the offline fixtures do not claim fields the live API no longer returns.
+
+> **Read this before trusting the four European boards.** Their parsers and
+> their fixtures were written from vendor documentation on a machine with **no
+> outbound network** — not one byte of a real response was ever seen. The
+> offline suite proves the parsers agree with those fixtures. If a field name
+> is wrong, the fixture and the parser are wrong *together* and every test
+> stays green. `pytest -m network -q` is the only thing that can settle it, and
+> the fixture-vs-reality tests in that file are the ones to read first.
 
 It is excluded from the default run on purpose — a suite that goes red because
 someone else's API had a bad afternoon trains you to ignore failures — and each
-test **skips** rather than fails when the network is simply unreachable. Run it
-on setup, and again whenever a source mysteriously returns nothing.
+test **skips** rather than fails when the network is simply unreachable. One
+cheap probe decides that for the whole file, so an offline `pytest -m network`
+finishes in about a second instead of spending every test's retry budget
+rediscovering it. Run it on setup, and again whenever a source mysteriously
+returns nothing.
 
 ## Adding a test
 
