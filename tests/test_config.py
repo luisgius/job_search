@@ -14,7 +14,15 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src.config import DEFAULTS, Config, ConfigError, deep_merge
+from src.config import (
+    DEFAULT_MAX_AGE_HOURS,
+    DEFAULT_REPOST_MIN_GAP_DAYS,
+    DEFAULT_STALE_AFTER_DAYS,
+    DEFAULTS,
+    Config,
+    ConfigError,
+    deep_merge,
+)
 from src.config import WATCHLIST_DEFAULTS as DEFAULTS_WATCHLIST
 from tests.conftest import write_config
 
@@ -217,6 +225,88 @@ def test_null_threshold_means_unspecified_not_invalid(tmp_path: Path):
 def test_validate_rejects_bad_freshness(tmp_path: Path, hours):
     cfg = write_config(tmp_path, {"freshness": {"max_age_hours": hours}})
     assert any("max_age_hours" in p for p in cfg.validate())
+
+
+@pytest.mark.parametrize("dotted", ["stale_after_days", "repost_min_gap_days"])
+@pytest.mark.parametrize("value", [-1, "soon", True])
+def test_validate_rejects_bad_ghost_job_thresholds(tmp_path: Path, dotted, value):
+    """These two only ever colour a card, so a bad value costs a wrong flag
+    rather than a lost posting — but a setting that is silently ignored is
+    worse than one that is rejected, because the user believes it took
+    effect."""
+    cfg = write_config(tmp_path, {"freshness": {dotted: value}})
+    assert any(dotted in p for p in cfg.validate())
+
+
+@pytest.mark.parametrize("dotted", ["stale_after_days", "repost_min_gap_days"])
+def test_zero_is_a_legal_ghost_job_threshold(tmp_path: Path, dotted):
+    """The neighbouring case: 0 means "flag everything you can tell me about",
+    which is a coherent thing to ask for and must not be read as invalid."""
+    cfg = write_config(tmp_path, {"freshness": {dotted: 0}})
+    assert cfg.validate() == []
+
+
+# ==========================================================================
+# the freshness window has exactly one definition
+# ==========================================================================
+
+
+def test_the_freshness_window_is_defined_once_and_read_everywhere(tmp_path: Path):
+    """The regression this constant exists to prevent.
+
+    `freshness.max_age_hours` used to be written out as a literal `24` in four
+    places: `DEFAULTS`, `Config.validate`, `filters.apply_filters` and
+    `digest._config_summary`. Four copies of one number is a latent bug —
+    change one and the others silently disagree, so the digest cheerfully
+    reports a window the filter is not using and the funnel stops adding up.
+
+    Each assertion below is one of those four sites, driven through its own
+    public entry point rather than by reading the source.
+    """
+    from src import digest, filters
+    from tests.conftest import NOW, make_job
+
+    # 1. the shipped default
+    assert DEFAULTS["freshness"]["max_age_hours"] == DEFAULT_MAX_AGE_HOURS
+    # 2. a loaded config with no freshness block of its own
+    assert write_config(tmp_path).get("freshness.max_age_hours") == DEFAULT_MAX_AGE_HOURS
+    # 3. the filter's own fallback, on a config that names no window at all
+    inside = make_job(hours_old=DEFAULT_MAX_AGE_HOURS - 1, ats_job_id="in")
+    outside = make_job(hours_old=DEFAULT_MAX_AGE_HOURS + 1, ats_job_id="out")
+    kept = filters.apply_filters([inside, outside], {}, now=NOW).kept
+    assert [job.ats_job_id for job in kept] == ["in"]
+    # 4. what the digest tells the reader the window was
+    assert digest.build_context([], None, None, now=NOW)["config_summary"][
+        "max_age_hours"] == DEFAULT_MAX_AGE_HOURS
+
+
+def test_the_window_is_seventy_two_hours_not_twenty_four():
+    """Pinned with its argument, because the obvious "tidy-up" is to put it
+    back to 24 and nobody would notice what that costs.
+
+    A narrower window does not make the digest smaller: `db.skip_seen_days`
+    already guarantees each posting is shown exactly once, so widening 24h to
+    72h does not triple anything. What it does is stop losing things — a
+    Friday posting when the next run is Monday, a board that publishes in
+    batches, an aggregator whose timestamp is its own ingest time — and every
+    one of those is a real job that vanishes with no trace that it existed.
+
+    The premise behind 24 was "apply within a day or lose". That is contested:
+    one tracked sample of 347 applications saw 12% response on day one against
+    61% on day four, because day one is when the other 200 applicants arrive.
+    """
+    assert DEFAULT_MAX_AGE_HOURS == 72
+
+
+def test_the_ghost_job_thresholds_have_defaults_worth_defending():
+    """30 days: past that, a posting is disproportionately one of the 18-27%
+    that is never filled. 14 days: comfortably longer than any cross-source
+    ingest lag, so an ordinary Greenhouse-plus-Adzuna duplicate is never
+    mistaken for a re-listing, and comfortably shorter than a hiring cycle."""
+    assert DEFAULT_STALE_AFTER_DAYS == 30
+    assert DEFAULT_REPOST_MIN_GAP_DAYS == 14
+    assert DEFAULTS["freshness"]["stale_after_days"] == DEFAULT_STALE_AFTER_DAYS
+    assert DEFAULTS["freshness"]["repost_min_gap_days"] == DEFAULT_REPOST_MIN_GAP_DAYS
 
 
 def test_validate_flags_adzuna_without_keys(tmp_path: Path):

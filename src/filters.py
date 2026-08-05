@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, NamedTuple
 
+from . import config as config_module
 from . import geo
 from .models import Job, collapse_initialisms, ensure_utc, normalize_text, utcnow
 from .util import get_logger
@@ -481,11 +482,14 @@ def apply_filters(
     that reach the location stage.
     """
     moment = ensure_utc(now) or utcnow()
-    max_age = _cfg(config, "freshness.max_age_hours", 24)
+    # One definition of the window, in config.py — this used to be a second
+    # literal `24`, free to drift away from the default it was copied from.
+    default_age = float(config_module.DEFAULT_MAX_AGE_HOURS)
+    max_age = _cfg(config, "freshness.max_age_hours", default_age)
     try:
         max_age = float(max_age)
     except (TypeError, ValueError):
-        max_age = 24.0
+        max_age = default_age
     skip_undated = bool(_cfg(config, "freshness.skip_undated", True))
     try:
         min_chars = int(_cfg(config, "filters.min_description_chars", 0) or 0)

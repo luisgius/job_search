@@ -456,7 +456,7 @@ not once per job.
 
 ## Honest limitations
 
-**Freshness is the weakest claim here.** "Last 24 hours" is not something
+**Freshness is the weakest claim here.** A stated window is not something
 these sources can guarantee. Greenhouse's `updated_at` moves when anything
 changes, so a typo fix on a three-month-old req can look brand new. LinkedIn
 alert emails carry no per-posting date at all — every job in one email
@@ -464,6 +464,23 @@ inherits the email's arrival time. `freshness.skip_undated: true` is the
 honest default and it *will* silently discard real jobs; watch the `undated`
 count in the digest's filter breakdown for a week and relax it if a company
 you care about always lands there.
+
+The window itself ships at **72 hours, not 24**, and the reasoning is written
+out next to the setting in `config.yaml`: `db.skip_seen_days` already shows you
+each posting exactly once, so a wider window does not multiply your digest — it
+only recovers what a 24-hour one loses in silence (a weekend, a board that
+publishes late, an aggregator whose timestamp is its own ingest time).
+
+**Ghost jobs are flagged, never filtered.** Between 18% and 27% of online
+postings are never filled; Greenhouse's own study puts at least 1 in 5 US
+postings in that bucket. Two signals come free from what the tracker already
+stores, and both appear as a line on the card rather than as a rejection:
+a posting older than `freshness.stale_after_days` (30), and a role re-listed
+under a new job id at least `freshness.repost_min_gap_days` (14) after the
+first listing. The gap is what keeps an ordinary cross-source duplicate — one
+live job arriving from Greenhouse *and* Adzuna — from being called a repost.
+A wrong flag costs you a glance; a wrong deletion costs you a job you never
+hear about, so nothing here ever removes a card.
 
 **The ATS APIs are unofficial-but-public.** They have been stable for years,
 but nothing obliges them to stay that way, and a format change degrades into
@@ -618,13 +635,20 @@ other way round, and the give-away is where their "Apply" button points.
 
 **"0 jobs found" on a run that fetched hundreds** — almost always freshness.
 Look at the filter breakdown in the digest: a large `stale` or `undated` count
-is the answer. Widen it:
+is the answer. The window already ships at 72 hours, so widen it further and,
+if the `undated` count is the big one, keep the postings nobody dated:
 
 ```yaml
 freshness:
-  max_age_hours: 72
+  max_age_hours: 168      # a week
   skip_undated: false
 ```
+
+`skip_undated: false` is the bigger change of the two: a board with no dates
+hands you its entire back catalogue on the first run, not just its recent
+postings. That is one noisy morning, not a permanent one — `db.skip_seen_days`
+suppresses them all afterwards — but it can push genuinely fresh jobs past
+`scoring.max_jobs`, so flip it deliberately rather than as a first guess.
 
 Second most common: `filters.countries` is narrower than you think, or a
 `title_exclude` term is catching more than you meant.

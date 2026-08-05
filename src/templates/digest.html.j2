@@ -555,6 +555,25 @@ footer code {
 </head>
 <body>
 
+{#
+  Advisory ghost-job notes: posting age past freshness.stale_after_days, and a
+  re-listing of a role already seen under another job id. Rendered with the
+  same `p.alert` line the scorer's own failure uses, deliberately — a second
+  warning style would just teach the reader that some warnings are optional.
+
+  These NEVER remove a card. Every sentence is computed in digest._ghost_flags;
+  this loop prints what it was given and decides nothing. Defined before
+  card_head because that macro calls it.
+#}
+{% macro ghost_flags(item) %}
+{# `or []` because render_html documents that it accepts a hand-built or
+   partial context, and iterating a missing key would take the whole page
+   down over an advisory line. #}
+{% for flag in item.flags or [] %}
+<p class="alert">{{ flag }}</p>
+{% endfor %}
+{% endmacro %}
+
 {% macro card_head(item) %}
 <div class="head">
   <span class="badge {{ item.score_class }}" title="fit score{% if item.score_model %} — {{ item.score_model }}{% endif %}">{{ item.score_label }}</span>
@@ -569,6 +588,7 @@ footer code {
     </div>
   </div>
 </div>
+{{ ghost_flags(item) }}
 {% endmacro %}
 
 {% macro links(item, primary) %}
@@ -689,6 +709,7 @@ footer code {
     <span class="badge {{ item.score_class }}">{{ item.score_label }}</span>
     <strong>{{ item.company }}</strong> — {{ item.title }}
     <div class="meta">{{ item.location }} · {{ item.posted_label }}</div>
+    {{ ghost_flags(item) }}
     <div class="detail">{{ item.status_detail }}</div>
     <a href="{{ item.url }}" target="_blank" rel="noopener">Open the posting →</a>
   </article>
@@ -926,6 +947,7 @@ footer code {
             <tr><td>score threshold</td><td class="num">{{ config_summary.threshold }}</td></tr>
             <tr><td>auto-apply floor</td><td class="num">{{ config_summary.apply_min_score }}</td></tr>
             <tr><td>max age (hours)</td><td class="num">{{ config_summary.max_age_hours }}</td></tr>
+            <tr><td>flag as stale after (days)</td><td class="num">{{ config_summary.stale_after_days }}</td></tr>
             <tr><td>scoring model</td><td>{{ config_summary.scoring_model or '—' }}</td></tr>
             <tr><td>tailoring model</td><td>{{ config_summary.tailoring_model if config_summary.tailoring_enabled else 'off' }}</td></tr>
             <tr><td>sources enabled</td><td>{{ config_summary.sources_enabled | join(', ') or 'none' }}</td></tr>

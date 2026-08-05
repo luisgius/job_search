@@ -119,6 +119,188 @@ def test_get_job_returns_none_for_unknown_key(memory_tracker):
 
 
 # ==========================================================================
+# repost_gap_days — "has this role been listed before, and how long ago?"
+# ==========================================================================
+#
+# The measurement behind the digest's repost flag. It is only ever used to
+# annotate a card, never to drop one, so every test below is about *accuracy*
+# rather than safety — but one case is worth as much as the double-apply tests
+# are: a simultaneous cross-source duplicate must not read as a re-listing,
+# because that would put a ghost-job warning on a perfectly healthy posting.
+
+
+def cross_source_twin(**overrides):
+    """The same posting as `make_job()`, as an aggregator would hand it over.
+
+    No ATS id, so `Job.key` falls back to company/title/location and differs —
+    while `dedupe_key` (company + title + city) is identical. That is exactly
+    the shape a re-listing has, which is the whole difficulty.
+    """
+    return make_job(source="adzuna", ats=None, ats_job_id=None,
+                    url="https://www.adzuna.de/details/1", **overrides)
+
+
+def test_a_role_never_seen_before_has_no_repost_gap(memory_tracker):
+    job = make_job()
+    memory_tracker.record_job(job, now=NOW)
+    assert memory_tracker.repost_gap_days(job.dedupe_key, key=job.key, now=NOW) is None
+
+
+def test_seeing_the_same_listing_again_is_not_a_repost(memory_tracker):
+    """The ordinary case: a board still carrying the same req every morning.
+    One key, so there is no *other* sighting to compare against, however many
+    times it is recorded."""
+    job = make_job(hours_old=2)
+    memory_tracker.record_job(job, now=NOW)
+    memory_tracker.record_job(job, now=NOW + timedelta(days=40))
+    assert memory_tracker.repost_gap_days(
+        job.dedupe_key, key=job.key, posted_at=job.posted_at,
+        now=NOW + timedelta(days=40),
+    ) is None
+
+
+def test_a_simultaneous_cross_source_duplicate_is_not_a_repost(memory_tracker):
+    """The false positive this whole method is shaped around.
+
+    One live job reaching us from Greenhouse and from Adzuna in the same run
+    has one `dedupe_key` and two `Job.key`s — structurally identical to a
+    re-listing. What separates them is time, so the gap has to come out near
+    zero here. Flagging this would put a ghost-job warning on a healthy
+    posting, every day, until the reader stopped believing the flag.
+    """
+    ats = make_job(hours_old=3)
+    aggregator = cross_source_twin(hours_old=3)
+    assert aggregator.dedupe_key == ats.dedupe_key
+    assert aggregator.key != ats.key
+
+    memory_tracker.record_job(ats, now=NOW)
+    memory_tracker.record_job(aggregator, now=NOW)
+
+    gap = memory_tracker.repost_gap_days(
+        aggregator.dedupe_key, key=aggregator.key,
+        posted_at=aggregator.posted_at, now=NOW,
+    )
+    assert gap is not None          # there *is* an earlier row ...
+    assert abs(gap) < 1             # ... it is simply not a gap
+
+
+def test_a_relisting_after_a_gap_is_measured_in_days(memory_tracker):
+    """A recruiter closing and re-opening a requisition: same company, same
+    title, same city, new ATS id — so a new `Job.key` and the same
+    `dedupe_key`. This is the signal."""
+    old = make_job(ats_job_id="old", posted_at=NOW - timedelta(days=90))
+    memory_tracker.record_job(old, now=NOW - timedelta(days=90))
+
+    new = make_job(ats_job_id="new", posted_at=NOW - timedelta(days=1))
+    assert new.dedupe_key == old.dedupe_key and new.key != old.key
+    memory_tracker.record_job(new, now=NOW)
+
+    gap = memory_tracker.repost_gap_days(
+        new.dedupe_key, key=new.key, posted_at=new.posted_at, now=NOW)
+    assert gap == pytest.approx(89, abs=0.01)
+
+
+def test_an_undated_earlier_sighting_falls_back_to_when_we_first_saw_it(memory_tracker):
+    """`posted_at` is the employer's claim and `first_seen_at` is ours. Ours
+    can never be *earlier* than the posting, so the substitution can only
+    shrink the gap — which is the safe direction for a flag that would
+    otherwise fire on a healthy posting."""
+    old = make_job(ats_job_id="old", hours_old=None)
+    memory_tracker.record_job(old, now=NOW - timedelta(days=90))
+    assert memory_tracker.get_job(old.key)["posted_at"] is None
+
+    new = make_job(ats_job_id="new", posted_at=NOW)
+    gap = memory_tracker.repost_gap_days(
+        new.dedupe_key, key=new.key, posted_at=new.posted_at, now=NOW)
+    assert gap == pytest.approx(90, abs=0.01)
+
+
+def test_an_undated_repost_is_measured_from_when_the_tracker_met_it(memory_tracker):
+    """Neither side has to be dated for the *gap* to be knowable: two
+    sightings ninety days apart are ninety days apart whatever the boards
+    claim."""
+    old = make_job(ats_job_id="old", hours_old=None)
+    memory_tracker.record_job(old, now=NOW - timedelta(days=90))
+    new = make_job(ats_job_id="new", hours_old=None)
+    memory_tracker.record_job(new, now=NOW)
+
+    gap = memory_tracker.repost_gap_days(
+        new.dedupe_key, key=new.key, posted_at=None, now=NOW)
+    assert gap == pytest.approx(90, abs=0.01)
+
+
+def test_a_cross_source_twin_does_not_mask_a_real_repost(memory_tracker):
+    """The earliest sighting decides the gap, not the nearest one.
+
+    A role re-listed after three months does not stop being a re-listing
+    because an aggregator also carries today's copy of it.
+    """
+    old = make_job(ats_job_id="old", posted_at=NOW - timedelta(days=90))
+    memory_tracker.record_job(old, now=NOW - timedelta(days=90))
+    memory_tracker.record_job(cross_source_twin(hours_old=2), now=NOW)
+
+    new = make_job(ats_job_id="new", posted_at=NOW)
+    gap = memory_tracker.repost_gap_days(
+        new.dedupe_key, key=new.key, posted_at=new.posted_at, now=NOW)
+    assert gap == pytest.approx(90, abs=0.01)
+
+
+def test_a_newer_other_sighting_is_not_evidence_of_anything(memory_tracker):
+    """Looking at the *older* of two listings. The other one is in its future,
+    so it says nothing about this one having been re-listed — and a negative
+    gap can never clear a threshold."""
+    old = make_job(ats_job_id="old", posted_at=NOW - timedelta(days=90))
+    memory_tracker.record_job(old, now=NOW - timedelta(days=90))
+    new = make_job(ats_job_id="new", posted_at=NOW)
+    memory_tracker.record_job(new, now=NOW)
+
+    gap = memory_tracker.repost_gap_days(
+        old.dedupe_key, key=old.key, posted_at=old.posted_at, now=NOW)
+    assert gap is not None and gap < 0
+
+
+def test_the_gap_is_not_shortened_by_the_old_listing_still_being_fetched(memory_tracker):
+    """`last_seen_at` is deliberately not what this measures.
+
+    A requisition that is still on the board is re-recorded every morning, and
+    `record_job` moves `last_seen_at` each time. Measuring from that would
+    quietly erase a ninety-day gap. Worse, it would read our own silence — a
+    weekend, a watchlist edit, a board outage — as the employer closing the
+    role. `posted_at` is frozen by COALESCE and `first_seen_at` is never
+    rewritten, which is what makes them comparable across rows at all.
+    """
+    old = make_job(ats_job_id="old", posted_at=NOW - timedelta(days=90))
+    memory_tracker.record_job(old, now=NOW - timedelta(days=90))
+    memory_tracker.record_job(old, now=NOW)          # still on the board today
+
+    new = make_job(ats_job_id="new", posted_at=NOW)
+    gap = memory_tracker.repost_gap_days(
+        new.dedupe_key, key=new.key, posted_at=new.posted_at, now=NOW)
+    assert gap == pytest.approx(90, abs=0.01)
+
+
+def test_an_empty_dedupe_key_is_never_a_repost(memory_tracker):
+    """Same guard `has_applied_similar` has: an empty key would otherwise
+    match every job that never got one."""
+    assert memory_tracker.repost_gap_days("", key="whatever", now=NOW) is None
+    assert memory_tracker.repost_gap_days("   ", key="whatever", now=NOW) is None
+
+
+def test_repost_gap_days_reads_nothing_but_the_jobs_table(memory_tracker):
+    """It is a measurement, not a decision: no application row is needed and
+    none is written. The threshold that turns a gap into a flag lives in the
+    config, not in here."""
+    old = make_job(ats_job_id="old", posted_at=NOW - timedelta(days=90))
+    memory_tracker.record_job(old, now=NOW - timedelta(days=90))
+    new = make_job(ats_job_id="new", posted_at=NOW)
+
+    assert memory_tracker.counts_by_status() == {}
+    assert memory_tracker.repost_gap_days(
+        new.dedupe_key, key=new.key, posted_at=new.posted_at, now=NOW) is not None
+    assert memory_tracker.counts_by_status() == {}
+
+
+# ==========================================================================
 # the double-apply guarantee
 # ==========================================================================
 

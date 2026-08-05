@@ -180,6 +180,32 @@ def test_the_funnel_adds_up(tmp_path: Path, stub_sources, memory_tracker):
     assert stats.matches == stats.auto_applied + stats.dry_run + stats.digest_items
 
 
+def test_a_relisted_job_is_flagged_on_the_page_and_not_dropped_from_it(
+        tmp_path: Path, stub_sources, memory_tracker):
+    """The wiring behind the ghost-job flags: `run_pipeline` hands the tracker
+    to the digest, which is the only way the page can know a role was already
+    listed under a different job id.
+
+    Both halves are asserted, and the second is the important one. A flag that
+    also removed the job would be worse than no flag at all, so the funnel has
+    to read exactly as it would have without it.
+    """
+    earlier = make_job(company="Company0", title="Backend Engineer",
+                       location="Berlin, Germany", ats_job_id="old-req",
+                       posted_at=NOW - timedelta(days=120))
+    memory_tracker.record_job(earlier, now=NOW - timedelta(days=120))
+
+    stub_sources.results["ats_boards"] = fresh_jobs(2)
+    _, stats = run_pipeline(pipeline_config(tmp_path), tracker=memory_tracker,
+                            now=NOW, llm_client=llm_client(LLM_SCRIPT))
+
+    assert stats.after_filters == 2       # the repost survived every filter ...
+    assert stats.matches == 2             # ... and reached the digest
+    html = Path(stats.digest_path).read_text(encoding="utf-8")
+    assert "Re-listed" in html
+    assert "Company0" in html and "Company1" in html
+
+
 def test_source_counts_are_recorded(tmp_path: Path, stub_sources, memory_tracker):
     stub_sources.results["ats_boards"] = fresh_jobs(3)
     _, stats = run_pipeline(pipeline_config(tmp_path), tracker=memory_tracker,

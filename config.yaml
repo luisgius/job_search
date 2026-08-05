@@ -48,10 +48,53 @@ sources:
   linkedin_email: false    # needs gmail_credentials.json (see README)
 
 freshness:
-  max_age_hours: 24
+  # 72, not 24 — and the reason is worth reading before you tighten it back.
+  #
+  # A narrow window feels like it keeps the digest small. It does not: that job
+  # belongs to db.skip_seen_days, which already guarantees you are shown each
+  # posting exactly once. Widening the window from 24h to 72h therefore does
+  # NOT triple your morning digest. Yesterday's jobs are still yesterday's
+  # jobs, and the tracker still suppresses them.
+  #
+  # What 24 hours does do is lose things, silently and permanently. A Friday
+  # posting when the next run is Monday. A board that publishes in batches, or
+  # a company whose HR team posts at 18:00 on a day the run happened at 08:00.
+  # Adzuna's `created` is its own ingest time, not the employer's, and lags.
+  # Greenhouse's `first_published` is missing often enough that the fallback
+  # matters. Every one of those is a real job that never appears, with no trace
+  # anywhere that it existed — which is the one failure this tool must not have.
+  #
+  # The premise behind 24 was "apply in the first day or you have lost". That
+  # is contested: one tracked sample of 347 applications saw 12% response on
+  # day one and 61% on day four, because day one is when 200+ other applicants
+  # arrive at once. Speed is worth something; it is not worth silence.
+  max_age_hours: 72
   # Postings with no trustworthy date can't be proven fresh. Dropping them is
   # the honest default — set false to keep them and accept some staleness.
+  # Watch the `undated` count in the digest's filter breakdown for a week
+  # before you decide; if one company you care about always lands there, this
+  # is the switch.
   skip_undated: true
+
+  # --- ghost-job flags: these annotate a card, they never drop a job ---------
+  #
+  # Somewhere between 18% and 27% of online postings are never filled, and
+  # Greenhouse's own study found at least 1 in 5 US postings falls in that
+  # bucket. The two cheapest signals both come free from data the tracker
+  # already stores.
+
+  # A posting older than this many days is flagged on its card. It still
+  # renders in full, still counts in the funnel, still links to the form —
+  # a wrong flag costs you a glance, a wrong deletion costs you a job you
+  # never hear about.
+  stale_after_days: 30
+
+  # A role re-listed under a new job id is the second signal. The catch is
+  # that a healthy job reaching us from Greenhouse AND Adzuna at the same
+  # time looks identical — one role, two ids — so a sighting only counts as
+  # a repost when it is this many days after the earlier one. Lower it and
+  # you start calling ordinary cross-source duplicates ghost jobs.
+  repost_min_gap_days: 14
 
 filters:
   # ISO-3166 alpha-2 — the whole EU27 plus the EEA and the UK.

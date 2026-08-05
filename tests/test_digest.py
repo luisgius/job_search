@@ -22,7 +22,10 @@ from pathlib import Path
 import pytest
 
 from src.digest import (
+    DEFAULT_STALE_AFTER_DAYS,
+    RELATIVE_DAYS_LIMIT,
     build_context,
+    posting_age_days,
     relative_time,
     render_html,
     write_digest,
@@ -96,6 +99,306 @@ def test_relative_time(delta, expected_fragment):
 
 def test_relative_time_on_an_undated_posting():
     assert relative_time(None, NOW) == "—"
+
+
+# ==========================================================================
+# posting age — and the refusal to invent one
+# ==========================================================================
+
+
+def test_posting_age_is_measured_in_days():
+    assert posting_age_days(NOW - timedelta(days=45), NOW) == pytest.approx(45)
+
+
+def test_an_undated_posting_has_no_age_at_all():
+    """Not zero, not "fresh" — `None`. The only honest answer, and the one
+    thing between this feature and a card that quietly presents `first_seen_at`
+    as a posting date."""
+    assert posting_age_days(None, NOW) is None
+
+
+def test_the_card_states_the_age_of_a_recent_posting(tmp_path: Path):
+    item = build_context([make_scored(score=90, hours_old=72)], stats(),
+                         digest_config(tmp_path), now=NOW)["needs_click"][0]
+    assert item["posted_age_days"] == 3
+    assert item["posted_label"] == "posted 3d ago"
+
+
+def test_the_card_states_the_age_of_a_very_old_posting_too(tmp_path: Path):
+    """`relative_time` switches to a calendar date past
+    `RELATIVE_DAYS_LIMIT`, which is easier to place but stops answering the
+    question. On a posting old enough to be flagged, the age in days *is* the
+    news, so the card prints both."""
+    old = make_scored(score=90, hours_old=24 * (RELATIVE_DAYS_LIMIT + 40))
+    item = build_context([old], stats(), digest_config(tmp_path),
+                         now=NOW)["needs_click"][0]
+    assert item["posted_age_days"] == RELATIVE_DAYS_LIMIT + 40
+    assert "100 days ago" in item["posted_label"]
+    assert "2026-04-26" in item["posted_label"]     # and still the date
+
+
+def test_an_undated_card_says_so_instead_of_guessing(tmp_path: Path, memory_tracker):
+    """The tracker knows exactly when it first *fetched* this job, and that
+    date is right there for the taking. Printing it would manufacture a
+    freshness the source never claimed, so the card shows no date, no age and
+    no flag. An undated posting has to look undated.
+    """
+    undated = make_scored(score=90, hours_old=None)
+    # The fact the card must not reach for: a first_seen_at, three days ago.
+    memory_tracker.record_job(undated.job, now=NOW - timedelta(days=3))
+
+    ctx = build_context([undated], stats(), digest_config(tmp_path), now=NOW,
+                        tracker=memory_tracker)
+    item = ctx["needs_click"][0]
+
+    assert item["posted_age_days"] is None
+    assert item["posted_at"] == ""
+    assert item["posted_at_iso"] == ""
+    assert item["posted_label"] == "no posting date"
+    html = render_html(ctx)
+    assert "no posting date" in html
+    assert "2026-08-01" not in html          # the first_seen_at, unmentioned
+    assert "3d ago" not in html
+
+
+# ==========================================================================
+# the stale flag — advisory, never a filter
+# ==========================================================================
+
+
+def test_an_old_posting_is_flagged_stale(tmp_path: Path):
+    """One posting in five is never filled, and the old ones are where they
+    gather. The flag is the cheapest thing this pipeline can tell you."""
+    old = make_scored(score=90, hours_old=24 * 45)
+    item = build_context([old], stats(), digest_config(tmp_path),
+                         now=NOW)["needs_click"][0]
+    assert item["stale"] is True
+    assert any("45 days" in flag for flag in item["flags"])
+
+
+def test_a_recent_posting_is_not_flagged_stale(tmp_path: Path):
+    """The neighbouring case. A flag that fires on a two-day-old posting is a
+    flag nobody reads by the end of the week."""
+    fresh = make_scored(score=90, hours_old=48)
+    item = build_context([fresh], stats(), digest_config(tmp_path),
+                         now=NOW)["needs_click"][0]
+    assert item["stale"] is False
+    assert item["flags"] == []
+
+
+def test_a_posting_exactly_at_the_stale_threshold_is_not_flagged(tmp_path: Path):
+    """Boundary, stated the same way `is_fresh` states its own: at the limit
+    is inside it. An hour past is not."""
+    at = make_scored(score=90, hours_old=24 * DEFAULT_STALE_AFTER_DAYS,
+                     ats_job_id="at")
+    past = make_scored(score=90, hours_old=24 * DEFAULT_STALE_AFTER_DAYS + 1,
+                       ats_job_id="past")
+    ctx = build_context([at, past], stats(), digest_config(tmp_path), now=NOW)
+    flags = {item["key"]: item["stale"] for item in ctx["needs_click"]}
+    assert flags[at.job.key] is False
+    assert flags[past.job.key] is True
+
+
+def test_an_undated_posting_is_never_flagged_stale(tmp_path: Path):
+    """The case that would otherwise be got wrong by treating a missing date
+    as an infinitely old one. There is nothing to judge here, and guessing
+    would put a ghost-job warning on every LinkedIn alert item there is."""
+    undated = make_scored(score=90, hours_old=None)
+    item = build_context([undated], stats(), digest_config(tmp_path),
+                         now=NOW)["needs_click"][0]
+    assert item["posted_age_days"] is None
+    assert item["stale"] is False
+    assert item["flags"] == []
+
+
+def test_the_stale_threshold_is_configurable(tmp_path: Path):
+    old = make_scored(score=90, hours_old=24 * 45)
+    cfg = digest_config(tmp_path, freshness={"stale_after_days": 60})
+    item = build_context([old], stats(), cfg, now=NOW)["needs_click"][0]
+    assert item["stale"] is False
+
+
+def test_the_stale_flag_reaches_the_page(tmp_path: Path):
+    old = make_scored(score=90, hours_old=24 * 45)
+    html = render_html(build_context([old], stats(), digest_config(tmp_path), now=NOW))
+    assert "On the market 45 days" in html
+
+
+# ==========================================================================
+# the repost flag — the half that needs the tracker
+# ==========================================================================
+
+
+def relisted(tracker, *, gap_days, posted=True, age_days=0):
+    """Seed one earlier listing of `make_job()`'s role and return today's one.
+
+    Same company, same title, same city — so the same `dedupe_key` — under a
+    different ATS id, which is what a re-opened requisition looks like.
+
+    `age_days` is how old today's listing itself is; the earlier one appeared
+    `gap_days` before *that*, so the gap under test is exactly `gap_days`.
+    `posted=False` makes the earlier listing undated, leaving `first_seen_at`
+    as the only thing to measure from.
+    """
+    listed_at = NOW - timedelta(days=age_days)
+    earlier_at = listed_at - timedelta(days=gap_days)
+    earlier = make_job(ats_job_id="old", hours_old=None,
+                       posted_at=earlier_at if posted else None)
+    tracker.record_job(earlier, now=earlier_at)
+
+    today = make_scored(score=90, ats_job_id="new", hours_old=None,
+                        posted_at=listed_at)
+    tracker.record_job(today.job, now=NOW)
+    assert today.job.dedupe_key == earlier.dedupe_key
+    assert today.job.key != earlier.key
+    return today
+
+
+def test_a_relisting_after_a_gap_is_flagged(tmp_path: Path, memory_tracker):
+    today = relisted(memory_tracker, gap_days=90)
+    item = build_context([today], stats(), digest_config(tmp_path), now=NOW,
+                         tracker=memory_tracker)["needs_click"][0]
+    assert item["repost_gap_days"] == 90
+    assert any("Re-listed" in flag for flag in item["flags"])
+
+
+def test_a_simultaneous_cross_source_duplicate_is_not_flagged_as_a_repost(
+        tmp_path: Path, memory_tracker):
+    """The neighbouring case, and the one that matters most.
+
+    The same live job reaching us from Greenhouse and from Adzuna in one run
+    has one `dedupe_key` and two `Job.key`s — indistinguishable from a
+    re-listing except by time. Flagging it would put a ghost-job warning on a
+    healthy posting every single morning.
+    """
+    aggregator_copy = make_job(source="adzuna", ats=None, ats_job_id=None,
+                               url="https://www.adzuna.de/details/1", hours_old=3)
+    memory_tracker.record_job(aggregator_copy, now=NOW)
+
+    today = make_scored(score=90, hours_old=3)
+    memory_tracker.record_job(today.job, now=NOW)
+    assert today.job.dedupe_key == aggregator_copy.dedupe_key
+    assert today.job.key != aggregator_copy.key
+
+    item = build_context([today], stats(), digest_config(tmp_path), now=NOW,
+                         tracker=memory_tracker)["needs_click"][0]
+    assert item["repost_gap_days"] == 0
+    assert item["flags"] == []
+
+
+def test_a_repost_whose_earlier_listing_was_undated_is_still_flagged(
+        tmp_path: Path, memory_tracker):
+    """The gap survives a missing date on either side: two sightings ninety
+    days apart are ninety days apart whatever the boards claimed. The fallback
+    is `first_seen_at`, which is *our* observation and can only ever shrink
+    the gap — never invent one."""
+    today = relisted(memory_tracker, gap_days=90, posted=False)
+    item = build_context([today], stats(), digest_config(tmp_path), now=NOW,
+                         tracker=memory_tracker)["needs_click"][0]
+    assert item["repost_gap_days"] == 90
+    assert any("Re-listed" in flag for flag in item["flags"])
+
+
+def test_the_repost_gap_threshold_is_configurable(tmp_path: Path, memory_tracker):
+    today = relisted(memory_tracker, gap_days=20)
+    cfg = digest_config(tmp_path, freshness={"repost_min_gap_days": 30})
+    item = build_context([today], stats(), cfg, now=NOW,
+                         tracker=memory_tracker)["needs_click"][0]
+    assert item["repost_gap_days"] == 20        # measured ...
+    assert item["flags"] == []                  # ... but under the threshold
+
+
+def test_without_a_tracker_there_is_simply_no_repost_flag(tmp_path: Path):
+    """`tracker=` is optional. Leaving it out costs one advisory line and
+    changes nothing else on the page."""
+    today = make_scored(score=90, ats_job_id="new", hours_old=1)
+    item = build_context([today], stats(), digest_config(tmp_path),
+                         now=NOW)["needs_click"][0]
+    assert item["repost_gap_days"] is None
+    assert item["flags"] == []
+
+
+def test_a_tracker_that_raises_costs_one_flag_not_the_page(tmp_path: Path):
+    """By the time the digest runs, the run's money is already spent. A
+    tracker problem must not take the card — or the page — down with it."""
+
+    class BrokenTracker:
+        def repost_gap_days(self, *args, **kwargs):
+            raise RuntimeError("database is locked")
+
+    old = make_scored(score=90, company="Northwind", hours_old=24 * 45)
+    ctx = build_context([old], stats(), digest_config(tmp_path), now=NOW,
+                        tracker=BrokenTracker())
+    item = ctx["needs_click"][0]
+    assert item["repost_gap_days"] is None
+    assert item["stale"] is True               # the other flag still works
+    assert "Northwind" in render_html(ctx)     # and the card is still there
+
+
+def test_a_hand_built_item_with_no_flags_key_still_renders(tmp_path: Path):
+    """`render_html` documents that it takes a partial context, and the
+    fallback path and older fixtures both build items by hand. Losing the
+    whole page over a missing advisory line would be the wrong trade twice
+    over."""
+    context = build_context([], RunStats(), digest_config(tmp_path), now=NOW)
+    context["needs_click"] = [{"company": "Handmade", "title": "Engineer",
+                               "score_label": "80", "score_class": "score-80",
+                               "url": "https://example.com/1"}]
+    assert "Handmade" in render_html(context)
+
+
+def test_the_repost_flag_reaches_the_page(tmp_path: Path, memory_tracker):
+    today = relisted(memory_tracker, gap_days=90)
+    html = render_html(build_context([today], stats(), digest_config(tmp_path),
+                                     now=NOW, tracker=memory_tracker))
+    assert "Re-listed" in html
+
+
+# ==========================================================================
+# the governing constraint: a flag is never a filter
+# ==========================================================================
+
+
+def test_flagging_never_removes_a_job_from_the_digest(tmp_path: Path, memory_tracker):
+    """The invariant the whole feature is subordinate to.
+
+    A stale, re-listed, undated posting is exactly the profile these flags are
+    looking for — and it must still be on the page, in its section, counted in
+    the totals, with its link intact. A wrong flag costs a glance; a wrong
+    deletion costs an opportunity the user never learns existed.
+    """
+    today = relisted(memory_tracker, gap_days=200, age_days=200)
+
+    cfg = digest_config(tmp_path)
+    without = build_context([today], stats(), cfg, now=NOW)
+    with_tracker = build_context([today], stats(), cfg, now=NOW,
+                                 tracker=memory_tracker)
+
+    item = with_tracker["needs_click"][0]
+    assert item["stale"] is True
+    assert len(item["flags"]) == 2                       # both flags fired ...
+    assert with_tracker["totals"] == without["totals"]   # ... and nothing moved
+    assert with_tracker["funnel"] == without["funnel"]
+    assert len(with_tracker["needs_click"]) == 1
+    assert item["url"] == today.job.url
+    assert item["score"] == 90
+
+
+def test_the_funnel_is_untouched_by_the_flags(tmp_path: Path, memory_tracker):
+    """Stated separately because the funnel is the number a user reads to tell
+    a quiet day from a broken pipeline. If flagging ever started dropping
+    jobs, this is where it would show — and it must not."""
+    scored = [relisted(memory_tracker, gap_days=90)]
+    scored.append(make_scored(score=70, ats_job_id="fresh", hours_old=2))
+    scored.append(make_scored(score=60, ats_job_id="undated", hours_old=None,
+                              status=ApplyStatus.SCORED_BELOW))
+
+    ctx = build_context(scored, stats(), digest_config(tmp_path), now=NOW,
+                        tracker=memory_tracker)
+    assert {step["label"]: step["value"] for step in ctx["funnel"]}["fetched"] == 312
+    assert ctx["totals"]["all"] == 3
+    assert ctx["totals"]["needs_click"] == 2
+    assert ctx["totals"]["below"] == 1
 
 
 # ==========================================================================

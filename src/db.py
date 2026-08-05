@@ -227,6 +227,95 @@ class Tracker:
         ).fetchone()
         return _parse_iso(row["first_seen_at"]) if row else None
 
+    def repost_gap_days(
+        self,
+        dedupe_key: str,
+        *,
+        key: str,
+        posted_at: datetime | None = None,
+        now: datetime | None = None,
+    ) -> float | None:
+        """How long this role had already been listed before *this* listing.
+
+        A recruiter who closes a requisition and opens it again gets a new
+        `ats_job_id`, therefore a new `Job.key` — but `dedupe_key` (company +
+        title + city) does not move. So a row carrying this `dedupe_key` under
+        a **different** `key` is the same role, listed before. Re-listing is
+        one of the two cheap ghost-job signals; posting age is the other.
+
+        Same shape as `has_applied_similar`: one indexed lookup on
+        `dedupe_key`, no network, no cost. It reads only the `jobs` table and
+        **nothing acts on the answer except a flag on a digest card.**
+
+        Returns the days between the earliest earlier sighting and this one, or
+        `None` when this role has never been seen under another key. The value
+        is signed: negative means the only other rows are *newer* than this
+        listing, which is evidence of nothing. **The caller applies the
+        threshold** — the gap is a measurement, whether it is wide enough to
+        call a repost is policy, and policy lives in the config
+        (`freshness.repost_min_gap_days`).
+
+        Which timestamps, and why. This is the part worth reading:
+
+        * Each row contributes `posted_at` when it has one and `first_seen_at`
+          when it does not. `posted_at` is the employer's own claim about when
+          the listing went up, which is exactly the quantity being compared.
+          `first_seen_at` is *our* first sight of it, which can never be
+          earlier than the posting itself — so substituting it can only shrink
+          the gap, never inflate it. Shrinking is the safe direction for a flag
+          that would otherwise fire on a perfectly healthy posting.
+        * Both are stable per row. `record_job` freezes `posted_at` with
+          COALESCE and never rewrites `first_seen_at`, so both mean "when this
+          listing first appeared" and neither drifts as the same row is
+          re-fetched every morning. That stability is what makes two rows
+          comparable at all.
+        * `last_seen_at` is deliberately **not** used, though "was the old
+          listing still live?" sounds like the sharper question. It moves for
+          reasons that have nothing to do with the employer: a weekend with no
+          cron run, a watchlist edit, a board outage or a narrowed country
+          filter all freeze it. Our own gaps in observation would then read as
+          the employer closing the requisition.
+
+        The gap is also the whole defence against the false positive that
+        matters: a **simultaneous cross-source duplicate is not a repost.** The
+        same live job arriving from Greenhouse and from Adzuna has one
+        `dedupe_key` and two keys, structurally identical to a re-listing. What
+        tells them apart is time — a duplicate arrives beside its twin, a
+        repost arrives after the first listing has been and gone — so the
+        duplicate's gap comes out at roughly zero and no sane threshold fires.
+        """
+        clean = str(dedupe_key or "").strip()
+        own = str(key or "")
+        if not clean:
+            return None
+
+        rows = self.conn.execute(
+            "SELECT key, posted_at, first_seen_at FROM jobs WHERE dedupe_key = ?",
+            (clean,),
+        ).fetchall()
+
+        def appeared(row: sqlite3.Row) -> datetime | None:
+            return _parse_iso(row["posted_at"]) or _parse_iso(row["first_seen_at"])
+
+        others = [appeared(row) for row in rows if row["key"] != own]
+        earlier = [moment for moment in others if moment is not None]
+        if not earlier:
+            return None
+
+        # Reference for *this* listing, most authoritative first: what the
+        # caller knows, then what the tracker recorded when it first met this
+        # key, then the clock. Sorting is done in Python rather than SQL
+        # because ISO strings with and without microseconds do not sort
+        # chronologically as text.
+        reference = ensure_utc(posted_at)
+        if reference is None:
+            mine = [appeared(row) for row in rows if row["key"] == own]
+            reference = next((m for m in mine if m is not None), None)
+        if reference is None:
+            reference = ensure_utc(now) or utcnow()
+
+        return (reference - min(earlier)).total_seconds() / 86400.0
+
     # -- applications -----------------------------------------------------
 
     def record_status(

@@ -269,7 +269,7 @@ def test_apply_filters_partitions_the_batch(tmp_path, jobs):
     kept = {j.company for j in result.kept}
     assert "Acme" in kept          # fresh, Berlin
     assert "Umbrella" in kept      # fresh, remote with an EU hint
-    assert "Globex" not in kept    # 50h old
+    assert "Globex" not in kept    # older than freshness.max_age_hours
     assert "Initech" not in kept   # undated
     assert "Hooli" not in kept     # San Francisco
     assert "Soylent" not in kept   # remote, US-flavoured

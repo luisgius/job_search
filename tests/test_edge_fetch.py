@@ -26,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from src import geo
+from src.config import DEFAULT_MAX_AGE_HOURS
 from src.filters import (
     apply_filters,
     dedupe,
@@ -68,8 +69,8 @@ def fresh_cfg(tmp_path, **filters):
     """Same, but with the freshness gate wide open.
 
     Several tests below are about title/location/keywords and would otherwise
-    be answered by the 24h freshness default before reaching the stage under
-    test.
+    be answered by `freshness.max_age_hours` before reaching the stage under
+    test — whatever that window happens to be set to.
     """
     return write_config(
         tmp_path,
@@ -562,13 +563,23 @@ def test_a_summer_offset_is_converted_rather_than_read_as_utc():
     assert "25.0h" in reason
 
 
-def test_a_posting_thirty_hours_old_is_already_invisible(tmp_path):
+def test_a_posting_past_the_configured_window_is_invisible(tmp_path):
     """Pinned known limitation (docs/EVALUATION.md §9.4, "a --since /
-    catch-up flag"). At the 24h default, a job posted at lunchtime yesterday
-    is gone by this morning's run — so a missed run really does mean a missed
-    day, and this test is the reminder of the cost."""
-    result = apply_filters([make_job(hours_old=30)], cfg(tmp_path), now=NOW)
-    assert result.kept == []
+    catch-up flag"): whatever `freshness.max_age_hours` says, the hour after
+    it is a cliff. A posting that falls off it is absent from that morning's
+    run with no trace anywhere, so a missed run really does mean a missed day.
+
+    Written against the configured window rather than against a number of
+    hours, because the number has moved once already — 24 to 72, see
+    `config.DEFAULT_MAX_AGE_HOURS` — and the cliff is the part that matters.
+    Both sides are asserted: a test that only shows the drop cannot tell a
+    working boundary from a filter that rejects everything.
+    """
+    window = DEFAULT_MAX_AGE_HOURS
+    inside = make_job(hours_old=window - 1, ats_job_id="inside")
+    outside = make_job(hours_old=window + 1, ats_job_id="outside")
+    result = apply_filters([inside, outside], cfg(tmp_path), now=NOW)
+    assert [job.ats_job_id for job in result.kept] == ["inside"]
     assert result.counts == {"stale": 1}
 
 

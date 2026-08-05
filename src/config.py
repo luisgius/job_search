@@ -22,6 +22,39 @@ import yaml
 # defaults
 # --------------------------------------------------------------------------
 
+#: The freshness window, in hours — **the** definition of it.
+#:
+#: This number used to be written out four times (here, `Config.validate`,
+#: `filters.apply_filters` and `digest._config_summary`). Four copies of one
+#: number is a latent bug: change one and the others silently disagree, so the
+#: page reports a window the filter is not using.
+#:
+#: 72 rather than 24, and the reasoning is in `config.yaml` next to the
+#: setting: `db.skip_seen_days` already guarantees each job is shown once, so a
+#: wider window does not triple the digest — it only recovers what a 24-hour
+#: window loses in silence (a weekend, a board that publishes late, a source
+#: whose timestamp is its own ingest time).
+DEFAULT_MAX_AGE_HOURS = 72
+
+#: A posting older than this many days is **flagged** on its card.
+#:
+#: Never filtered. Research puts ghost jobs at 18-27% of listings and
+#: Greenhouse's own study found at least 1 in 5 US postings is never filled;
+#: age is the cheapest signal we can compute for free. A wrong flag costs a
+#: glance, so the flag is safe in a way a rejection would not be.
+DEFAULT_STALE_AFTER_DAYS = 30
+
+#: How far apart two sightings of the same role must be before the later one
+#: is called a re-listing rather than a duplicate.
+#:
+#: The same live posting reaching us from Greenhouse and from Adzuna has one
+#: `dedupe_key` and two `Job.key`s — structurally identical to a re-listing.
+#: What separates them is time: a duplicate arrives alongside its twin, a
+#: repost arrives after the first listing has been and gone. Two weeks is
+#: comfortably longer than any cross-source ingest lag and comfortably shorter
+#: than a hiring cycle.
+DEFAULT_REPOST_MIN_GAP_DAYS = 14
+
 DEFAULTS: dict[str, Any] = {
     "applicant": {
         "name": "",
@@ -61,10 +94,15 @@ DEFAULTS: dict[str, Any] = {
         "linkedin_email": False,
     },
     "freshness": {
-        "max_age_hours": 24,
+        "max_age_hours": DEFAULT_MAX_AGE_HOURS,
         # Postings without a trustworthy date cannot be proven fresh. Dropping
         # them is the honest default; flip to False to keep them.
         "skip_undated": True,
+        # The two below are FLAGS ON THE CARD, never filters. Nothing reads
+        # them to drop, hide or reject a posting — they annotate a card the
+        # digest was going to render anyway. See `digest._ghost_flags`.
+        "stale_after_days": DEFAULT_STALE_AFTER_DAYS,
+        "repost_min_gap_days": DEFAULT_REPOST_MIN_GAP_DAYS,
     },
     "filters": {
         "countries": [
@@ -429,10 +467,24 @@ class Config:
                 or not 0 <= threshold <= 100:
             problems.append(f"scoring.threshold must be 0-100, got {threshold!r}")
 
-        max_age = self.get("freshness.max_age_hours", 24)
+        max_age = self.get("freshness.max_age_hours", DEFAULT_MAX_AGE_HOURS)
         if isinstance(max_age, bool) or not isinstance(max_age, (int, float)) \
                 or max_age <= 0:
             problems.append(f"freshness.max_age_hours must be > 0, got {max_age!r}")
+
+        # The two ghost-job thresholds only ever colour a card, so a bad value
+        # costs a wrong flag rather than a lost posting. Still checked: a
+        # setting that is silently ignored is worse than one that is rejected,
+        # because the user believes it took effect. Zero is legal — it means
+        # "flag everything you can", which is a coherent thing to ask for.
+        for dotted, default in (
+            ("freshness.stale_after_days", DEFAULT_STALE_AFTER_DAYS),
+            ("freshness.repost_min_gap_days", DEFAULT_REPOST_MIN_GAP_DAYS),
+        ):
+            value = self.get(dotted, default)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) \
+                    or value < 0:
+                problems.append(f"{dotted} must be >= 0, got {value!r}")
 
         if self.source_enabled("adzuna") and not (
             self.get("keys.adzuna_app_id") and self.get("keys.adzuna_app_key")

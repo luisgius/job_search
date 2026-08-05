@@ -636,7 +636,11 @@ def run_pipeline(
 
     # -- 11. digest -------------------------------------------------------
     try:
-        path = digest.write_digest(scored_jobs, stats, config, now=moment)
+        # The tracker goes in read-only, for the sighting history the repost
+        # flag needs. Nothing is dropped on the strength of it: a run with no
+        # tracker renders exactly the same cards, minus one advisory line.
+        path = digest.write_digest(scored_jobs, stats, config, now=moment,
+                                   tracker=tracker)
         stats.digest_path = str(path)  # type: ignore[attr-defined]
     except Exception as exc:
         logger.warning("could not write the digest: %s", exc)

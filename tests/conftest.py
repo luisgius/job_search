@@ -28,6 +28,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.config import DEFAULT_MAX_AGE_HOURS  # noqa: E402
 from src.models import ApplyStatus, Job, Score, ScoredJob  # noqa: E402
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -142,12 +143,19 @@ def jobs() -> list[Job]:
 
     Covers: fresh EU, stale EU, undated, US, remote-EU, remote-unqualified,
     and an excluded-by-title internship.
+
+    Globex's age is stated relative to the shipped `freshness.max_age_hours`
+    rather than as a literal, so "stale EU" stays true when that window is
+    retuned. It moved from 24h to 72h once already, and a fixture whose
+    comment claims one thing while its number means another is the rot this
+    suite exists to avoid.
     """
     return [
         make_job(company="Acme", title="Backend Engineer",
                  location="Berlin, Germany", hours_old=2, ats_job_id="1"),
         make_job(company="Globex", title="Data Engineer",
-                 location="Amsterdam, Netherlands", hours_old=50, ats_job_id="2"),
+                 location="Amsterdam, Netherlands",
+                 hours_old=DEFAULT_MAX_AGE_HOURS + 26, ats_job_id="2"),
         make_job(company="Initech", title="Platform Engineer",
                  location="Madrid, Spain", hours_old=None, ats_job_id="3"),
         make_job(company="Hooli", title="Backend Engineer",

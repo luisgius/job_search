@@ -32,8 +32,8 @@ implementation — it is what the numbers say.
 
 ## 2. Freshness is the weakest claim in the pitch
 
-"Fresh EU postings (last 24h)" is not something any of these sources can
-actually guarantee.
+"Fresh EU postings, posted in the last N hours" is not something any of these
+sources can actually guarantee.
 
 - **Greenhouse** exposes `updated_at` on every job and `first_published` on
   most. `updated_at` moves when *anything* changes — a typo fix on a
@@ -54,6 +54,46 @@ discard real jobs. Expect the funnel line in the digest to show a large
 `undated` rejection count on some boards. **Check that number in week one**;
 if one company you care about always lands there, set `skip_undated: false`
 and accept the staleness for that board rather than never seeing it.
+
+`freshness.max_age_hours` ships at **72**, which is the setting this section
+argues for: the window is the one place where imprecise source dates turn into
+permanently invisible jobs, and `db.skip_seen_days` — not the window — is what
+keeps the digest from repeating itself. Widening it costs a slightly longer
+first digest and buys back the Friday postings, the late-publishing boards and
+the aggregator lag described above.
+
+**`skip_undated` was reconsidered alongside it and deliberately left alone.**
+The two settings look symmetric and are not. Widening the window admits at
+most a few extra days of postings; `skip_undated: false` admits every undated
+posting a board has ever left open, because ATS board endpoints return the
+whole set of open requisitions rather than the recent ones. That is bounded in
+time — `db.skip_seen_days` suppresses them from the second run onwards — but on
+the run where it happens it can push genuinely fresh jobs past
+`scoring.max_jobs`, which drops them from that run entirely. The honest advice
+stays the one above: watch the `undated` count for a week, then flip it *for a
+reason*, knowing what the first morning will look like.
+
+## 2b. Ghost jobs are flagged, not filtered
+
+Between 18% and 27% of online postings are estimated never to be filled, and
+Greenhouse's own study found at least 1 in 5 US postings falls in that bucket;
+45% of surveyed HR professionals say they post them routinely. Two signals are
+computable from data the tracker already stores, for free and with no network:
+
+- **age** — a posting past `freshness.stale_after_days` (default 30);
+- **re-listing** — the same role posted again under a new ATS id, at least
+  `freshness.repost_min_gap_days` (default 14) after the first listing. The
+  gap is what separates a re-listing from a healthy job that simply reached us
+  from Greenhouse and Adzuna at the same time: those share a `dedupe_key` and
+  differ in `Job.key`, exactly like a repost, and only time tells them apart.
+
+Both are lines on the card and nothing else. They do not filter, hide, reorder
+or downweight anything, and the digest's funnel is identical with and without
+them — which is asserted, because the temptation to "just hide the obvious
+ghosts" is exactly how this tool would start deleting real opportunities. A
+wrong flag costs a glance. Neither signal is proof: a genuine role can sit
+open for two months, and a genuine re-listing happens when the first search
+failed. Read them as "do not read silence here as rejection", not as "skip".
 
 ## 3. Auto-apply: read this twice
 
@@ -205,8 +245,10 @@ In rough order of value:
    actually got interviews for is real calibration data, and it is being
    thrown away.
 3. **Retention policy for `output/applications/`.** It grows without bound.
-4. **A `--since` / catch-up flag.** Missing Monday's run currently means
-   Monday's jobs are gone, because Tuesday's run only looks back 24h.
+4. **A `--since` / catch-up flag.** Partly mitigated: the window now ships at
+   72h, so a single missed weekday no longer loses that day's postings. The
+   cliff still exists, it has just moved — miss a run over a long weekend and
+   Friday's jobs are gone with no trace that they existed.
 5. **Company-level dedupe.** Applying to three roles at the same company in
    one week is worse than applying to one. The tracker sees jobs, not
    employers.
