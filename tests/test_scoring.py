@@ -108,6 +108,51 @@ def test_prompt_carries_the_instructions_that_change_the_score():
     assert "concrete evidence" in lowered
 
 
+def test_title_alignment_outranks_the_rest_of_the_rubric():
+    """The rubric is an ordered list and the order is the instruction.
+
+    Title alignment used to be item 6 — a floor check tacked on after the
+    technical criteria. It is the strongest thing observable about an
+    application before a human reads the CV, so it leads. Asserting the
+    ordering rather than mere presence is deliberate: putting the clause back
+    at the bottom would keep every substring in this file green while undoing
+    the whole point of it.
+    """
+    prompt = build_prompt(make_job(), BASE_CV, {}).lower()
+    family = prompt.index("job family and title alignment")
+    tech = prompt.index("must-have technologies")
+    seniority = prompt.index("years of experience")
+    assert family < tech < seniority
+
+
+def test_title_alignment_is_judged_on_the_work_not_the_string():
+    """Ranking on title is one instruction away from keyword matching.
+
+    A candidate whose employer called them a "Backend Developer" is not a
+    worse fit for a "Backend Engineer" role, and a rubric that ranks on the
+    literal title would score them down for their previous company's word
+    choice. The counter-example matters as much as the rule: "Data Engineer"
+    and "Data Scientist" overlap by a word and are different jobs.
+    """
+    prompt = build_prompt(make_job(), BASE_CV, {}).lower()
+    assert "judge the work, not the string" in prompt
+    assert "backend developer" in prompt
+    assert "data scientist" in prompt
+
+
+def test_a_different_job_family_is_still_a_ceiling_not_a_deduction():
+    """Promoting this clause must not have softened it.
+
+    The old wording made a wrong-family posting a 5. If reordering had turned
+    that into "weigh title heavily", a strong backend CV would start scoring
+    60 on sales roles — which is exactly the noise the threshold exists to
+    keep out.
+    """
+    prompt = build_prompt(make_job(), BASE_CV, {}).lower()
+    assert "it is a 5" in prompt
+    assert "ceiling, not a deduction" in prompt
+
+
 def test_prompt_includes_the_applicant_header_when_given():
     prompt = build_prompt(make_job(), BASE_CV,
                           {"name": "Ada Lovelace", "location": "Berlin, Germany"})

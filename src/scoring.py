@@ -226,15 +226,27 @@ HOW TO SCORE
 0-100, where 70+ means "worth a tailored application" — a role the candidate
 should spend an hour on tonight. Below 70 means "skip it".
 
-Weigh, roughly in this order:
-1. Required years of experience and seniority, against what the CV shows.
+Weigh, roughly in this order. The first two dominate the rest: a recruiter's
+own search filters on skills first and job title second, and of everything
+visible before a human reads a word of the CV, title alignment is the single
+strongest predictor of whether this application goes anywhere at all.
+
+1. Job family and title alignment. Is this posting the job the CV already
+   describes, an adjacent one, or a different job? Same job is the strongest
+   signal available. Adjacent — backend to platform, data engineer to
+   analytics engineer — is real but discounted. A different family is a
+   ceiling, not a deduction: a great backend CV is not a 60 for a sales role,
+   it is a 5.
+   Judge the WORK, not the string. "Software Engineer", "Backend Engineer"
+   and "Backend Developer" are one job with three names, and a candidate is
+   not penalised because their employer used an unusual title. Equally,
+   "Data Engineer" and "Data Scientist" share a word and are not the same job.
 2. Must-have technologies: are the named ones in the CV, or only adjacent ones?
-3. Domain overlap between the CV's experience and this team's problem.
-4. Language requirements (a posting written in or demanding German, French,
+3. Required years of experience and seniority, against what the CV shows.
+4. Domain overlap between the CV's experience and this team's problem.
+5. Language requirements (a posting written in or demanding German, French,
    Dutch ... when the CV does not claim that language).
-5. Location and work-authorisation feasibility for this candidate.
-6. Whether this is even the same job family as the CV — a great backend CV is
-   not a 60 for a sales role, it is a 5.
+6. Location and work-authorisation feasibility for this candidate.
 
 Penalise HARD — not by five points, by half the score or more — when a hard
 requirement is simply absent from the CV: work authorisation for the posting's
