@@ -37,6 +37,7 @@ import pytest
 from src.models import utcnow
 from src.sources.ats_boards import (
     ASHBY_JOB_BOARD_URL,
+    RequestBudget,
     PERSONIO_XML_URL,
     SMARTRECRUITERS_POSTING_URL,
     SMARTRECRUITERS_POSTINGS_URL,
@@ -1079,4 +1080,129 @@ def test_the_personio_fixture_does_not_claim_elements_reality_never_sends():
         f"personio_positions.xml claims element(s) the live feed does not send: "
         f"{sorted(invented)} — the offline Personio tests are validating a "
         "document that does not exist"
+    )
+
+
+# ==========================================================================
+# discovery
+#
+# `--discover` guesses a slug and asks six vendors about it, so its whole
+# confidence model rests on one assumption about the real internet: **a slug
+# nobody owns is answered with a 404, not with an empty board.** If any vendor
+# ever starts serving 200 + zero postings for an unknown tenant, every guess
+# comes back "reachable, nothing open", and the tool starts recommending
+# spellings that do not exist — which is the exact failure it was built to
+# avoid, since a wrong slug in `watchlist.yaml` produces an empty board every
+# morning that reads as a quiet market.
+#
+# That cannot be settled offline: the fixture and the parser would agree with
+# each other and both be wrong. It is settled here.
+# ==========================================================================
+
+#: A slug no tenant will ever own. Deliberately not random: a rerun must ask
+#: the same question, and a random string would make a failure unreproducible.
+NONEXISTENT_SLUG = "no-such-company-job-hunter-probe-9f3a"
+
+
+def live_probe(board: str, slug: str):
+    """One discovery probe, under this file's skip-or-fail policy.
+
+    `probe_board` never raises — it classifies — so the policy is applied to the
+    classification instead of to an exception. Only `unreachable` (no answer at
+    all: DNS, refused connection, timeout) skips. Everything else, `error`
+    included, is an answer and is handed back for the test to assert on: a 403
+    or a 429 means the board heard us and refused, which is a finding, and a
+    test that skips on it prints green while proving nothing.
+    """
+    from src.sources.ats_boards import PROBE_UNREACHABLE, probe_board
+
+    probe = probe_board(board, slug)
+    if probe.status == PROBE_UNREACHABLE:
+        pytest.skip(f"network unreachable: {board}/{slug}: {probe.message}")
+    return probe
+
+
+@pytest.mark.parametrize("board", [
+    "greenhouse", "lever", "workable", "ashby", "smartrecruiters", "personio",
+])
+def test_a_slug_nobody_owns_is_answered_with_a_404(board):
+    """The assumption every confidence in the discovery module rests on.
+
+    An `absent` probe is the one that lets discovery rule a board *out*. If this
+    ever comes back `empty`, the sweep can no longer tell "this company is not
+    here" from "this company is here and is not hiring", and it will happily
+    recommend a slug that belongs to nobody.
+    """
+    from src.sources.ats_boards import PROBE_ABSENT, PROBE_EMPTY
+
+    probe = live_probe(board, NONEXISTENT_SLUG)
+    assert probe.status != PROBE_EMPTY, (
+        f"{board} answered 200 with an empty board for a slug that cannot "
+        "exist — discovery can no longer rule this board out for any company, "
+        "and every guess will look reachable"
+    )
+    assert probe.status == PROBE_ABSENT, (
+        f"{board} answered a nonexistent slug with {probe.status!r} "
+        f"({probe.message}) rather than a 404 — the discovery sweep classifies "
+        "that as 'we do not know', so every company will come back qualified"
+    )
+
+
+@pytest.mark.parametrize("board,slug", [
+    ("greenhouse", GREENHOUSE_SLUGS[0]),
+    ("lever", LEVER_SLUGS[0]),
+])
+def test_a_real_board_probes_as_found(board, slug):
+    """The other half of the pair: a slug that does exist must come back
+    `found`, with a posting count, from the cheap probe kwargs discovery uses
+    (no descriptions, one SmartRecruiters page). If the cheap path stopped
+    returning postings, every real company would read as an empty board."""
+    from src.sources.ats_boards import PROBE_FOUND
+
+    probe = live_probe(board, slug)
+    assert probe.status == PROBE_FOUND, f"{board}/{slug}: {probe.message}"
+    assert probe.count and probe.count > 0
+
+
+def test_discovery_finds_a_company_from_its_name_alone():
+    """End to end against the real internet: a company name in, the board and
+    slug to paste out. This is the only test that exercises slug derivation,
+    the sweep and the live boards together.
+
+    Bounded explicitly, because this is the one feature that makes unsolicited
+    requests: a deliberate `-m network` run must not turn into a tenant scan.
+    """
+    from src.sources.ats_boards import discover_company
+
+    budget = RequestBudget(12)
+    result = discover_company(GREENHOUSE_SLUGS[0].title(), budget=budget)
+    if not result.probes:
+        pytest.skip("the request budget was spent before anything was asked")
+    if all(p.status == "unreachable" for p in result.probes):
+        pytest.skip(f"network unreachable: {result.probes[0].message}")
+
+    hits = {(p.board, p.slug) for p in result.matches}
+    assert ("greenhouse", GREENHOUSE_SLUGS[0]) in hits, (
+        f"discovery did not find greenhouse/{GREENHOUSE_SLUGS[0]} from the "
+        f"company name alone — it reported {result.confidence!r} with "
+        f"{sorted(hits)}. Either the slug moved (which `--check` will confirm) "
+        "or the derivation no longer produces it"
+    )
+    assert budget.spent <= budget.limit
+
+
+def test_a_discovery_sweep_stays_inside_its_request_budget():
+    """The bound is the feature. A budget that a real payload can walk past —
+    SmartRecruiters' offset pagination is the obvious way — is not a bound."""
+    from src.sources.ats_boards import discover
+
+    budget = RequestBudget(8)
+    results, budget = discover([NONEXISTENT_SLUG, "Some Other Company"],
+                               budget=budget)
+    if not any(r.probes for r in results):
+        pytest.skip("nothing was probed")
+    assert budget.spent <= 8
+    assert budget.skipped, (
+        "eight probes covered two whole companies, so the cap never engaged — "
+        "this test is no longer testing anything"
     )

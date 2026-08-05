@@ -25,6 +25,25 @@ the `--check` CLI is for::
     python -m src.sources.ats_boards --check personio acme
     python -m src.sources.ats_boards --check-all
 
+`--discover` is the other half: it goes from a company *name* to the board and
+slug to paste into `watchlist.yaml`, which was otherwise a manual trawl through
+careers pages looking at where the Apply button points::
+
+    python -m src.sources.ats_boards --discover "Glovo" "Factorial HR"
+
+**It is the one thing in this tool that makes unsolicited requests to third
+parties.** Everything else fetches boards the user chose; discovery guesses, and
+guessing is six vendors times several slug spellings times N companies of 404s
+from a single IP. A tool that looks like a scanner gets its user blocked from
+the boards they actually need, so the sweep is bounded twice
+(`DISCOVER_MAX_SLUGS_PER_COMPANY`, `DISCOVER_MAX_REQUESTS`), says out loud what
+each bound dropped, stops as soon as a board answers with real postings, and
+reuses `util.http_get`'s retry policy rather than adding a second one — a 404 is
+an answer and is never retried. It reports a *confidence*, never a verdict, and
+it never writes to `watchlist.yaml`: a confident-looking wrong slug is worse
+than no slug, because it produces an empty board every morning that is
+indistinguishable from a quiet market.
+
 Nothing in here raises out of `fetch()` — one dead board must never take the
 whole run down with it.
 
@@ -41,12 +60,14 @@ import argparse
 import html as html_module
 import json as json_lib
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from ..config import Config, ConfigError
-from ..models import Job
+from ..models import Job, collapse_initialisms, normalize_company, normalize_text
 from ..util import (
+    HttpError,
     get_logger,
     html_to_text,
     http_get,
@@ -1873,6 +1894,138 @@ def fetch(config: Config, *, session: Any = None, errors: list[str] | None = Non
 # --------------------------------------------------------------------------
 
 
+#: The five distinguishable answers a board can give about one slug.
+#:
+#: Collapsing any two of them is how a wrong slug gets into the watchlist. "The
+#: board answered with zero postings" is a company that exists and is not hiring
+#: today; "the board says there is no such slug" is a spelling that is simply
+#: wrong; "nothing answered at all" is a statement about *our* network and no
+#: evidence about the company either way. `--check` only needs ok/not-ok and
+#: flattens the last three; discovery needs all five, because it is deciding
+#: what to recommend rather than reporting on a slug the user already trusts.
+PROBE_FOUND = "found"                #: answered, >= 1 open posting
+PROBE_EMPTY = "empty"                #: answered, 0 postings — a real state
+PROBE_ABSENT = "absent"              #: answered "no such slug" (404/410)
+PROBE_ERROR = "error"                #: answered, but not with a usable board
+PROBE_UNREACHABLE = "unreachable"    #: never answered — DNS, refused, timeout
+
+#: `util.http_get` raises this exact shape, and only this shape, when no
+#: response was ever received. Everything else it raises quotes a status line,
+#: which means the far end answered — including "did not return JSON", where the
+#: server replied with an error page. Matching the sentence rather than the
+#: exception type is what keeps "the host timed out" apart from "the host served
+#: us a login wall", and those two must never read the same.
+_TRANSPORT_FAILURE_RE = re.compile(r"failed after \d+ attempts?:")
+
+
+def _classify_probe_error(exc: Exception) -> str:
+    """Which of the five answers an exception represents."""
+    text = str(exc)
+    status = _HTTP_STATUS_RE.search(text)
+    if status:
+        # 404/410 is the board telling us this slug does not exist — an answer,
+        # and the most useful one discovery gets. 401/403/429/5xx means the
+        # board exists and would not talk to us, which is not evidence about
+        # the company at all.
+        return PROBE_ABSENT if status.group(1) in ("404", "410") else PROBE_ERROR
+    if _TRANSPORT_FAILURE_RE.search(text):
+        return PROBE_UNREACHABLE
+    # A parse failure (Personio's "did not return parseable XML", a body that is
+    # not JSON) or a rejected argument. Something answered; it was not a board.
+    return PROBE_ERROR
+
+
+@dataclass
+class BoardProbe:
+    """One (board, slug) question and the answer it got.
+
+    `count` is deliberately `None` rather than 0 for every non-answer: zero
+    postings is a measurement and "we do not know" is not, and a report that
+    prints 0 for both invites the reader to average them.
+    """
+
+    board: str
+    slug: str
+    status: str
+    count: int | None = None
+    message: str = ""
+    #: What the payload called the employer, for the two vendors that say.
+    company_name: str = ""
+    #: True when that published name is not plausibly the company asked for.
+    name_mismatch: bool = False
+
+    @property
+    def answered(self) -> bool:
+        """The board exists under this slug — with or without open postings."""
+        return self.status in (PROBE_FOUND, PROBE_EMPTY)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "board": self.board, "slug": self.slug, "status": self.status,
+            "count": self.count, "message": self.message,
+            "company_name": self.company_name or None,
+            "name_mismatch": self.name_mismatch,
+        }
+
+
+#: The two vendors whose payload carries the employer's own name. The other four
+#: derive it from the slug (`company_from_slug`), so comparing that back against
+#: what the user asked for would compare a string to itself and always agree —
+#: an assertion that cannot fail, which is worse than none.
+_BOARDS_WITH_A_PUBLISHED_NAME = frozenset({"workable", "smartrecruiters"})
+
+
+def _names_disagree(asked: str, published: str) -> bool:
+    """True when a board's own name for the company is not the one we asked for.
+
+    The failure this guards against: `acme` on Lever is a different company from
+    `acme` on Greenhouse, and slug collisions across vendors are common enough
+    that "a board answered" is not the same as "your company is on that board".
+    Where the vendor publishes a name, that is checkable.
+
+    Deliberately lenient — containment either way counts as agreement — because
+    "Acme" and "Acme Insurance Group" are one company and a false mismatch would
+    downgrade a correct answer. Only a name with nothing in common is reported.
+    """
+    a = normalize_company(asked)
+    b = normalize_company(published)
+    if not a or not b:
+        return False
+    return a not in b and b not in a
+
+
+def _probe(
+    board: str,
+    slug: str,
+    *,
+    session: Any = None,
+    kwargs: Mapping[str, Any] | None = None,
+    expect: str = "",
+) -> BoardProbe:
+    """Ask one board about one slug and classify the answer. Never raises."""
+    try:
+        found = _fetch_board(board, slug, session=session, **dict(kwargs or {}))
+    except Exception as exc:
+        return BoardProbe(
+            board=board, slug=slug, status=_classify_probe_error(exc),
+            count=None, message=_describe_error(exc),
+        )
+
+    count = len(found)
+    published = ""
+    if board in _BOARDS_WITH_A_PUBLISHED_NAME and found:
+        published = str(getattr(found[0], "company", "") or "").strip()
+    return BoardProbe(
+        board=board,
+        slug=slug,
+        status=PROBE_FOUND if count else PROBE_EMPTY,
+        count=count,
+        message=f"{count} posting{'s' if count != 1 else ''}",
+        company_name=published,
+        name_mismatch=bool(expect and published and _names_disagree(expect, published)),
+    )
+
+
 def _check(board: str, slug: str, *, session: Any = None) -> tuple[bool, str, int | None]:
     """`check_slug` plus the posting count, which `--json` reports separately."""
     board_name = str(board or "").strip().lower()
@@ -1882,19 +2035,17 @@ def _check(board: str, slug: str, *, session: Any = None) -> tuple[bool, str, in
     if not clean:
         return False, "empty slug", None
 
-    try:
-        # Descriptions are not needed to prove a board exists, and they are the
-        # expensive half of every fetch — skip them where the vendor allows it.
-        found = _fetch_board(
-            board_name, clean, session=session, **_CHEAP_CHECK_KWARGS.get(board_name, {})
-        )
-    except Exception as exc:
-        return False, _describe_error(exc), None
-
-    count = len(found)
-    if count == 0:
+    # Descriptions are not needed to prove a board exists, and they are the
+    # expensive half of every fetch — skip them where the vendor allows it.
+    probe = _probe(
+        board_name, clean, session=session,
+        kwargs=_CHEAP_CHECK_KWARGS.get(board_name, {}),
+    )
+    if not probe.answered:
+        return False, probe.message, None
+    if probe.count == 0:
         return True, "0 postings (board reachable but empty)", 0
-    return True, f"{count} posting{'s' if count != 1 else ''}", count
+    return True, probe.message, probe.count
 
 
 def check_slug(board: str, slug: str, *, session: Any = None) -> tuple[bool, str]:
@@ -1905,6 +2056,669 @@ def check_slug(board: str, slug: str, *, session: Any = None) -> tuple[bool, str
     """
     ok, message, _count = _check(board, slug, session=session)
     return ok, message
+
+
+# --------------------------------------------------------------------------
+# discovery: company name -> board + slug
+# --------------------------------------------------------------------------
+
+#: How many spellings of one company name may be tried.
+#:
+#: Six boards times this many candidates is the worst case for one company that
+#: is on none of them — 24 requests, spread one per host per round, which is a
+#: sweep rather than a hammering. Four covers every shape the derivation
+#: produces for a real name ("factorialhr", "factorial-hr", "factorial", plus
+#: one expansion) and stops well short of enumerating spellings nobody uses.
+#: What it drops is logged and printed, never silently discarded: a company the
+#: sweep gave up on must not look like a company that is not on any board.
+DISCOVER_MAX_SLUGS_PER_COMPANY = 4
+
+#: How many probes one `--discover` invocation may make in total.
+#:
+#: The per-company cap bounds one name; this bounds the run, which is what the
+#: boards actually see. 120 is five companies' worth of complete misses, or
+#: roughly twenty companies at the ~6 probes a company that *is* found costs.
+#: Past that the traffic stops looking like someone filling in a watchlist and
+#: starts looking like someone enumerating a vendor's tenants, and the cost of
+#: being wrong about that is losing access to the boards the daily run needs.
+#:
+#: One probe is one HTTP request, with one exception worth naming: a bare
+#: Personio slug that 404s on `.jobs.personio.de` is retried once on
+#: `.jobs.personio.com`, so a Personio miss is two requests against this budget's
+#: one. The bound is therefore approximate in the safe direction only for the
+#: five other boards, and understates Personio by at most one request per probe.
+DISCOVER_MAX_REQUESTS = 120
+
+#: Discovery only needs to know whether a board answers and roughly how big it
+#: is, so every expensive half of a fetch is off. `max_pages: 1` is on top of
+#: `--check`'s settings and matters most: without it a single probe against a
+#: large SmartRecruiters tenant would quietly spend twenty requests of a budget
+#: that thinks it spent one.
+_DISCOVER_PROBE_KWARGS: dict[str, dict[str, Any]] = {
+    **_CHEAP_CHECK_KWARGS,
+    "smartrecruiters": {"details": False, "max_pages": 1},
+}
+
+def probe_board(board: str, slug: str, *, session: Any = None, expect: str = "") -> BoardProbe:
+    """Ask one board about one slug exactly the way `--discover` does.
+
+    The unit of a discovery sweep, public because it is also the unit the live
+    contract tests need: "a slug nobody owns still answers 404, rather than
+    answering 200 with an empty board" is the assumption every confidence in
+    this module rests on, and it can only be settled against the real internet.
+
+    `expect` is the company name the user asked for, used only to notice that a
+    board is publishing somebody else's postings under this slug.
+    """
+    return _probe(
+        board, slug, session=session,
+        kwargs=_DISCOVER_PROBE_KWARGS.get(board, {}), expect=expect,
+    )
+
+
+#: Confidence, not verdict. A wrong slug that looks right is the expensive
+#: outcome: it goes into `watchlist.yaml`, and from then on produces an empty
+#: board every morning that is indistinguishable from a quiet market — the exact
+#: failure `src/health.py` exists to catch, arriving with no error attached.
+CONFIDENCE_HIGH = "high"      #: one board answered with postings, nothing qualifies it
+CONFIDENCE_MEDIUM = "medium"  #: one clear answer, but the sweep was incomplete
+CONFIDENCE_LOW = "low"        #: answered, and something is wrong with the answer
+CONFIDENCE_NONE = "none"      #: nothing answered anywhere
+
+#: `high` and `medium` are pasteable; `low` and ambiguous results are printed
+#: commented out, so that pasting the block can never install a guess.
+_PASTEABLE = (CONFIDENCE_HIGH, CONFIDENCE_MEDIUM)
+
+#: "&" is punctuation to `normalize_text`, so "H&M" tokenises to ["h", "m"] and
+#: the joined spelling "hm" comes out right. The written-out form is a genuinely
+#: different slug ("h-and-m") and cheap to add as one extra candidate.
+_AMPERSAND_RE = re.compile(r"\s*&\s*")
+
+#: German expands its umlauts rather than dropping them — "Bücher" is spelled
+#: "buecher" in a URL at least as often as "bucher", and NFKD only ever produces
+#: the latter. Both are tried; neither is guessed at silently.
+_GERMAN_EXPANSIONS = {
+    "ä": "ae", "ö": "oe", "ü": "ue", "Ä": "Ae", "Ö": "Oe", "Ü": "Ue", "ß": "ss",
+}
+
+#: A slug this short is never right and costs a whole round of six probes to
+#: prove it: "H&M" would otherwise contribute the first-token candidate "h".
+_MIN_SLUG_CHARS = 2
+
+
+def _company_tokens(name: str) -> tuple[list[str], list[str]]:
+    """`(folded tokens, the same tokens with their original capitals)`.
+
+    Both come from `models.normalize_company` / `normalize_text` — the
+    normaliser the tracker already uses to decide that "Spotify AB" and
+    "spotify" are one company. That is the same question discovery asks, so it
+    gets the same answer: legal suffixes dropped ("Adyen N.V." -> "adyen"),
+    dotted initialisms collapsed before the dots become spaces, accents folded
+    and the letters NFKD refuses to decompose transliterated ("Æther" ->
+    "aether", "Bücher" -> "bucher").
+
+    The cased list exists only because SmartRecruiters addresses a company by a
+    case-sensitive slug spelled the way the company spells itself. It is the
+    *same* tokenisation with the fold turned off, truncated to the folded list's
+    length so that the suffix `normalize_company` dropped is dropped from both;
+    if the two ever fail to line up, the folded list is used for both rather
+    than risking a mismatched pairing.
+    """
+    folded = normalize_company(name).split()
+    capitals = normalize_text(collapse_initialisms(name), casefold=False).split()
+    capitals = capitals[:len(folded)]
+    if [t.lower() for t in capitals] != folded:
+        capitals = list(folded)
+    return folded, capitals
+
+
+def _slug_forms(tokens: Sequence[str], *, hyphen_first: bool = True) -> list[str]:
+    """The spellings a multi-word company name is plausibly a slug under.
+
+    "Factorial HR" -> "factorialhr", "factorial-hr", "factorial", in that order.
+
+    `hyphen_first=False` is for SmartRecruiters, whose slugs are the company's
+    own spelling with the spaces closed up ("FactorialHR", "SopraSteria") and
+    where a hyphen is rare — so with a cap in play the bare first token is the
+    better third guess there and the hyphenated form is the better one anywhere
+    else.
+    """
+    if not tokens:
+        return []
+    forms = ["".join(tokens)]
+    if len(tokens) > 1:
+        hyphenated = "-".join(tokens)
+        first = tokens[0]
+        forms.extend([hyphenated, first] if hyphen_first else [first, hyphenated])
+    return forms
+
+
+def _name_variants(name: str) -> list[str]:
+    """Rewrites of the raw name that produce a genuinely different slug."""
+    text = str(name or "")
+    variants: list[str] = []
+    if "&" in text:
+        variants.append(_AMPERSAND_RE.sub(" and ", text))
+    if any(ch in text for ch in _GERMAN_EXPANSIONS):
+        variants.append("".join(_GERMAN_EXPANSIONS.get(ch, ch) for ch in text))
+    return variants
+
+
+def slug_candidates(
+    name: str,
+    *,
+    cased: bool = False,
+    limit: int | None = DISCOVER_MAX_SLUGS_PER_COMPANY,
+) -> list[str]:
+    """Slugs `name` might be published under, most likely first.
+
+    `cased=True` is SmartRecruiters, and only SmartRecruiters: its slug is
+    case-sensitive and spelled as the company spells itself, so the folded form
+    alone would miss "FactorialHR" entirely. Both spellings are tried, cased
+    first, interleaved form by form so that the cap cuts the *least likely
+    shape* rather than every capitalised candidate at once. For a name the user
+    typed in lower case the two coincide and dedupe to one, costing nothing.
+
+    `limit=None` returns the whole ordered list, which is how the caller sees
+    what a cap dropped in order to say so.
+    """
+    folded, capitals = _company_tokens(name)
+    ordered: list[str] = []
+    if cased:
+        for cased_form, folded_form in zip(
+            _slug_forms(capitals, hyphen_first=False),
+            _slug_forms(folded, hyphen_first=False),
+        ):
+            ordered.extend([cased_form, folded_form])
+    else:
+        ordered.extend(_slug_forms(folded))
+
+    for variant in _name_variants(name):
+        variant_folded, variant_capitals = _company_tokens(variant)
+        if cased:
+            for cased_form, folded_form in zip(
+                _slug_forms(variant_capitals, hyphen_first=False),
+                _slug_forms(variant_folded, hyphen_first=False),
+            ):
+                ordered.extend([cased_form, folded_form])
+        else:
+            ordered.extend(_slug_forms(variant_folded))
+
+    # Exact-string dedupe, never case-insensitive: "Glovo" and "glovo" are two
+    # different SmartRecruiters tenants and folding them together here would
+    # silently delete the candidate the cased list exists to produce.
+    seen: set[str] = set()
+    kept: list[str] = []
+    for candidate in ordered:
+        if len(candidate) < _MIN_SLUG_CHARS or candidate in seen:
+            continue
+        seen.add(candidate)
+        kept.append(candidate)
+    return kept if limit is None else kept[:max(0, int(limit))]
+
+
+class RequestBudget:
+    """The total-request cap, and a record of what it stopped us asking.
+
+    Kept as an object rather than a counter so that "the sweep was cut short" is
+    a fact the report can state. A discovery run that quietly stops probing
+    looks exactly like a company that is on no board, and that is the one
+    reading it must never be given.
+    """
+
+    def __init__(self, limit: int = DISCOVER_MAX_REQUESTS) -> None:
+        self.limit = max(0, int(limit))
+        self.spent = 0
+        #: `(company, board, slug)` for every probe the cap prevented.
+        self.skipped: list[tuple[str, str, str]] = []
+
+    @property
+    def exhausted(self) -> bool:
+        return self.spent >= self.limit
+
+    @property
+    def companies_cut_short(self) -> list[str]:
+        out: list[str] = []
+        for company, _board, _slug in self.skipped:
+            if company not in out:
+                out.append(company)
+        return out
+
+    def take(self, company: str, board: str, slug: str) -> bool:
+        """Claim one request, or record that it could not be made."""
+        if self.exhausted:
+            self.skipped.append((company, board, slug))
+            return False
+        self.spent += 1
+        return True
+
+
+@dataclass
+class DiscoveryResult:
+    """What one company name turned into, evidence included."""
+
+    company: str
+    probes: list[BoardProbe] = field(default_factory=list)
+    candidates: dict[str, list[str]] = field(default_factory=dict)
+    dropped_candidates: dict[str, list[str]] = field(default_factory=dict)
+    #: The per-company cap actually in force, so the report can print the bound
+    #: it applied rather than the default it might not have been run with.
+    max_slugs: int = DISCOVER_MAX_SLUGS_PER_COMPANY
+    confidence: str = CONFIDENCE_NONE
+    ambiguous: bool = False
+    notes: list[str] = field(default_factory=list)
+    #: True when a hit stopped the sweep before every candidate was tried.
+    stopped_early: bool = False
+    #: True when the request cap, not the evidence, ended this company's sweep.
+    capped: bool = False
+
+    @property
+    def matches(self) -> list[BoardProbe]:
+        """Boards that answered with at least one open posting."""
+        return [p for p in self.probes if p.status == PROBE_FOUND]
+
+    @property
+    def empties(self) -> list[BoardProbe]:
+        """Boards that exist under this slug but have nothing open today."""
+        return [p for p in self.probes if p.status == PROBE_EMPTY]
+
+    @property
+    def untried(self) -> list[tuple[str, str]]:
+        """`(board, slug)` pairs the sweep stopped before asking about.
+
+        A `(board, slug)` pair rather than a bare slug: a hit in round one
+        leaves SmartRecruiters' second, case-folded spelling unasked even though
+        every other board was asked about that exact string, and a report that
+        says "nothing was skipped" there is wrong.
+        """
+        asked = {(p.board, p.slug) for p in self.probes}
+        return [
+            (board, slug)
+            for board, slugs in self.candidates.items()
+            for slug in slugs
+            if (board, slug) not in asked
+        ]
+
+    @property
+    def suggestion(self) -> BoardProbe | None:
+        """The single board worth writing down, or None when there isn't one.
+
+        None whenever two boards answered: picking one of two would be the tool
+        inventing the confidence it was asked not to have.
+        """
+        if self.ambiguous:
+            return None
+        if len(self.matches) == 1:
+            return self.matches[0]
+        if not self.matches and len(self.empties) == 1:
+            return self.empties[0]
+        return None
+
+    @property
+    def pasteable(self) -> bool:
+        return self.confidence in _PASTEABLE and self.suggestion is not None
+
+    def to_dict(self) -> dict[str, Any]:
+        suggestion = self.suggestion
+        return {
+            "company": self.company,
+            "confidence": self.confidence,
+            "max_slugs": self.max_slugs,
+            "ambiguous": self.ambiguous,
+            "pasteable": self.pasteable,
+            "stopped_early": self.stopped_early,
+            "capped": self.capped,
+            "candidates": {b: list(c) for b, c in self.candidates.items()},
+            "dropped_candidates": {
+                b: list(c) for b, c in self.dropped_candidates.items() if c
+            },
+            "untried": [{"board": b, "slug": s} for b, s in self.untried],
+            "suggestion": (
+                {"board": suggestion.board, "slug": suggestion.slug,
+                 "count": suggestion.count}
+                if suggestion else None
+            ),
+            "matches": [p.to_dict() for p in self.matches],
+            "probes": [p.to_dict() for p in self.probes],
+            "notes": list(self.notes),
+        }
+
+
+def _grade(result: DiscoveryResult) -> None:
+    """Fill in `confidence`, `ambiguous` and `notes` from the probes.
+
+    The whole point of this function is to make an ambiguous result *look*
+    ambiguous. Two boards answering is not a tie to be broken; it is the finding.
+    """
+    matches = result.matches
+    empties = result.empties
+    unknown = [p for p in result.probes
+               if p.status in (PROBE_ERROR, PROBE_UNREACHABLE)]
+
+    if len(matches) > 1:
+        result.ambiguous = True
+        result.confidence = CONFIDENCE_LOW
+        result.notes.append(
+            "two or more boards answered — "
+            + " and ".join(f"{p.board}/{p.slug} ({p.count} postings)" for p in matches)
+            + "; one of them is probably a different company that happens to "
+              "share the slug, so this needs a human eye rather than a guess"
+        )
+    elif len(matches) == 1:
+        hit = matches[0]
+        result.confidence = CONFIDENCE_HIGH
+        if hit.name_mismatch:
+            result.confidence = CONFIDENCE_LOW
+            result.notes.append(
+                f"{hit.board}/{hit.slug} answered, but it calls itself "
+                f"{hit.company_name!r} and you asked for {result.company!r} — "
+                "very likely a different company on the same slug"
+            )
+        if empties:
+            result.confidence = min(result.confidence, CONFIDENCE_MEDIUM, key=_rank)
+            result.notes.append(
+                "also reachable but with nothing open: "
+                + ", ".join(f"{p.board}/{p.slug}" for p in empties)
+            )
+    elif len(empties) == 1:
+        result.confidence = CONFIDENCE_LOW
+        result.notes.append(
+            f"{empties[0].board}/{empties[0].slug} exists but has no open "
+            "postings, so nothing confirms it is the right company — a board "
+            "with no jobs on it looks the same either way"
+        )
+    elif len(empties) > 1:
+        result.ambiguous = True
+        result.confidence = CONFIDENCE_LOW
+        result.notes.append(
+            "several boards exist under this name but none has an open posting: "
+            + ", ".join(f"{p.board}/{p.slug}" for p in empties)
+        )
+    else:
+        result.confidence = CONFIDENCE_NONE
+
+    if unknown and result.confidence != CONFIDENCE_NONE:
+        result.confidence = min(result.confidence, CONFIDENCE_MEDIUM, key=_rank)
+    if unknown:
+        # Short form on purpose: a transport failure's message is a paragraph of
+        # urllib3, it is already printed in full against its own probe line
+        # above, and repeating six of them here would bury the sentence that
+        # matters — that these boards were not ruled out.
+        result.notes.append(
+            "no answer either way from: "
+            + ", ".join(
+                f"{p.board}/{p.slug} ({truncate(p.message, 60, suffix=' …')})"
+                for p in unknown
+            )
+            + " — these boards were neither ruled in nor out"
+        )
+    if result.capped:
+        result.confidence = min(result.confidence, CONFIDENCE_LOW, key=_rank)
+        result.notes.append(
+            "the request cap stopped this company's sweep early, so the boards "
+            "below it were never asked"
+        )
+
+
+_CONFIDENCE_ORDER = (CONFIDENCE_NONE, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, CONFIDENCE_HIGH)
+
+
+def _rank(confidence: str) -> int:
+    """Order confidences so `min()` can only ever move one downwards."""
+    return _CONFIDENCE_ORDER.index(confidence)
+
+
+def discover_company(
+    name: str,
+    *,
+    session: Any = None,
+    boards: Sequence[str] = BOARDS,
+    max_slugs: int = DISCOVER_MAX_SLUGS_PER_COMPANY,
+    budget: RequestBudget | None = None,
+) -> DiscoveryResult:
+    """Work out which board — if any — publishes `name`, and how sure we are.
+
+    The sweep is **candidate-major**: round one asks all six boards about the
+    best slug spelling, round two asks about the second-best, and so on. Two
+    reasons, both about not looking like a scanner. Consecutive requests go to
+    six different hosts rather than six in a row to one, and the round that
+    matters — the first — is the one that answers in the ordinary case, so a
+    company that is where you would expect costs six requests and stops.
+
+    **A board answering with real postings ends the sweep.** Later candidates
+    are not tried; the ones that were skipped are recorded and reported, because
+    "we stopped looking" and "there was nothing to find" are different claims.
+
+    The one thing the sweep deliberately does *not* cut short is the round it is
+    in. Stopping at the first hit mid-round would make the result depend on the
+    order of `BOARDS`, which is arbitrary, and would hide the case this whole
+    module reports rather than resolves: two vendors answering for one name,
+    where one of them is a different company sharing a slug. Six requests, one
+    per host, is the price of being able to see that at all.
+    """
+    cap = max(1, int(max_slugs))
+    result = DiscoveryResult(company=str(name or "").strip(), max_slugs=cap)
+    if not result.company:
+        result.notes.append("empty company name")
+        return result
+
+    budget = budget if budget is not None else RequestBudget()
+    board_list = [b for b in boards if b in BOARDS]
+
+    for board in board_list:
+        every = slug_candidates(name, cased=(board == "smartrecruiters"), limit=None)
+        result.candidates[board] = every[:cap]
+        result.dropped_candidates[board] = every[cap:]
+
+    dropped = sorted({s for values in result.dropped_candidates.values() for s in values})
+    if dropped:
+        logger.info(
+            "discover/%s: %d slug candidate(s) dropped by the per-company cap "
+            "(DISCOVER_MAX_SLUGS_PER_COMPANY=%d) and never tried: %s — check "
+            "one directly with --check if you think it is the right spelling",
+            result.company, len(dropped), cap, ", ".join(dropped),
+        )
+
+    rounds = max((len(c) for c in result.candidates.values()), default=0)
+    for index in range(rounds):
+        hit = False
+        for board in board_list:
+            candidates = result.candidates.get(board, [])
+            if index >= len(candidates):
+                continue
+            slug = candidates[index]
+            if not budget.take(result.company, board, slug):
+                # Deliberately keep walking rather than breaking out: the
+                # remaining rounds cost nothing (no request is made) and the
+                # walk is what makes "N probes were not made" a real count
+                # rather than however many happened to be left in this round.
+                result.capped = True
+                continue
+            probe = probe_board(board, slug, session=session, expect=result.company)
+            result.probes.append(probe)
+            hit = hit or probe.status == PROBE_FOUND
+        if hit and not result.capped:
+            result.stopped_early = index + 1 < rounds
+            break
+
+    _grade(result)
+    return result
+
+
+def discover(
+    names: Sequence[str],
+    *,
+    session: Any = None,
+    boards: Sequence[str] = BOARDS,
+    max_slugs: int = DISCOVER_MAX_SLUGS_PER_COMPANY,
+    max_requests: int = DISCOVER_MAX_REQUESTS,
+    budget: RequestBudget | None = None,
+) -> tuple[list[DiscoveryResult], RequestBudget]:
+    """Run `discover_company` over several names against one shared budget."""
+    budget = budget if budget is not None else RequestBudget(max_requests)
+    results = [
+        discover_company(name, session=session, boards=boards,
+                         max_slugs=max_slugs, budget=budget)
+        for name in names
+    ]
+    if budget.skipped:
+        logger.warning(
+            "discover: the request cap stopped the sweep after %d probe(s) "
+            "(DISCOVER_MAX_REQUESTS=%d). %d probe(s) were NOT made and these "
+            "companies are unfinished: %s — nothing below is evidence that they "
+            "are on no board, only that they were not asked",
+            budget.spent, budget.limit, len(budget.skipped),
+            ", ".join(budget.companies_cut_short),
+        )
+    return results, budget
+
+
+# --------------------------------------------------------------------------
+# discovery output
+# --------------------------------------------------------------------------
+
+_STATUS_LABELS = {
+    PROBE_FOUND: "postings",
+    PROBE_EMPTY: "reachable, nothing open",
+    PROBE_ABSENT: "no such slug",
+    PROBE_ERROR: "answered, but not with a board",
+    PROBE_UNREACHABLE: "no answer",
+}
+
+
+def _probe_line(probe: BoardProbe) -> str:
+    if probe.status == PROBE_FOUND:
+        detail = f"{probe.count} posting{'s' if probe.count != 1 else ''}"
+        if probe.company_name:
+            detail += f" — board calls itself {probe.company_name!r}"
+    elif probe.status == PROBE_EMPTY:
+        detail = "0 postings (reachable, nothing open)"
+    else:
+        detail = f"{_STATUS_LABELS.get(probe.status, probe.status)} — {probe.message}"
+    return f"  {probe.board:<16} {probe.slug:<22} {detail}"
+
+
+def _paste_block(result: DiscoveryResult) -> list[str]:
+    """The YAML to paste — or the reason there is none, as a comment.
+
+    Anything below `medium`, and anything ambiguous, is emitted **commented
+    out**. Pasting this block must never be able to install a guess: a wrong
+    slug produces an empty board every morning and reads as a quiet market
+    rather than as a mistake, which is the expensive way to be wrong here.
+    """
+    lines: list[str] = []
+    hit = result.suggestion
+    if result.pasteable and hit is not None:
+        lines.append(f"{hit.board}:")
+        lines.append(
+            f"  - {hit.slug}"
+            f"{' ' * max(1, 22 - len(hit.slug))}"
+            f"# {result.company} — {hit.count} posting"
+            f"{'s' if hit.count != 1 else ''} ({result.confidence} confidence)"
+        )
+        for note in result.notes:
+            lines.append(f"  # note: {note}")
+        return lines
+
+    if result.ambiguous:
+        lines.append(
+            f"# {result.company} — AMBIGUOUS, nothing pasted. Two or more boards "
+            "answered:"
+        )
+        for probe in (result.matches or result.empties):
+            lines.append(f"#   {probe.board}: [{probe.slug}]   "
+                         f"# {probe.count} posting"
+                         f"{'s' if probe.count != 1 else ''}")
+        lines.append("# Open the careers page of the company you mean, look at where "
+                     "the Apply")
+        lines.append("# button points, then --check that one board.")
+        return lines
+
+    if hit is not None:
+        lines.append(f"# {result.company} — {result.confidence} confidence, "
+                     "so this is commented out on purpose:")
+        lines.append(f"#   {hit.board}: [{hit.slug}]")
+    elif result.capped:
+        # Never the "not on any board" wording: this company was not asked, and
+        # printing the two as the same sentence is the exact confusion the cap's
+        # reporting exists to prevent.
+        lines.append(
+            f"# {result.company} — UNFINISHED. The request cap stopped the run "
+            f"after {len(result.probes)} of {len(result.probes) + len(result.untried)} "
+            "board(s) had been asked,"
+        )
+        lines.append("# so this is not a result: re-run this company on its own.")
+    else:
+        tried = sorted({p.slug for p in result.probes})
+        lines.append(
+            f"# {result.company} — no board answered for "
+            f"{', '.join(tried) if tried else 'any candidate'}."
+        )
+        lines.append("# Either they are not on one of the six public boards this "
+                     "tool reads,")
+        lines.append("# or the slug is spelled differently: open their careers page, "
+                     "copy the")
+        lines.append("# Apply URL, and paste it into --check.")
+    for note in result.notes:
+        lines.append(f"#   note: {note}")
+    return lines
+
+
+def format_discovery(results: Sequence[DiscoveryResult], budget: RequestBudget) -> str:
+    """The whole human report: evidence per company, then one paste block."""
+    lines: list[str] = []
+    for result in results:
+        lines.append(f"{result.company} — confidence: {result.confidence.upper()}"
+                     + ("  [AMBIGUOUS]" if result.ambiguous else ""))
+        for probe in result.probes:
+            lines.append(_probe_line(probe))
+        untried = result.untried
+        if not result.probes:
+            lines.append(
+                f"  nothing was asked — the request cap stopped the run first, so "
+                f"all {len(untried)} board/slug pairs are unasked"
+                if result.capped else "  (nothing was probed)"
+            )
+        elif untried:
+            reason = ("the request cap stopped this sweep" if result.capped
+                      else "stopped here: a board answered")
+            shown = ", ".join(f"{board}/{slug}" for board, slug in untried[:8])
+            if len(untried) > 8:
+                shown += f", and {len(untried) - 8} more"
+            lines.append(f"  {reason}, so these were never asked: {shown}")
+        dropped = sorted({s for v in result.dropped_candidates.values() for s in v})
+        if dropped:
+            lines.append(
+                "  the per-company cap dropped these spellings untried "
+                f"(DISCOVER_MAX_SLUGS_PER_COMPANY={result.max_slugs}): "
+                + ", ".join(dropped)
+            )
+        for note in result.notes:
+            lines.append(f"  note: {note}")
+        lines.append("")
+
+    lines.append("# " + "-" * 70)
+    lines.append("# paste into watchlist.yaml — check anything commented out by hand")
+    lines.append("# " + "-" * 70)
+    for result in results:
+        lines.extend(_paste_block(result))
+        lines.append("")
+
+    lines.append(
+        f"{budget.spent} probe(s) for {len(results)} compan"
+        f"{'y' if len(results) == 1 else 'ies'} "
+        f"(cap DISCOVER_MAX_REQUESTS={budget.limit})."
+    )
+    if budget.skipped:
+        lines.append(
+            f"REQUEST CAP HIT after {budget.spent} probe(s): {len(budget.skipped)} "
+            f"probe(s) were NOT made, and these companies are unfinished: "
+            + ", ".join(budget.companies_cut_short)
+            + ". Nothing above is evidence that they are on no board — they were "
+              "not asked. Re-run them separately, or raise --max-requests "
+              "deliberately."
+        )
+    return "\n".join(lines)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -1923,6 +2737,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "  python -m src.sources.ats_boards --check smartrecruiters Acme\n"
             "  python -m src.sources.ats_boards --check personio acme\n"
             "  python -m src.sources.ats_boards --check-all --json\n"
+            '  python -m src.sources.ats_boards --discover "Glovo" "Factorial HR"\n'
+            "\n"
+            "--discover guesses slugs and asks boards that were never told to "
+            "expect us,\n"
+            "so it is bounded on purpose: at most "
+            f"{DISCOVER_MAX_SLUGS_PER_COMPANY} spellings per company and "
+            f"{DISCOVER_MAX_REQUESTS} requests\n"
+            "in total, it stops as soon as a board answers with real postings, "
+            "and it\n"
+            "prints what to paste rather than editing watchlist.yaml for you.\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -1937,6 +2761,23 @@ def _build_parser() -> argparse.ArgumentParser:
         "--check-all",
         action="store_true",
         help="check every board slug in the watchlist",
+    )
+    parser.add_argument(
+        "--discover",
+        nargs="+",
+        metavar="COMPANY",
+        help="given company NAMES, find which board publishes them and print "
+             "the watchlist.yaml lines to paste (never writes the file)",
+    )
+    parser.add_argument(
+        "--max-requests",
+        type=int,
+        default=DISCOVER_MAX_REQUESTS,
+        metavar="N",
+        help="total probes one --discover run may make (default: %(default)s). "
+             "Raise it deliberately and for a reason: these are unsolicited "
+             "requests to third-party boards, and traffic that looks like a "
+             "scanner gets you blocked from the boards the daily run needs",
     )
     parser.add_argument(
         "--config",
@@ -1954,8 +2795,39 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _run_discovery(args: argparse.Namespace) -> int:
+    """`--discover NAME...`: print the watchlist lines, never write them.
+
+    Exit code 0 only when every name produced something that can be pasted
+    without a decision — so an ambiguous result, a low-confidence one, a company
+    found nowhere and a run the cap cut short all exit 1. The alternative is a
+    green exit on a report whose whole content is "you need to look at this".
+    """
+    results, budget = discover(
+        args.discover, max_requests=args.max_requests,
+    )
+    if args.json:
+        print(json_lib.dumps(
+            {
+                "ok": all(r.pasteable for r in results) and not budget.skipped,
+                "companies": len(results),
+                "requests": budget.spent,
+                "request_cap": budget.limit,
+                "capped": bool(budget.skipped),
+                "skipped_probes": [
+                    {"company": c, "board": b, "slug": s} for c, b, s in budget.skipped
+                ],
+                "results": [r.to_dict() for r in results],
+            },
+            indent=2,
+        ))
+    else:
+        print(format_discovery(results, budget))
+    return 0 if all(r.pasteable for r in results) and not budget.skipped else 1
+
+
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry point: `--check BOARD SLUG` / `--check-all`.
+    """CLI entry point: `--check BOARD SLUG` / `--check-all` / `--discover NAME`.
 
     Exit code 0 when every checked slug answered, 1 on any failure (including
     "you gave me nothing to check", so a typo in CI is never mistaken for a pass).
@@ -1965,6 +2837,9 @@ def main(argv: list[str] | None = None) -> int:
     # Keep stdout to the OK/FAIL lines; library logging goes to stderr only
     # when something is genuinely wrong.
     setup_logging("WARNING")
+
+    if args.discover:
+        return _run_discovery(args)
 
     targets: list[tuple[str, str]] = []
     if args.check:

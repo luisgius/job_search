@@ -1,6 +1,6 @@
 # Testing
 
-**1700 tests, ~43s, fully offline** (plus 44 network-only contract tests,
+**1789 tests, ~53s, fully offline** (plus 54 network-only contract tests,
 deselected by default).
 
 ```bash
@@ -17,11 +17,12 @@ pytest --cov=src --cov-report=term-missing
 | `test_edge_apply.py` | 111 | the apply leg against real 2026 form markup |
 | `test_ats_boards.py` | 108 | Greenhouse/Lever payload reality; slug + `--check` for all six |
 | `test_edge_fetch.py` | 86 | the shapes a real European job week produces |
+| `test_discover.py` | 83 | **`--discover`: its two caps, and never sounding surer than the evidence** |
 | `test_edge_match.py` | 76 | prompt injection; a model reply is untrusted input |
 | `test_main.py` | 64 | the pipeline end to end, offline |
 | `test_util.py` | 59 | retries, HTML flattening, every ATS date shape |
 | `test_filters.py` | 58 | whole-word matching, dedupe richness |
-| `test_models.py` | 53 | job identity — the tracker's primary key |
+| `test_models.py` | 59 | job identity — the tracker's primary key |
 | `test_linkedin_email.py` | 52 | leniency under LinkedIn template change |
 | `test_scoring.py` | 52 | a job is never silently lost |
 | `test_llm_openrouter.py` | 50 | provider equivalence — same behaviour either way |
@@ -31,7 +32,7 @@ pytest --cov=src --cov-report=term-missing
 | `test_tailor.py` | 42 | **the anti-fabrication guarantee** |
 | `test_db.py` | 57 | **the double-apply guarantee** |
 | `test_workable.py` | 69 | split description/requirements/benefits; assembled locations |
-| `test_live_contract.py` | 44 | **the live APIs still emit what we parse** (network-only) |
+| `test_live_contract.py` | 54 | **the live APIs still emit what we parse** (network-only) |
 | `test_live_contract_policy.py` | 22 | **that file skips only when it should** — offline |
 | `test_ashby.py` | 40 | `secondaryLocations`; unlisted drafts stay hidden |
 | `test_smartrecruiters.py` | 48 | the two-call shape — and its cap |
@@ -170,6 +171,37 @@ actually occur in production payloads:
     `autoapply.SUPPORTED_ATS`, and `detect_ats` is asserted to reject every URL
     they produce. Only Greenhouse and Lever have been through the screener-bail
     work; anything else must reach a human.
+- **`test_discover.py`** — the one feature that makes *unsolicited* requests to
+  third parties, so half the file is about the bounds and half about not
+  sounding surer than the evidence. A wrong slug is worse than no slug: it goes
+  into `watchlist.yaml` and produces an empty board every morning that reads as
+  a quiet market rather than as a mistake.
+  - **Both caps are asserted to be audible.** The per-company candidate cap and
+    the total request cap each have a test for the bound *and* a test for it
+    being said out loud — in the log and in the printed report. A cap that bites
+    silently turns "we stopped guessing" into "this company is on no board",
+    which is why `test_a_capped_company_is_not_reported_as_a_company_with_no_board`
+    exists as its own case.
+  - **Five answers, never collapsed**: a board with zero postings, a board that
+    404s, a board that refused with a 403, a board that served something that is
+    not a board at all, and a board that never answered. Each has a test, and
+    the pairs that would be tempting to merge (`empty` vs `absent`, `unreachable`
+    vs `absent`) are asserted apart explicitly.
+  - **Ambiguity is the finding, not a tie to break.** Two boards answering for
+    one name reports both, suggests neither, and prints the paste block wholly
+    commented out — asserted line by line, because "pasting this block installs
+    nothing" is the property that keeps a guess out of the watchlist.
+  - Derivation is tested on the names that actually break it: legal suffixes
+    (`Adyen N.V.`), spaces (`Factorial HR`), ampersands (`H&M`), and non-ASCII
+    in both directions (`Æther` needs `models._TRANSLITERATE`; `Bücher` needs
+    both the NFKD form and the German `ue` expansion). SmartRecruiters gets its
+    own group: its slug is case-sensitive, so the folded spelling alone would
+    404 on the one board a European company may actually be on.
+  - The `FakeSession` routes in this file are **anchored regexes, not
+    substrings**, and the reason is in the helper's docstring:
+    `.../accounts/factorial` is a substring of `.../accounts/factorial-hr`, so a
+    substring route makes "the first spelling 404s and the second one hits" pass
+    no matter which spelling the code asked about.
 - **`test_adzuna.py`** — snippet-only descriptions flagged, duplicate results
   collapsed, a rejected key abandoning its country instead of collecting the
   same 401 once per query, and API keys redacted out of error strings before
@@ -266,6 +298,11 @@ to the real internet. It asserts the specific things the parsers bet on:
 - Personio still serves `<workzag-jobs>` XML with `<jobDescription>` sections,
   its colon-less `+0200` offsets are still parseable, and `?language=` is still
   accepted;
+- a slug **nobody owns is still answered with a 404** on all six boards — the
+  assumption every `--discover` confidence rests on. If any vendor starts
+  serving 200 + zero postings for an unknown tenant, discovery can no longer
+  rule a board out and will recommend spellings that belong to nobody, and the
+  fixture and the parser would agree with each other about it forever;
 - no live board produces a URL `autoapply.detect_ats` would accept;
 - and the offline fixtures do not claim fields the live API no longer returns —
   excepting a short, named list of fields carried *on purpose* to prove the

@@ -132,8 +132,52 @@ and `tailoring.model` are independent.
 
 ### 3. Name the companies in `watchlist.yaml`
 
-Slugs come out of the URL on a company's careers page. Open the company's
-"Apply" link and read the host — that tells you which board they are on:
+Start from the company names and let the tool find the boards:
+
+```bash
+python -m src.sources.ats_boards --discover "Glovo" "Factorial HR" "TravelPerk"
+```
+
+It derives the plausible slug spellings from each name, asks the six boards,
+and prints the YAML to paste — along with what it asked and what answered:
+
+```text
+Glovo — confidence: HIGH
+  greenhouse       glovo                  no such slug — HTTP 404 (slug not found)
+  lever            glovo                  no such slug — HTTP 404 (slug not found)
+  workable         glovo                  34 postings — board calls itself 'Glovo'
+  ashby            glovo                  no such slug — HTTP 404 (slug not found)
+  smartrecruiters  Glovo                  no such slug — HTTP 404 (slug not found)
+  personio         glovo                  no such slug — HTTP 404 (slug not found)
+  stopped here: a board answered, so these were never asked: smartrecruiters/glovo
+
+# ----------------------------------------------------------------------
+# paste into watchlist.yaml — check anything commented out by hand
+# ----------------------------------------------------------------------
+workable:
+  - glovo                 # Glovo — 34 postings (high confidence)
+
+6 probe(s) for 1 company (cap DISCOVER_MAX_REQUESTS=120).
+```
+
+**Read the confidence, not the suggestion.** `high` means exactly one board
+answered with real postings and nothing qualified it. Anything else is printed
+*commented out* on purpose — two boards answering (a slug shared with a
+different company), a board that exists with nothing open, a board that never
+answered — because a wrong slug here is worse than no slug: it returns nothing
+every morning and looks exactly like a quiet market. It never edits
+`watchlist.yaml`; that file stays yours.
+
+It is also the only part of this tool that talks to boards nobody told it
+about, so it is bounded: at most 4 spellings per company and 120 requests per
+run, it stops as soon as a board answers with postings, and it says out loud
+what each bound dropped. `--max-requests` raises it — deliberately, because
+traffic that looks like a scanner gets you blocked from the boards the daily
+run needs. `--json` gives the whole thing as data.
+
+Or do it by hand. Slugs come out of the URL on a company's careers page. Open
+the company's "Apply" link and read the host — that tells you which board they
+are on:
 
 ```text
 boards.greenhouse.io/SLUG/jobs/123        ->  greenhouse: SLUG
@@ -639,9 +683,18 @@ Remember the slug is the path segment, not the company name:
 Two exceptions: **SmartRecruiters** slugs are case-sensitive, and **Personio**
 slugs are the *subdomain* (`acme.jobs.personio.de` is `acme`).
 
-**A company moved off Greenhouse and you cannot find them** — check the other
-five. European companies migrate to Personio and Workable more often than the
-other way round, and the give-away is where their "Apply" button points.
+**A company moved off Greenhouse and you cannot find them** — ask all six at
+once instead of guessing:
+
+```bash
+python -m src.sources.ats_boards --discover "Really Acme"
+```
+
+European companies migrate to Personio and Workable more often than the other
+way round. If `--discover` comes back with nothing, the give-away is still
+where their "Apply" button points — and if it comes back *ambiguous*, two
+vendors answered to the same slug and one of them is somebody else's board;
+open the careers page of the company you actually mean before pasting either.
 
 **"0 jobs found" on a run that fetched hundreds** — almost always freshness.
 Look at the filter breakdown in the digest: a large `stale` or `undated` count

@@ -49,7 +49,7 @@ _COMPANY_SUFFIXES = {
 }
 
 
-def normalize_text(value: str | None) -> str:
+def normalize_text(value: str | None, *, casefold: bool = True) -> str:
     """Lowercase, fold accents, strip punctuation and collapse whitespace.
 
     Invisible formatting characters are *deleted* rather than turned into
@@ -63,6 +63,14 @@ def normalize_text(value: str | None) -> str:
 
     Real spaces — including NBSP and the thin spaces boards decorate with — stay
     spaces: they *are* word boundaries.
+
+    `casefold=False` keeps the original capitals and changes nothing else. It
+    exists for exactly one caller — `ats_boards`' slug discovery, where
+    SmartRecruiters addresses a company by a **case-sensitive** slug spelled the
+    way the company spells itself ("FactorialHR"), so the folded form is the
+    wrong string to guess with. Everything else in the pipeline compares names
+    and wants the fold; the default therefore stays on, and there is one
+    normaliser rather than two that can drift apart.
     """
     if not value:
         return ""
@@ -72,8 +80,8 @@ def normalize_text(value: str | None) -> str:
         c for c in decomposed
         if not unicodedata.combining(c) and unicodedata.category(c) != "Cf"
     )
-    lowered = ascii_only.lower()
-    depunct = _PUNCT_RE.sub(" ", lowered)
+    folded = ascii_only.lower() if casefold else ascii_only
+    depunct = _PUNCT_RE.sub(" ", folded)
     return _WS_RE.sub(" ", depunct).strip()
 
 

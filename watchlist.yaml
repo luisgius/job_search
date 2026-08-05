@@ -4,9 +4,31 @@
 #     python -m src.sources.ats_boards --check personio acme
 #     python -m src.sources.ats_boards --check-all        # everything below
 #
-# Finding a slug: open a company's careers page and look at the job link.
-# The slug is the path segment (or, for Personio, the subdomain) — never the
-# company's display name.
+# START FROM A COMPANY NAME instead, and let the tool find the board:
+#     python -m src.sources.ats_boards --discover "Glovo" "Factorial HR"
+#
+# It derives the plausible slug spellings from each name, asks the six boards,
+# and prints the lines to paste here — plus what it asked and what answered, so
+# you can disagree with it. It never edits this file: this is the one you
+# curate by hand, and a tool that rewrites it will eventually eat something.
+#
+# Read the confidence rather than the suggestion. `high` means one board
+# answered with real postings and nothing qualified it. Anything else is
+# printed COMMENTED OUT on purpose — two boards answering (a slug shared with a
+# different company), a board that exists with nothing open, a board that never
+# answered — because a wrong slug in here is worse than no slug: it returns
+# nothing every morning and looks exactly like a quiet market.
+#
+# It is also the only part of this tool that makes requests to boards nobody
+# told it about, so it is bounded: at most 4 spellings per company and 120
+# requests a run, it stops as soon as a board answers with postings, and it
+# says out loud what each bound dropped. Raise `--max-requests` deliberately —
+# traffic that looks like a scanner gets you blocked from the boards the daily
+# run actually needs.
+#
+# Finding a slug by hand: open a company's careers page and look at the job
+# link. The slug is the path segment (or, for Personio, the subdomain) — never
+# the company's display name.
 #
 #   boards.greenhouse.io/SLUG/jobs/123        -> greenhouse:      SLUG
 #   jobs.lever.co/SLUG/uuid                   -> lever:           SLUG
@@ -17,10 +39,11 @@
 #
 # Pasting the whole URL works too — it is reduced to the slug for you.
 #
-# WHICH ONE IS A COMPANY ON?  Open their careers page and look at where the
-# "Apply" link goes. Greenhouse and Lever are where American companies post;
-# Workable, Ashby, SmartRecruiters and Personio are where European ones do, and
-# Personio in particular is the default for German, Spanish and Italian SMBs.
+# WHICH ONE IS A COMPANY ON?  `--discover` answers this for most companies.
+# Otherwise: open their careers page and look at where the "Apply" link goes.
+# Greenhouse and Lever are where American companies post; Workable, Ashby,
+# SmartRecruiters and Personio are where European ones do, and Personio in
+# particular is the default for German, Spanish and Italian SMBs.
 # ---------------------------------------------------------------------------
 
 greenhouse:

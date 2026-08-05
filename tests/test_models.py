@@ -54,6 +54,38 @@ def test_normalize_text(raw, expected):
 @pytest.mark.parametrize(
     "raw,expected",
     [
+        ("Factorial HR", "Factorial HR"),
+        ("Zürich", "Zurich"),
+        ("Æther", "AEther"),
+        ("H&M", "H M"),
+        ("Adyen N.V.", "Adyen N V"),
+    ],
+)
+def test_normalize_text_can_keep_the_capitals(raw, expected):
+    """`casefold=False` turns off the fold and nothing else — accents, ligatures,
+    punctuation and whitespace are handled exactly as before.
+
+    One caller needs it: `ats_boards` derives SmartRecruiters slug candidates,
+    and that vendor's slug is case-sensitive and spelled the way the company
+    spells itself. A second normaliser written for that would drift away from
+    this one, and the two disagreeing about what a company is called is how the
+    tracker's primary key stops being stable.
+    """
+    assert normalize_text(raw, casefold=False) == expected
+
+
+def test_normalize_text_still_folds_by_default():
+    """The guard on the parameter above. Every other caller in the pipeline
+    compares names for equality and depends on the fold; flipping the default
+    would break job identity everywhere and show up first as duplicate
+    applications."""
+    assert normalize_text("Factorial HR") == "factorial hr"
+    assert normalize_text("Æther") == "aether"
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
         ("Spotify AB", "spotify"),
         ("Spotify", "spotify"),
         ("Zalando SE", "zalando"),

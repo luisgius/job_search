@@ -49,7 +49,10 @@ digest.render        -> output/digest_YYYY-MM-DD.html
   cover_letter_md, tailored_cv_md`; `.score_value`, `.key`.
 - `RunStats` — counters + `errors: list[str]` + `source_counts`.
 - Helpers: `normalize_text`, `normalize_company`, `normalize_title`,
-  `utcnow`, `ensure_utc`.
+  `utcnow`, `ensure_utc`. `normalize_text(value, *, casefold=True)` — the fold
+  is off for exactly one caller, `ats_boards`' slug discovery, because
+  SmartRecruiters' slug is case-sensitive; a second normaliser for that would
+  be free to drift away from the one job identity depends on.
 
 ## Config (`src/config.py`) — already implemented
 
@@ -204,6 +207,18 @@ def fetch_personio(slug, *, session=None) -> list[Job]
 def fetch(config, *, session=None, errors=None) -> list[Job]
 def check_slug(board: str, slug: str, *, session=None) -> tuple[bool, str]
 def main(argv=None) -> int          # supports: --check greenhouse spotify
+
+# discovery: company name -> the board and slug to paste into watchlist.yaml
+DISCOVER_MAX_SLUGS_PER_COMPANY = 4
+DISCOVER_MAX_REQUESTS = 120
+PROBE_FOUND / PROBE_EMPTY / PROBE_ABSENT / PROBE_ERROR / PROBE_UNREACHABLE
+CONFIDENCE_HIGH / CONFIDENCE_MEDIUM / CONFIDENCE_LOW / CONFIDENCE_NONE
+
+def slug_candidates(name, *, cased=False, limit=DISCOVER_MAX_SLUGS_PER_COMPANY) -> list[str]
+def probe_board(board, slug, *, session=None, expect="") -> BoardProbe
+def discover_company(name, *, session=None, boards=BOARDS, max_slugs=…, budget=None) -> DiscoveryResult
+def discover(names, *, session=None, …, max_requests=…, budget=None) -> tuple[list[DiscoveryResult], RequestBudget]
+def format_discovery(results, budget) -> str
 ```
 Every `fetch_<board>` raises on transport/HTTP failure; `fetch` isolates each
 slug so one dead board costs that company and nothing else, and never raises.
@@ -260,6 +275,74 @@ positively.
 - `--check` prints `OK <board>/<slug> — N postings` or a clear failure and
   returns exit code 0/1. Runnable as `python -m src.sources.ats_boards`.
   `_CHEAP_CHECK_KWARGS` skips the expensive half of a fetch per vendor.
+
+#### `--discover` — company name to watchlist entry
+
+`--check` answers "is this slug real?". `--discover` answers the question that
+comes first and used to be a manual trawl through careers pages: **which board
+is this company on, and under what slug?**
+
+    python -m src.sources.ats_boards --discover "Glovo" "Factorial HR"
+
+This is **the only feature that makes deliberate unsolicited requests**.
+Everything else fetches boards the user chose; discovery guesses, and six
+vendors times several spellings times N companies of 404s from one IP is what a
+scanner looks like. Losing access to the boards the daily run needs costs far
+more than the convenience is worth, so the design is shaped by that:
+
+- **Slug candidates come from `models.normalize_company`** — the same normaliser
+  the tracker uses to decide "Spotify AB" and "spotify" are one company, which
+  is the same question. Legal suffixes go (`Adyen N.V.` -> `adyen`), dotted
+  initialisms collapse before the dots become spaces, `_TRANSLITERATE` handles
+  the letters NFKD will not decompose (`Æther` -> `aether`). On top of that:
+  `"".join` / `"-".join` / first-token for multi-word names, plus `&` -> `and`
+  and the German umlaut expansion (`Bücher` -> `buecher`), which NFKD alone
+  cannot produce. `normalize_text(…, casefold=False)` supplies the same
+  tokenisation with the capitals kept, because **SmartRecruiters slugs are
+  case-sensitive** and folding them away loses the one board a European company
+  may actually be on. Only that vendor pays for both spellings.
+- **The sweep is candidate-major.** Round one asks all six boards about the best
+  spelling, round two about the second-best. Consecutive requests therefore go
+  to six different hosts rather than six in a row to one, and the ordinary case
+  (the company is where you would expect) costs six requests and stops.
+- **A board answering with real postings ends the sweep**; later candidates are
+  not tried, and the `(board, slug)` pairs that were skipped are reported —
+  "we stopped looking" and "there was nothing to find" are different claims. An
+  *empty* board does not end it: zero postings is consistent both with the right
+  slug on a quiet week and with a wrong slug that happens to exist.
+- **The round is not cut short**, and this is the one place the economy is
+  deliberately not taken. Stopping at the first hit mid-round would make the
+  answer depend on the arbitrary order of `BOARDS`, and would hide the finding
+  the whole module exists to surface: two vendors answering for one name, where
+  one of them is a different company sharing a slug.
+- **Two bounds, both audible.** `DISCOVER_MAX_SLUGS_PER_COMPANY` (4) caps the
+  spellings and `DISCOVER_MAX_REQUESTS` (120) caps the run; each logs and prints
+  exactly what it dropped, for the reason `SMARTRECRUITERS_MAX_PAGES` does. A
+  cap that bites silently turns "we stopped guessing" into "this company is on
+  no board", which is the one reading that must never be given.
+- **`util.http_get`'s retry policy is reused, not replaced.** A 404 is an answer
+  and is never retried, so a probe against a slug nobody owns costs exactly one
+  request. `_DISCOVER_PROBE_KWARGS` turns off descriptions and holds
+  SmartRecruiters to one listing page — the offset walk is right for the daily
+  run and would otherwise turn one probe into twenty against a budget that
+  thinks it spent one.
+- **Five answers, never collapsed**: `found` (postings), `empty` (reachable,
+  nothing open), `absent` (404/410 — the answer that lets a board be ruled
+  *out*), `error` (403/429/5xx, or a body that is not a board), `unreachable`
+  (no answer at all). A confidence, not a verdict, is derived from them:
+  `high` only for a single unqualified hit; anything ambiguous, name-mismatched,
+  half-swept or postings-free is `low` and is printed **commented out** so that
+  pasting the block can never install a guess.
+- **Where the vendor publishes its own name** (Workable, SmartRecruiters) it is
+  compared against the name asked for, leniently — containment either way is
+  agreement — because `acme` on Lever is not the same company as `acme` on
+  Greenhouse. The other four derive the name from the slug, so comparing it back
+  would be a constant compared to a constant and is not done.
+- **It never writes `watchlist.yaml`.** It prints. The file is the one the user
+  curates by hand, and a tool that rewrites it will eventually eat something
+  they wrote — while a wrong guess that stays on the terminal costs nothing.
+- Exit code 0 only when every name produced something pasteable without a
+  decision; ambiguous, low-confidence, not-found and cap-truncated all exit 1.
 
 ### `src/sources/adzuna.py`
 ```python
