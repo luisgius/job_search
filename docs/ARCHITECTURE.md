@@ -63,6 +63,7 @@ digest.render        -> output/digest_YYYY-MM-DD.html
 `Tracker(path)`, `record_job(job, now=)`, `has_job(key)`,
 `record_status(key, status, detail=, score=, method=, artifacts_dir=, now=)`,
 `get_status(key)`, `has_applied(key)`, `has_applied_similar(dedupe_key)`,
+`repost_gap_days(dedupe_key, key=, posted_at=, now=)`,
 `record_submit_attempt(key, url=, method=, now=)` /
 `clear_submit_attempt(key)` / `submit_attempted(key)`,
 `should_surface(key, within_days=, now=)`, `start_run` / `finish_run`,
@@ -74,6 +75,14 @@ eligible for a real application later.
 `has_applied_similar` is the same gate one notch blunter, on `dedupe_key`: a
 recruiter closing and re-opening a requisition produces a new ATS id for the
 same role, and `has_applied` cannot see that.
+
+`repost_gap_days` reads the same `dedupe_key` index to *measure* that
+re-opening — how many days before this listing the same role was already on
+the market — and returns `None` when it never was. It decides nothing: the
+threshold lives in `freshness.repost_min_gap_days` and the only consumer is an
+advisory line on a digest card. The gap is what separates a re-listing from
+one live job arriving via two sources at once, which has the same one
+`dedupe_key` / two `Job.key` shape.
 
 The `submit_attempt*` trio is a write-ahead record of a submit *click*, taken
 before the click and cleared only on positive evidence that nothing was sent.
@@ -322,10 +331,14 @@ page object; Playwright is imported only inside `run`.
 
 ### `src/digest.py`
 ```python
-def build_context(scored_jobs, stats, config, *, now=None) -> dict
+def build_context(scored_jobs, stats, config, *, now=None, tracker=None) -> dict
 def render_html(context) -> str
-def write_digest(scored_jobs, stats, config, *, now=None) -> Path
+def write_digest(scored_jobs, stats, config, *, now=None, tracker=None) -> Path
 ```
+`tracker=` is optional and read-only — it supplies the sighting history behind
+the repost flag. Every card renders identically with or without it, minus one
+advisory line: the ghost-job signals are **flags, never filters**, and the
+funnel is asserted to be unchanged by them.
 Jinja2 template at `src/templates/digest.html.j2`, self-contained (inline
 CSS, no CDN). Sections: **Needs your click** (digest status, sorted by score
 desc), **Auto-applied**, **Dry run — check these**, **Below threshold**,
