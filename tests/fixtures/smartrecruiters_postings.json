@@ -18,7 +18,9 @@
       "department": { "label": "Engineering" },
       "typeOfEmployment": { "label": "Permanent" },
       "experienceLevel": { "id": "senior", "label": "Mid-Senior Level" },
+      "createdOn": "2026-07-06T09:15:00.000Z",
       "releasedDate": "2026-08-04T07:00:00.000Z",
+      "updatedOn": "2026-08-04T08:45:00.000Z",
       "ref": "https://api.smartrecruiters.com/v1/companies/Umbrella/postings/743999900000001"
     },
     {

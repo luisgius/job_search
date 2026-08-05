@@ -123,6 +123,80 @@ def test_the_host_is_recognised_by_shape_not_by_a_list_of_domains(pasted, expect
     assert _clean_slug(pasted) == expected
 
 
+@pytest.mark.parametrize(
+    "pasted,expected",
+    [
+        # The whole invariant in one line: a host has a dot in it. Without
+        # that, "contoso" is a host, gets dropped, and the slug becomes "j".
+        ("contoso/j/ABC123/", "contoso"),
+        ("spotify/jobs", "spotify"),
+        ("spotify/jobs/1", "spotify"),
+        ("Umbrella/743999900000001", "Umbrella"),
+        ("initech/uuid", "initech"),
+        ("acme-corp/", "acme-corp"),
+        ("acme_corp/jobs", "acme_corp"),
+    ],
+)
+def test_a_first_segment_with_no_dot_in_it_is_the_slug_not_a_host(pasted, expected):
+    """`_HOST_LIKE_RE` requires **two or more** dot-separated labels, and this
+    is the test that says so.
+
+    Relax `(?:\\.[\\w-]+)+$` to `*$` — one character — and a single bare label
+    counts as a host, so the first path segment is thrown away and the *second*
+    becomes the slug: `contoso/j/ABC123/` yields `"j"` and `spotify/jobs`
+    yields `"jobs"`. Both are perfectly plausible-looking slugs, both 404, and
+    a 404 on this path is indistinguishable from a company that closed its
+    board. Nothing asserted the dot, and this helper is shared by Greenhouse
+    and Lever — the two vendors the apply leg is allowed to act on.
+    """
+    from src.sources.ats_boards import _clean_slug
+
+    assert _clean_slug(pasted) == expected
+
+
+@pytest.mark.parametrize("host_shaped", [
+    "boards.greenhouse.io",
+    "www.example.com",
+    "apply.workable.com",
+    "acme.jobs.personio.de",
+])
+def test_a_first_segment_with_a_dot_in_it_is_dropped_as_a_host(host_shaped):
+    """The other half of the pair: something *does* follow it, so it is a URL."""
+    from src.sources.ats_boards import _clean_slug
+
+    assert _clean_slug(f"{host_shaped}/acme-corp") == "acme-corp"
+
+
+@pytest.mark.parametrize("pasted", [
+    "https://boards.greenhouse.io/embed/job_board?for=spotify",
+    "boards.greenhouse.io/embed/job_board?for=spotify",
+    "https://boards.greenhouse.io/embed/job_board/js?for=spotify&b=1",
+    "https://boards.greenhouse.io/embed/job_app?for=spotify&token=1",
+])
+def test_the_greenhouse_embed_url_keeps_its_slug(pasted):
+    """The embed URL is what a great many careers pages link to, so it is what
+    gets pasted — and it is the one shape where the slug is in the query string
+    rather than the path. Dropping the query left the literal segment `embed`
+    as the slug: a 404, and a 404 here is indistinguishable from a company that
+    closed its board."""
+    from src.sources.ats_boards import _clean_slug
+
+    assert _clean_slug(pasted) == "spotify"
+
+
+@pytest.mark.parametrize("pasted,expected", [
+    ("https://apply.workable.com/contoso?lang=en", "contoso"),
+    ("https://boards.greenhouse.io/spotify?token=1", "spotify"),
+    ("https://jobs.lever.co/plaid/uuid?lever-origin=applied", "plaid"),
+])
+def test_an_ordinary_query_string_is_still_just_discarded(pasted, expected):
+    """The rescue above must stay narrow: only `?for=` on the embed
+    scaffolding. Any other query string is noise and the path is the truth."""
+    from src.sources.ats_boards import _clean_slug
+
+    assert _clean_slug(pasted) == expected
+
+
 # ==========================================================================
 # Greenhouse
 # ==========================================================================

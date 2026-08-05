@@ -64,6 +64,17 @@ personio:
   # Bare tenant name -> {tenant}.jobs.personio.de, with an automatic retry on
   # .personio.com for the minority of tenants provisioned there. Write the full
   # host (acme.jobs.personio.com) to skip the guess.
+  #
+  # By default no language is requested and the feed answers in the tenant's
+  # own — which for a German SMB means German ads, and that is deliberate: a
+  # posting may exist ONLY in German, and asking for a language the career site
+  # does not publish returns an empty or half-empty description. A job made
+  # worse, or lost, to buy a translation nobody needed. Filtering and remote
+  # detection read German, Spanish, French, Italian, Dutch and Polish, and the
+  # scoring model is not monolingual either.
+  #
+  # Ask for one per tenant only when you know they publish it:
+  #     - {slug: acme, language: en}     # de en fr es nl it pt
   - personio
 
 adzuna:

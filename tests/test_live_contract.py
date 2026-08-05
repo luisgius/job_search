@@ -90,8 +90,14 @@ LEVER_EXPECTED = ("categories", "createdAt")
 WORKABLE_REQUIRED = ("title", "shortcode")
 #: Everything the parser bets on beyond bare usability. `requirements` and
 #: `benefits` only appear with `?details=true`, and they are half the ad.
-WORKABLE_EXPECTED = ("state", "location", "created_at", "description",
-                     "requirements", "benefits", "employment_type")
+WORKABLE_EXPECTED = ("state", "location", "published_on", "created_at",
+                     "description", "requirements", "benefits", "employment_type")
+
+#: Every spelling the parser will accept for a Workable posting's *extra*
+#: offices. Which one is live has never been seen; the test below records it.
+WORKABLE_LOCATION_LIST_KEYS = ("locations", "secondary_locations",
+                               "secondaryLocations", "additional_locations",
+                               "additionalLocations", "other_locations")
 
 ASHBY_REQUIRED = ("id", "title")
 ASHBY_EXPECTED = ("location", "secondaryLocations", "isListed", "publishedAt",
@@ -119,22 +125,83 @@ _STATUS_RE = re.compile(r"\bHTTP (\d{3})\b")
 #: one already knew, and `pytest -m network` on a train takes minutes to tell
 #: you it has nothing to say. `retries=1` because a probe that retries is
 #: measuring the retry policy, not the network.
-_PROBE_URL = "https://boards-api.greenhouse.io/v1/boards/gitlab/jobs"
+#:
+#: **Several unrelated hosts, not one company's board.** The probe used to be
+#: `boards-api.greenhouse.io/v1/boards/gitlab/jobs` alone, and it skipped the
+#: whole file on *any* exception — a 404 included. The day GitLab leaves
+#: Greenhouse, or renames its board, `pytest -m network` skips all forty
+#: contract tests, prints "skipped", and reads exactly like a pass. The four
+#: European boards this file exists to settle would go unchecked and nobody
+#: would be told. One company's hiring decision must not be able to do that.
+#:
+#: These are chosen to be independent: different companies, different vendors,
+#: different DNS. Any one of them answering proves there is a route out.
+_PROBE_URLS: tuple[tuple[str, dict | None], ...] = (
+    ("https://boards-api.greenhouse.io/v1/boards/gitlab/jobs", {"content": "false"}),
+    ("https://api.lever.co/v0/postings/plaid", {"mode": "json", "limit": "1"}),
+    ("https://api.ashbyhq.com/posting-api/job-board/ashby", None),
+)
+
+
+def answered_and_rejected(exc: BaseException) -> bool:
+    """True when the API *answered* — a status code came back — and said no.
+
+    The one rule this file's skip-or-fail policy turns on, written once so that
+    every helper below obeys the same one. A 404, a 403 or a 500 means the
+    endpoint exists, heard us and refused: a finding, and a test that skips on
+    it is a test that lies. A DNS failure or a refused connection is a train
+    tunnel, and failing on that trains people to ignore this file.
+
+    `HTTPSConnectionPool` contains the letters "HTTP", which is why the match
+    is on an actual three-digit status and not on the word.
+    """
+    return isinstance(exc, HttpError) and bool(_STATUS_RE.search(str(exc)))
+
+
+def probe_network(probes=_PROBE_URLS, *, get=None) -> None:
+    """Decide, once for the file, whether there is a network to talk to.
+
+    Three outcomes, deliberately distinguishable:
+
+      * one probe answered -> there is a network; run the file. A *single*
+        blocked or moved host is still reported per test by `_reachable`.
+      * every probe failed at the transport level -> no route to anywhere.
+        Skip; a train tunnel is not a broken API.
+      * every probe was *answered* and rejected -> the probe URLs have rotted,
+        or something is intercepting them. **Fail**, loudly. "The probe is
+        broken" and "there is no network" must never look the same, because
+        one of them silently disarms every test in this file and prints green.
+
+    `get` is the seam: the meta-tests in `test_live_contract_policy.py` drive
+    this offline, which is the only way to prove the policy without a network.
+    """
+    if get is None:
+        from src.util import http_get as get
+
+    rejected: list[str] = []
+    unreachable: list[str] = []
+    for url, params in probes:
+        try:
+            get(url, params=params, retries=1, timeout=10)
+            return
+        except Exception as exc:
+            (rejected if answered_and_rejected(exc) else unreachable).append(
+                f"{url} -> {exc}"
+            )
+
+    if rejected and not unreachable:
+        pytest.fail(
+            "every network probe was answered and rejected, so this is not an "
+            "offline machine — the probe URLs have rotted, or something is "
+            "intercepting them. Skipping here would disarm every test in this "
+            "file and print green:\n  " + "\n  ".join(rejected)
+        )
+    pytest.skip("network unreachable: " + "; ".join(unreachable + rejected))
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _network_or_skip():
-    """Skip this whole file, fast, when nothing is reachable.
-
-    A *single* blocked host is still reported per test by `_reachable` — this
-    only short-circuits the case where there is no route to anywhere.
-    """
-    from src.util import http_get
-
-    try:
-        http_get(_PROBE_URL, params={"content": "false"}, retries=1, timeout=10)
-    except Exception as exc:
-        pytest.skip(f"network unreachable: {exc}")
+    probe_network()
 
 
 def _reachable(fn, *args, **kwargs):
@@ -145,31 +212,43 @@ def _reachable(fn, *args, **kwargs):
     """
     try:
         return fn(*args, **kwargs)
-    except HttpError as exc:
-        if _STATUS_RE.search(str(exc)):
+    except Exception as exc:
+        if answered_and_rejected(exc):
             pytest.fail(f"the API answered but rejected us: {exc}")
         pytest.skip(f"network unreachable: {exc}")
-    except Exception as exc:  # transport-level
+
+
+def fetch_raw(url: str, params: dict | None = None, *, get=None):
+    """One raw request, under exactly the policy `_reachable` uses.
+
+    These helpers back the field-shape tests — the only tests in the whole
+    suite that can settle whether the four European parsers read fields that
+    exist. They used to `pytest.skip` on *any* exception, 404 and 500 included,
+    so a moved slug or a revoked endpoint made every one of them read as green:
+    a test that skips when it should fail is worse than no test at all.
+    """
+    if get is None:
+        from src.util import http_get as get
+
+    try:
+        return get(url, params=params)
+    except Exception as exc:
+        if answered_and_rejected(exc):
+            pytest.fail(f"the API answered but rejected us: {exc}")
         pytest.skip(f"network unreachable: {exc}")
 
 
 def _raw_payload(url: str, params: dict | None = None):
-    from src.util import http_get_json
-
+    response = fetch_raw(url, params)
     try:
-        return http_get_json(url, params=params)
+        return response.json()
     except Exception as exc:
-        pytest.skip(f"network unreachable: {exc}")
+        pytest.fail(f"{url} did not return JSON: {exc}")
 
 
 def _raw_text(url: str, params: dict | None = None) -> str:
     """The response body as text — Personio's feed is XML, not JSON."""
-    from src.util import http_get
-
-    try:
-        return getattr(http_get(url, params=params), "text", "") or ""
-    except Exception as exc:
-        pytest.skip(f"network unreachable: {exc}")
+    return getattr(fetch_raw(url, params), "text", "") or ""
 
 
 def _union_of_keys(postings, limit: int = 25) -> set[str]:
@@ -419,6 +498,55 @@ def test_workable_location_is_still_structured_parts(slug):
 
 
 @pytest.mark.parametrize("slug", WORKABLE_SLUGS[:1])
+def test_workable_still_publishes_published_on(slug):
+    """The parser dates a posting by `published_on`, never by `created_at`.
+
+    `created_at` is when the requisition *record* was made — the day someone
+    opened the draft — and drafting weeks ahead is ordinary recruiting. A req
+    begun on 6 July and published on 4 August is brand new and would be dated a
+    month old, rejected as stale, and never seen. If `published_on` disappears
+    the parser falls back to exactly that, so this is the test that has to
+    notice."""
+    payload = _raw_payload(WORKABLE_ACCOUNT_URL.format(slug=slug), {"details": "true"})
+    postings = payload.get("jobs", [])
+    have = sum(1 for j in postings[:50] if j.get("published_on"))
+    assert have, (
+        "no posting carries `published_on` — freshness now rests on "
+        "`created_at`, which dates a posting by when its draft was opened and "
+        "silently ages every req that was written in advance"
+    )
+
+
+@pytest.mark.parametrize("slug", WORKABLE_SLUGS[:1])
+def test_workable_says_somewhere_which_offices_a_posting_is_open_in(slug):
+    """A posting open in San Francisco *and* Valencia must not be pinned to the
+    first one: US companies list their offices home-first, so `location` alone
+    reads as unambiguously American and the geo veto deletes a European role.
+    That is the same failure `allLocations` fixes on Lever and
+    `secondaryLocations` on Ashby.
+
+    The key name here is a hypothesis — the parser reads six spellings for that
+    reason — and this test is the only thing that can say which is real."""
+    payload = _raw_payload(WORKABLE_ACCOUNT_URL.format(slug=slug), {"details": "true"})
+    postings = payload.get("jobs", [])
+    seen = _union_of_keys(postings, limit=50)
+    found = [k for k in WORKABLE_LOCATION_LIST_KEYS if k in seen]
+    assert found, (
+        "no posting carries any of "
+        f"{list(WORKABLE_LOCATION_LIST_KEYS)}, so a multi-office posting is "
+        f"pinned to its primary location. Keys actually present: {sorted(seen)} "
+        "— add the real one to `_WORKABLE_LOCATION_LIST_KEYS`"
+    )
+    for key in found:
+        for posting in postings[:50]:
+            for entry in posting.get(key) or []:
+                assert isinstance(entry, dict), (
+                    f"workable `{key}` entries are now {type(entry).__name__}; "
+                    "the parser assembles them from city/region/country"
+                )
+
+
+@pytest.mark.parametrize("slug", WORKABLE_SLUGS[:1])
 def test_workable_jobs_parse_into_usable_records(slug):
     jobs = _reachable(fetch_workable, slug)
     assert all(j.title and j.url for j in jobs)
@@ -548,6 +676,37 @@ def test_smartrecruiters_listing_still_has_the_fields_we_parse(slug):
 
 
 @pytest.mark.parametrize("slug", SMARTRECRUITERS_SLUGS[:1])
+def test_smartrecruiters_still_pages_by_offset_and_says_how_many_there_are(slug):
+    """The listing is paged and the fetcher walks it with `?offset=`.
+
+    Two things have to stay true for that walk to terminate on the right page:
+    the envelope still reports `totalFound`, and `offset` still means what
+    https://developers.smartrecruiters.com/docs/pagination says it means. If
+    `offset` were ignored, page two would be page one again and a large company
+    would be read as its first hundred roles over and over."""
+    first = _raw_payload(SMARTRECRUITERS_POSTINGS_URL.format(slug=slug),
+                         {"limit": 10, "offset": 0})
+    assert isinstance(first, dict)
+    total = first.get("totalFound")
+    assert isinstance(total, int), (
+        "the listing envelope no longer reports `totalFound` — the fetcher can "
+        "no longer tell a finished board from a truncated one"
+    )
+    page_one = [p.get("id") for p in first.get("content", [])]
+    if total <= len(page_one) or len(page_one) < 10:
+        pytest.skip("this company has too few postings to prove paging")
+
+    second = _raw_payload(SMARTRECRUITERS_POSTINGS_URL.format(slug=slug),
+                          {"limit": 10, "offset": 10})
+    page_two = [p.get("id") for p in second.get("content", [])]
+    assert page_two, f"offset=10 returned nothing on a board of {total} postings"
+    assert not (set(page_one) & set(page_two)), (
+        "`offset` no longer advances the window — every page is page one, so a "
+        "company with 250 roles would contribute the same 100 forever"
+    )
+
+
+@pytest.mark.parametrize("slug", SMARTRECRUITERS_SLUGS[:1])
 def test_the_smartrecruiters_listing_still_carries_no_description(slug):
     """The single fact that shapes this source. If SmartRecruiters ever put the
     ad in the listing, the per-posting detail call — one HTTP request per job,
@@ -649,6 +808,26 @@ def test_personio_still_serves_workzag_jobs_xml(slug):
     assert str(root.tag).rsplit("}", 1)[-1] == "workzag-jobs", (
         f"the Personio feed root is now <{root.tag}> — src/sources/ats_boards.py "
         "rejects anything else and this board now yields nothing"
+    )
+
+
+@pytest.mark.parametrize("slug", PERSONIO_SLUGS[:1])
+def test_personio_still_accepts_the_documented_language_parameter(slug):
+    """`?language=` is documented (de/en/fr/es/nl/it/pt) and is opt-in per
+    watchlist entry. It is *not* sent by default, on purpose — a tenant only
+    publishes the languages its career site is configured for, and asking for
+    one it does not have is how a real ad comes back empty. This test says only
+    that a tenant which does publish a language still answers when asked."""
+    body = _raw_text(
+        PERSONIO_XML_URL.format(host=f"{slug}.jobs.personio.de"), {"language": "en"}
+    )
+    assert body.strip(), (
+        "the feed answered empty for ?language=en — a watchlist entry that "
+        "sets `language` would silently contribute nothing"
+    )
+    assert "<position" in body, (
+        "?language=en returned a document with no positions in it; either this "
+        "tenant does not publish English or the parameter has changed meaning"
     )
 
 
@@ -805,6 +984,25 @@ def test_the_offline_fixtures_match_the_shape_of_the_live_payload():
     )
 
 
+#: Fields a fixture carries **on purpose to prove the parser ignores them**.
+#:
+#: A negative test needs the field present to be a test at all — "we do not
+#: date a posting from `updated_at`" is unprovable against a payload with no
+#: `updated_at` in it. But the parser never reads them, so their absence from a
+#: live response says nothing about whether the parser is exercised against a
+#: payload that exists, which is the only thing the test below is asking. They
+#: are excluded from the comparison rather than removed from the fixtures.
+_DELIBERATELY_IGNORED_FIELDS: dict[str, frozenset[str]] = {
+    # Modified dates. Reading one overstates freshness — a typo fix on a
+    # three-month-old req looks like today's news.
+    "workable_jobs.json": frozenset({"updated_at"}),
+    "smartrecruiters_postings.json": frozenset({"updatedOn"}),
+    # The one-line OG-card teaser. Scoring it instead of the ad produces a
+    # perfectly reasonable-looking number from a sentence of marketing.
+    "ashby_jobs.json": frozenset({"descriptionSocial"}),
+}
+
+
 @pytest.mark.parametrize(
     "fixture_name,fixture_key,url,params,live_key,slug",
     [
@@ -813,7 +1011,7 @@ def test_the_offline_fixtures_match_the_shape_of_the_live_payload():
         ("ashby_jobs.json", "jobs",
          ASHBY_JOB_BOARD_URL, {"includeCompensation": "true"}, "jobs", ASHBY_SLUGS[0]),
         ("smartrecruiters_postings.json", "content",
-         SMARTRECRUITERS_POSTINGS_URL, {"limit": 100}, "content",
+         SMARTRECRUITERS_POSTINGS_URL, {"limit": 100, "offset": 0}, "content",
          SMARTRECRUITERS_SLUGS[0]),
     ],
 )
@@ -840,7 +1038,11 @@ def test_the_european_fixtures_do_not_claim_fields_reality_never_sends(
         pytest.skip(f"{slug} returned no postings to compare against")
 
     fixture = load_json_fixture(fixture_name)[fixture_key]
-    invented = _union_of_keys(fixture, limit=50) - _union_of_keys(postings, limit=50)
+    invented = (
+        _union_of_keys(fixture, limit=50)
+        - _union_of_keys(postings, limit=50)
+        - _DELIBERATELY_IGNORED_FIELDS.get(fixture_name, frozenset())
+    )
     assert not invented, (
         f"{fixture_name} claims field(s) the live API does not return: "
         f"{sorted(invented)} — every offline test for this source is validating "
@@ -870,7 +1072,9 @@ def test_the_personio_fixture_does_not_claim_elements_reality_never_sends():
     fixture_positions = list(
         ElementTree.fromstring(load_fixture("personio_positions.xml")).iter("position")
     )
-    invented = tags(fixture_positions) - tags(live_positions)
+    # `<updatedAt>` is in the fixture only so that "we never date a position
+    # from it" is a test rather than an aspiration; the parser never reads it.
+    invented = tags(fixture_positions) - tags(live_positions) - {"updatedAt"}
     assert not invented, (
         f"personio_positions.xml claims element(s) the live feed does not send: "
         f"{sorted(invented)} — the offline Personio tests are validating a "

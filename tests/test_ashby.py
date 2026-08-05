@@ -189,6 +189,47 @@ def test_ashby_prefers_description_plain_and_falls_back_to_html():
     assert "<strong>" not in jobs[REMOTE].description
 
 
+def test_ashby_keeps_the_whole_ad_and_not_just_its_opening_lines():
+    """The assertions above all land inside the first eighty characters, so a
+    parser that kept only an opening fragment would satisfy every one of them.
+
+    That is not a hypothetical shape of bug: it is the failure the whole
+    description-assembly effort exists to prevent, and its three siblings
+    (Workable, SmartRecruiters, Personio) already assert across every block.
+    The requirements — "6+ years", the work authorisation — and the benefits —
+    relocation — are the parts that actually decide a score, and they are at
+    the *end* of an ad, which is exactly where a truncation lands."""
+    jobs = by_id(fetch_ashby("initech", session=ab_session()))
+
+    plain = jobs[FIRST].description
+    assert "Own our ingestion services" in plain          # the opening
+    assert "edge collectors to the warehouse" in plain    # the middle
+    assert "6+ years of production Python" in plain       # the requirements
+    assert "EU work authorisation" in plain
+    assert "Relocation support to Valencia" in plain      # the closing benefits
+    assert len(plain) > 400
+
+    html = jobs[REMOTE].description
+    assert "Keep the fleet alive" in html                 # the opening
+    assert "error budget" in html                         # the middle
+    assert "5+ years running production Linux" in html    # the requirements
+    assert "relocation anywhere in the EU" in html        # the closing benefits
+    assert len(html) > 300
+
+
+def test_ashby_scores_the_real_ad_and_never_the_social_teaser():
+    """`descriptionSocial` is the one-line blurb Ashby renders into an OG card.
+
+    It is plausible, it is present, and it is a *teaser* — substituting it
+    would hand the model a sentence of marketing to score a job on, and the
+    result would look entirely reasonable: a number, no error, no empty field,
+    nothing in the digest to suggest anything went wrong."""
+    jobs = by_id(fetch_ashby("initech", session=ab_session()))
+    for job in (jobs[FIRST], jobs[REMOTE]):
+        assert "Apply now" not in job.description
+        assert not job.description.startswith("Initech is hiring")
+
+
 def test_ashby_marks_remote_positively_only():
     """`remote=False` would wrongly narrow the location filter, and a "Hybrid"
     workplace type is not the same claim as "not remote at all"."""

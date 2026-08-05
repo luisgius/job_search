@@ -19,7 +19,8 @@
       "publishedAt": "2026-08-04T07:00:00.000+00:00",
       "jobUrl": "https://jobs.ashbyhq.com/initech/3a1f9c20-1111-4d55-8b77-000000000001",
       "applyUrl": "https://jobs.ashbyhq.com/initech/3a1f9c20-1111-4d55-8b77-000000000001/application",
-      "descriptionPlain": "Own our ingestion services in Python. You will scale Kafka consumers and mentor two engineers.",
+      "descriptionSocial": "Initech is hiring a Senior Python Engineer. Apply now.",
+      "descriptionPlain": "About the role\nOwn our ingestion services in Python. You will scale Kafka consumers and mentor two engineers.\n\nWhat you will do\nDesign and operate the pipelines that move every event through Initech, from the edge collectors to the warehouse, and share a weekday on-call rotation with the rest of the platform group.\n\nWhat we are looking for\n6+ years of production Python, deep PostgreSQL, and comfort owning infrastructure as code. EU work authorisation is required.\n\nWhat we offer\nRelocation support to Valencia, 26 days of holiday and a hardware budget.",
       "descriptionHtml": "<p>Own our ingestion services in Python.</p>",
       "compensation": {
         "compensationTierSummary": "€70K – €90K",
@@ -41,8 +42,9 @@
       "publishedAt": "2026-08-04T05:00:00.000+00:00",
       "jobUrl": "https://jobs.ashbyhq.com/initech/3a1f9c20-2222-4d55-8b77-000000000002",
       "applyUrl": "https://jobs.ashbyhq.com/initech/3a1f9c20-2222-4d55-8b77-000000000002/application",
+      "descriptionSocial": "Initech is hiring an SRE. Apply now.",
       "descriptionPlain": "",
-      "descriptionHtml": "<p>Keep the fleet alive. <strong>Terraform</strong>, Kubernetes, Go.</p>",
+      "descriptionHtml": "<p>Keep the fleet alive. <strong>Terraform</strong>, Kubernetes, Go.</p><p>You will own the reliability of a fleet spread across three European regions, run the error budget with the teams that spend it, and take part in a follow-the-sun on-call rotation.</p><ul><li>5+ years running production Linux at scale</li><li>Fluency in one of Go, Python or Rust</li></ul><p>We support relocation anywhere in the EU and pay a hardware budget.</p>",
       "compensation": {}
     },
     {

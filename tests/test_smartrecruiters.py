@@ -22,6 +22,7 @@ import pytest
 
 from src.sources.ats_boards import (
     SMARTRECRUITERS_MAX_DESCRIPTIONS,
+    SMARTRECRUITERS_MAX_PAGES,
     check_slug,
     fetch,
     fetch_smartrecruiters,
@@ -59,6 +60,35 @@ def by_id(jobs):
     return {j.ats_job_id: j for j in jobs}
 
 
+def paged_listing(total, *, reported=None):
+    """A listing route that serves `total` postings in `offset`-sized pages.
+
+    This is the whole point of the seam: the vendor pages its listing, so the
+    fake has to page too, or the offline suite can only ever prove that page
+    one is parsed.
+    """
+    postings = [
+        {"id": f"7439999{n:08d}", "name": f"Engineer {n}",
+         "company": {"identifier": "Umbrella", "name": "Umbrella Iberia S.L."},
+         "location": {"city": "Valencia", "country": "es", "remote": False},
+         "releasedDate": "2026-08-04T07:00:00.000Z"}
+        for n in range(total)
+    ]
+
+    def route(url, params):
+        params = params or {}
+        offset = int(params.get("offset", 0))
+        limit = int(params.get("limit", 100))
+        return json_response({
+            "offset": offset,
+            "limit": limit,
+            "totalFound": total if reported is None else reported,
+            "content": postings[offset:offset + limit],
+        })
+
+    return route
+
+
 # ==========================================================================
 # request shape
 # ==========================================================================
@@ -70,7 +100,104 @@ def test_smartrecruiters_hits_the_public_posting_api():
     assert session.calls[0]["url"] == (
         "https://api.smartrecruiters.com/v1/companies/Umbrella/postings"
     )
-    assert session.calls[0]["params"] == {"limit": 100}
+    assert session.calls[0]["params"] == {"limit": 100, "offset": 0}
+
+
+def test_smartrecruiters_stops_after_one_page_when_the_company_is_small():
+    """The pagination must not cost a request on the boards that do not need
+    it. A short page is the end of the board, and the loop believes it."""
+    session = sr_session()
+    fetch_smartrecruiters("Umbrella", session=session, details=False)
+    assert len(session.calls) == 1
+
+
+# ==========================================================================
+# pagination — one page is not the board
+# ==========================================================================
+
+
+def test_smartrecruiters_follows_the_offsets_to_the_end_of_the_board():
+    """The listing is paged, at 100 per page, and asking for page one is not
+    asking for the board.
+
+    A company with 250 open roles contributed exactly 100 of them: no error, no
+    warning, nothing above DEBUG — 150 European jobs deleted every morning and
+    the pipeline reporting success. `totalFound` was read only to write an INFO
+    line, and nothing in `health.py` reads INFO."""
+    session = FakeSession([("/postings", paged_listing(250))])
+    jobs = fetch_smartrecruiters("Umbrella", session=session, details=False)
+
+    assert len(jobs) == 250
+    assert [c["params"]["offset"] for c in session.calls] == [0, 100, 200]
+    assert len({j.ats_job_id for j in jobs}) == 250
+
+
+def test_smartrecruiters_does_not_pay_for_a_page_it_knows_is_empty():
+    """`totalFound` is exactly two pages here. A third request would be a
+    request the company already told us has nothing in it."""
+    session = FakeSession([("/postings", paged_listing(200))])
+    jobs = fetch_smartrecruiters("Umbrella", session=session, details=False)
+    assert len(jobs) == 200
+    assert [c["params"]["offset"] for c in session.calls] == [0, 100]
+
+
+def test_smartrecruiters_trusts_a_short_page_over_a_wrong_total():
+    """A short page is the end of the board whatever the envelope claims.
+    `totalFound` understating the truth must not truncate the walk, and
+    overstating it must not spin."""
+    session = FakeSession([("/postings", paged_listing(150, reported=9999))])
+    jobs = fetch_smartrecruiters("Umbrella", session=session, details=False)
+    assert len(jobs) == 150
+    assert len(session.calls) == 2
+
+
+def test_a_board_that_never_runs_out_is_bounded_and_says_what_it_dropped(caplog):
+    """The other half of the bargain. A board whose `totalFound` is wrong — or
+    that simply keeps answering full pages — must not turn one watchlist slug
+    into an unbounded request loop.
+
+    But a silent cap is the bug this module exists to avoid, so the stop is
+    announced at WARNING and names the number left behind. `--check` and the
+    run log are the only places a user can find out that their 2,000-role
+    employer is being read in part; a DEBUG line is not one of them."""
+    import logging
+
+    def never_ends(url, params):
+        offset = int((params or {}).get("offset", 0))
+        return json_response({
+            "totalFound": 100000,
+            "content": [{"id": str(offset + n), "name": f"Engineer {offset + n}"}
+                        for n in range(100)],
+        })
+
+    session = FakeSession([("/postings", never_ends)])
+    with caplog.at_level(logging.WARNING, logger="src.sources.ats_boards"):
+        jobs = fetch_smartrecruiters("Umbrella", session=session, details=False,
+                                     max_pages=3)
+
+    assert len(session.calls) == 3
+    assert len(jobs) == 300
+    assert "100000" in caplog.text
+    assert "not fetched" in caplog.text.lower()
+
+
+def test_the_shipped_page_cap_is_a_real_bound():
+    assert 0 < SMARTRECRUITERS_MAX_PAGES <= 100
+    # Generous enough that no real employer ever meets it.
+    assert SMARTRECRUITERS_MAX_PAGES * 100 >= 2000
+
+
+def test_a_second_page_that_404s_costs_the_company_and_not_the_run():
+    """The listing is allowed to raise — `fetch` catches it per slug. What must
+    not happen is a half-page of jobs being returned as if it were the board."""
+    def route(url, params):
+        if int((params or {}).get("offset", 0)):
+            return FakeResponse(status_code=404)
+        return paged_listing(250)(url, params)
+
+    session = FakeSession([("/postings", route)])
+    with pytest.raises(Exception):
+        fetch_smartrecruiters("Umbrella", session=session, details=False)
 
 
 def test_smartrecruiters_fetches_one_description_per_posting():
@@ -235,6 +362,42 @@ def test_smartrecruiters_undated_posting_yields_none_not_a_guess():
     Inventing "now" here would defeat that setting silently."""
     job = by_id(fetch_smartrecruiters("Umbrella", session=sr_session()))[UNDATED]
     assert job.posted_at is None
+
+
+def test_smartrecruiters_ignores_updated_on_as_a_publication_date():
+    """The mirror of `test_ashby_ignores_updated_at_as_a_publication_date`, and
+    the test this file did not have.
+
+    Three dates arrive on the fixture's flagship posting: `createdOn` (6 July,
+    when the req was drafted), `releasedDate` (4 August, when it went live) and
+    `updatedOn` (later that morning, when somebody fixed a typo). Only the
+    middle one is a publication date. `updatedOn` overstates freshness — a
+    three-month-old req looks like today's news after one edit — and `createdOn`
+    understates it, which is worse, because a posting that looks a month old is
+    rejected as stale and vanishes."""
+    job = by_id(fetch_smartrecruiters("Umbrella", session=sr_session()))[FIRST]
+    assert job.raw["released_date"] == "2026-08-04T07:00:00.000Z"
+    assert job.posted_at == datetime(2026, 8, 4, 7, 0, tzinfo=UTC)
+
+
+def test_smartrecruiters_will_not_date_a_posting_from_updated_on_alone():
+    """No date is more honest than an inflated one: undated leaves the decision
+    to `freshness.skip_undated`, where the user can see it."""
+    listing = {"content": [{"id": "1", "name": "Engineer",
+                            "updatedOn": "2026-08-04T08:45:00.000Z"}]}
+    job = fetch_smartrecruiters("Umbrella", session=sr_session(listing),
+                                details=False)[0]
+    assert job.posted_at is None
+
+
+def test_smartrecruiters_falls_back_to_created_on_when_nothing_was_released():
+    """`createdOn` can only ever *under*state freshness, so it is a floor —
+    and a floor beats no date at all when `skip_undated` is on."""
+    listing = {"content": [{"id": "1", "name": "Engineer",
+                            "createdOn": "2026-08-04T07:00:00.000Z"}]}
+    job = fetch_smartrecruiters("Umbrella", session=sr_session(listing),
+                                details=False)[0]
+    assert job.posted_at == datetime(2026, 8, 4, 7, 0, tzinfo=UTC)
 
 
 def test_smartrecruiters_skips_a_titleless_posting_without_dropping_the_company():

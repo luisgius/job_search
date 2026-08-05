@@ -78,6 +78,14 @@ PERSONIO_PRIMARY_HOST = "{slug}.jobs.personio.de"
 PERSONIO_FALLBACK_HOST = "{slug}.jobs.personio.com"
 PERSONIO_XML_URL = "https://{host}/xml"
 PERSONIO_JOB_URL = "https://{host}/job/{job_id}"
+#: Values the feed documents for `?language=`. Omitting the parameter entirely
+#: is the default *and the safe one*: the feed then answers in the tenant's own
+#: language, whereas asking a German SMB for `en` risks an empty or degraded
+#: ad for a role that only exists in German — the job-losing direction. It is
+#: therefore opt-in, per watchlist entry (`{slug: acme, language: en}`).
+PERSONIO_LANGUAGES: frozenset[str] = frozenset(
+    {"de", "en", "fr", "es", "nl", "it", "pt"}
+)
 
 #: Boards this module knows how to talk to, in watchlist order.
 BOARDS: tuple[str, ...] = (
@@ -87,8 +95,33 @@ BOARDS: tuple[str, ...] = (
 # Project root, so `--check` works from any working directory.
 _ROOT = Path(__file__).resolve().parents[2]
 
+#: Remote markers, in the languages this tool actually searches in.
+#:
+#: English-only was a real gap rather than a theoretical one. The watchlist
+#: covers AT/BE/CH/DE/ES/FR/GB/IT/NL/PL/PT, and a German SMB writes
+#: "Homeoffice" as one word — which `home[- ]office` did not match — a Spaniard
+#: writes "teletrabajo", an Italian "smart working" and a Pole "praca zdalna".
+#: Every one of those postings came back `remote=None`, losing the only signal
+#: that a place-less ad is remote rather than unresolvable, and an
+#: unresolvable location is a job the geo filter drops.
+#:
+#: Deliberately *not* included: the bare prepositional phrases "a distancia",
+#: "à distance", "op afstand". They occur in "formación a distancia" and its
+#: kin, and `remote=True` only ever *widens* the location filter — so a false
+#: positive here is a US-only role arriving in a European digest, which is the
+#: one direction this file is not allowed to be careless in.
 _REMOTE_RE = re.compile(
-    r"\b(remote(?:ly)?|work from home|wfh|home[- ]office|telecommut\w*|anywhere)\b",
+    r"\b("
+    r"remote(?:ly)?|remot[oa]s?"                    # en / es / it / pt
+    r"|work from home|wfh|home[- ]?office|anywhere"
+    r"|telecommut\w*"
+    r"|telearbeit|ortsunabh\w+|mobiles? arbeit\w*"  # de
+    r"|teletrabajo|teletrabalho"                    # es / pt
+    r"|t[ée]l[ée]travail"                           # fr
+    r"|smart working|lavoro agile"                  # it
+    r"|thuiswerk\w*"                                # nl
+    r"|praca zdalna|zdaln[aey]\w*"                  # pl
+    r")\b",
     re.IGNORECASE,
 )
 # Greenhouse boards routinely carry placeholder offices; they are noise, not
@@ -129,6 +162,15 @@ _MAX_LOCATION_CHARS = 600
 #: A bare hostname: two or more dot-separated labels and nothing else.
 _HOST_LIKE_RE = re.compile(r"^[\w-]+(?:\.[\w-]+)+$")
 
+#: `boards.greenhouse.io/embed/job_board?for=spotify` is the *embed* URL, and
+#: it is what a great many careers pages actually link to — so it is what gets
+#: pasted into a watchlist. Its slug is in the query string rather than the
+#: path, and dropping the query leaves the literal segment `embed`: a slug that
+#: 404s, which is indistinguishable from a company that closed its board.
+_EMBED_SLUG_RE = re.compile(r"[?&]for=([\w.-]+)", re.IGNORECASE)
+#: Path segments that are never a slug — only ever the scaffolding around one.
+_EMBED_PATH_SEGMENTS = frozenset({"embed", "job_board", "job_app", "jobs"})
+
 
 def _clean_slug(value: Any) -> str:
     """Normalise a watchlist slug, tolerating a pasted board URL.
@@ -144,17 +186,25 @@ def _clean_slug(value: Any) -> str:
 
     A host is only dropped when something follows it: `booking.com` on its own
     is a slug, `apply.workable.com/contoso` is a URL.
+
+    The one exception to "the slug is the first path segment" is Greenhouse's
+    embed URL, where the slug is `?for=…` and the path says only `embed`. That
+    is rescued rather than left to 404 — but only when the path really is the
+    embed scaffolding, so a normal `?lang=en` on a normal URL is untouched.
     """
     text = str(value or "").strip()
     if not text:
         return ""
     text = re.sub(r"^[a-z][a-z0-9+.-]*://", "", text, flags=re.IGNORECASE)
+    embedded = _EMBED_SLUG_RE.search(text)
     text = text.split("?")[0].split("#")[0]
     parts = [p for p in text.split("/") if p.strip()]
     if not parts:
-        return ""
+        return embedded.group(1).strip() if embedded else ""
     if len(parts) > 1 and _HOST_LIKE_RE.match(parts[0]):
         parts = parts[1:]
+    if embedded and (not parts or parts[0].lower() in _EMBED_PATH_SEGMENTS):
+        return embedded.group(1).strip()
     return parts[0].strip().strip("/").strip()
 
 
@@ -633,30 +683,105 @@ _WORKABLE_CLOSED_STATES = frozenset(
 )
 
 
-def _workable_location(node: Any) -> tuple[str, bool | None]:
-    """`(location string, remote flag)` for a Workable posting.
+#: Keys a Workable payload might hang its *extra* offices off. The widget
+#: payload calls it `locations`; the v3 API and the older widget spell the same
+#: idea differently, and the cost of reading a key that is not there is nil
+#: while the cost of missing the one that is there is a deleted job.
+_WORKABLE_LOCATION_LIST_KEYS: tuple[str, ...] = (
+    "locations", "secondary_locations", "secondaryLocations",
+    "additional_locations", "additionalLocations", "other_locations",
+)
 
-    Workable gives the location as structured parts and never as a sentence,
-    so it has to be assembled here — `Job.location` is the *entire* input to
-    the geo filter, and a bare "Valencia" with the country dropped is how a
-    Spanish role ends up unresolvable.
+#: Every spelling of "this is a remote role" seen on a Workable location or
+#: posting. `telecommuting` is the documented one; `workplace_type` is what the
+#: hybrid/on-site/remote picker writes, and reading only the first loses the
+#: flag on any payload that moved to the second.
+_WORKABLE_REMOTE_FLAG_KEYS: tuple[str, ...] = (
+    "telecommuting", "telecommute", "is_remote", "remote",
+)
+_WORKABLE_WORKPLACE_KEYS: tuple[str, ...] = (
+    "workplace_type", "workplaceType", "workplace", "remote_type", "remoteType",
+)
+_WORKABLE_REMOTE_WORKPLACES = frozenset({"remote", "fully_remote", "fully remote"})
+
+
+def _workable_location_string(node: Any) -> str:
+    """One office, assembled from its structured parts ("Valencia, …, Spain").
+
+    Workable gives the location as parts and never as a sentence, so it has to
+    be assembled here — `Job.location` is the *entire* input to the geo filter,
+    and a bare "Valencia" with the country dropped is how a Spanish role ends
+    up unresolvable.
+
+    Every field is read under all of its known spellings, for the reason
+    `_first_text` exists: the widget API and the v3 API disagree, and reading
+    one spelling silently empties the field on the payloads that use the other.
     """
     if not isinstance(node, Mapping):
-        return "", None
-
-    # Both spellings are accepted on purpose: the widget API and the v3 API
-    # disagree on the casing of this one field, and reading only one of them
-    # silently loses the country on half of all payloads.
-    country = _first_text(node, "country", "countryCode", "country_code")
+        return ""
+    country = _first_text(
+        node, "country", "country_name", "countryName", "countryCode", "country_code",
+    )
+    region = _first_text(
+        node, "region", "regionCode", "region_code", "state", "stateCode", "state_code",
+    )
     parts = [
         _clean_location(node.get("city")),
-        _clean_location(node.get("region")),
+        _clean_location(region),
         _clean_location(country),
     ]
-    location = _join_locations(parts).replace("; ", ", ")
+    return _join_locations(parts).replace("; ", ", ")
 
-    telecommuting = node.get("telecommuting")
-    remote: bool | None = True if telecommuting is True else None
+
+def _workable_location_nodes(posting: Mapping[str, Any]) -> list[Any]:
+    """The primary office followed by every secondary one.
+
+    This is the `allLocations`/`secondaryLocations` problem again, and it bites
+    harder here than anywhere else: a posting whose offices are San Francisco,
+    Valencia and Berlin reads, from `location` alone, as an unambiguously
+    American role and is thrown away by the US veto. `_MAX_LOCATION_CHARS`
+    documents the same failure at length.
+    """
+    nodes: list[Any] = []
+    primary = posting.get("location")
+    if isinstance(primary, list):
+        nodes.extend(primary)
+    elif primary is not None:
+        nodes.append(primary)
+    for key in _WORKABLE_LOCATION_LIST_KEYS:
+        extra = posting.get(key)
+        if isinstance(extra, list):
+            nodes.extend(extra)
+        elif isinstance(extra, Mapping):
+            nodes.append(extra)
+    return nodes
+
+
+def _workable_remote(*nodes: Any) -> bool | None:
+    """True when any node asserts remote work, else None — never False.
+
+    Positive assertions only: `telecommuting: false` is a statement about one
+    office, not about the whole arrangement, and `False` would wrongly narrow
+    the location filter.
+    """
+    for node in nodes:
+        if not isinstance(node, Mapping):
+            continue
+        for key in _WORKABLE_REMOTE_FLAG_KEYS:
+            if node.get(key) is True:
+                return True
+        workplace = _first_text(node, *_WORKABLE_WORKPLACE_KEYS).lower()
+        if workplace.replace("-", "_") in _WORKABLE_REMOTE_WORKPLACES:
+            return True
+    return None
+
+
+def _workable_location(posting: Mapping[str, Any]) -> tuple[str, bool | None]:
+    """`(location string, remote flag)` for a whole Workable posting."""
+    nodes = _workable_location_nodes(posting)
+    location = _join_locations(_workable_location_string(n) for n in nodes)
+
+    remote = _workable_remote(posting, *nodes)
     if remote and not location:
         # A remote posting with no place attached still has to *say* "remote",
         # or the geo filter sees an empty string and drops it as unresolvable.
@@ -690,7 +815,7 @@ def _parse_workable_posting(
         return None
 
     location_node = posting.get("location")
-    location, remote = _workable_location(location_node)
+    location, remote = _workable_location(posting)
 
     # Description, requirements and benefits are three separate HTML blocks and
     # all three matter: "requirements" is where the years-of-experience and the
@@ -704,10 +829,26 @@ def _parse_workable_posting(
     if remote is None and _mentions_remote(location, title):
         remote = True
 
+    # The *publication* date, never the record's creation date.
+    #
+    # `created_at` is when the requisition row was created — i.e. when a
+    # recruiter started the draft. Drafting weeks ahead of going live is
+    # ordinary practice, so a req begun on 6 July and published on 4 August
+    # arrives here looking a month old, is rejected as stale, and never reaches
+    # the digest. `published_on` is the date the posting actually went live,
+    # and it is the only one of the two that answers "is this new?".
+    #
+    # `created_at` stays as the *last* resort rather than being dropped: it can
+    # only ever understate freshness (a record cannot be created after it was
+    # published), so it is a floor, and a floor beats no date at all when
+    # `freshness.skip_undated` is on. `updated_at` is deliberately absent — it
+    # moves on any edit and would overstate freshness, which is the mistake
+    # `_parse_ashby_posting` documents.
     posted_at = (
-        parse_datetime(posting.get("created_at"))
-        or parse_datetime(posting.get("published_on"))
+        parse_datetime(posting.get("published_on"))
+        or parse_datetime(posting.get("published_at"))
         or parse_datetime(posting.get("published"))
+        or parse_datetime(posting.get("created_at"))
     )
 
     return Job(
@@ -733,11 +874,16 @@ def _parse_workable_posting(
             # is what lets `employment_type_exclude` drop an internship whose
             # title says nothing at all.
             "employment_type": posting.get("employment_type"),
+            # Provenance: the primary office's own flag, verbatim. `Job.remote`
+            # is the decision and is drawn from more than this — every office
+            # and every spelling — so the two can legitimately differ.
             "telecommuting": (
                 location_node.get("telecommuting")
                 if isinstance(location_node, Mapping) else None
             ),
+            "workplace_type": _first_text(posting, *_WORKABLE_WORKPLACE_KEYS) or None,
             "apply_url": posting.get("application_url"),
+            "published_on": posting.get("published_on"),
             "created_at": posting.get("created_at"),
         },
     )
@@ -973,6 +1119,22 @@ def fetch_ashby(slug: str, *, session: Any = None) -> list[Job]:
 #: The list endpoint caps a page here; asking for more silently returns 100.
 SMARTRECRUITERS_PAGE_LIMIT = 100
 
+#: How many listing pages one company may cost.
+#:
+#: The endpoint is offset-paginated (`?offset=0&limit=100`, with `totalFound`
+#: in the envelope — https://developers.smartrecruiters.com/docs/pagination),
+#: and for a long time this fetcher asked for one page and stopped. A company
+#: with 250 open roles contributed 100 of them and lost 150 with no error and
+#: nothing above DEBUG: exactly the silent deletion this module exists to
+#: avoid. The loop below follows the offsets to the end.
+#:
+#: This bound is the guard against the other failure — a board whose
+#: `totalFound` is wrong, or that keeps answering full pages forever, turning
+#: one slug into an unbounded request loop. 20 pages is 2,000 postings, far
+#: past any real employer. Stopping here is announced in the log at WARNING,
+#: never silently, for the same reason `SMARTRECRUITERS_MAX_DESCRIPTIONS` is.
+SMARTRECRUITERS_MAX_PAGES = 20
+
 #: SmartRecruiters is the only board here whose listing carries **no
 #: description** — that lives behind one extra request *per posting*. A company
 #: with 400 open roles would otherwise mean 400 HTTP calls in a stage that is
@@ -1111,13 +1273,21 @@ def fetch_smartrecruiters(
     session: Any = None,
     details: bool = True,
     max_descriptions: int = SMARTRECRUITERS_MAX_DESCRIPTIONS,
+    max_pages: int = SMARTRECRUITERS_MAX_PAGES,
 ) -> list[Job]:
-    """Fetch one page of postings for a SmartRecruiters company.
+    """Fetch every posting for a SmartRecruiters company, following the offsets.
 
-    Two requests-shapes, because the vendor splits them: one listing call, then
-    one detail call per posting for the description. `details=False` skips the
-    second entirely (used by `--check`), and `max_descriptions` bounds it so a
-    company with hundreds of open roles cannot turn the cheap stage expensive.
+    Two request shapes, because the vendor splits them: the listing (paged),
+    then one detail call per posting for the description. `details=False` skips
+    the second entirely (used by `--check`), and `max_descriptions` bounds it so
+    a company with hundreds of open roles cannot turn the cheap stage
+    expensive.
+
+    The listing is walked with `?offset=…&limit=100` until the company runs
+    out of postings, because one page is not the whole board: a company with
+    250 open roles used to contribute exactly 100 and lose the rest in silence.
+    `max_pages` bounds that walk, and stopping early is logged rather than
+    hidden.
 
     A detail call that fails costs that posting its description and nothing
     else — the job still reaches the digest with its title, company and
@@ -1129,43 +1299,81 @@ def fetch_smartrecruiters(
     if not clean:
         raise ValueError("empty smartrecruiters slug")
 
-    payload = http_get_json(
-        SMARTRECRUITERS_POSTINGS_URL.format(slug=clean),
-        params={"limit": SMARTRECRUITERS_PAGE_LIMIT},
-        session=session,
-    )
     company = company_from_slug(clean)
+    url = SMARTRECRUITERS_POSTINGS_URL.format(slug=clean)
+    page_cap = max(1, int(max_pages))
 
     jobs: list[Job] = []
-    for posting in _as_list(payload, "content", "postings", "results"):
-        if not isinstance(posting, Mapping):
-            logger.debug(
-                "smartrecruiters/%s: skipping non-object posting %r", clean, posting
-            )
-            continue
-        try:
-            job = _parse_smartrecruiters_posting(posting, clean, company)
-        except Exception as exc:  # one bad posting must not kill the company
-            logger.debug(
-                "smartrecruiters/%s: skipping malformed posting %r: %s",
-                clean, posting.get("id"), exc,
-            )
-            continue
-        if job is None:
-            logger.debug(
-                "smartrecruiters/%s: skipping posting without title/id (id=%r)",
-                clean, posting.get("id"),
-            )
-            continue
-        jobs.append(job)
+    total: int | None = None
+    offset = 0
+    pages = 0
+    stopped_early = False
 
-    total = payload.get("totalFound") if isinstance(payload, Mapping) else None
-    if isinstance(total, (int, float)) and not isinstance(total, bool) \
-            and total > len(jobs):
+    while True:
+        payload = http_get_json(
+            url,
+            params={"limit": SMARTRECRUITERS_PAGE_LIMIT, "offset": offset},
+            session=session,
+        )
+        pages += 1
+
+        if isinstance(payload, Mapping):
+            reported = payload.get("totalFound")
+            if isinstance(reported, (int, float)) and not isinstance(reported, bool):
+                total = int(reported)
+
+        entries = _as_list(payload, "content", "postings", "results")
+        for posting in entries:
+            if not isinstance(posting, Mapping):
+                logger.debug(
+                    "smartrecruiters/%s: skipping non-object posting %r", clean, posting
+                )
+                continue
+            try:
+                job = _parse_smartrecruiters_posting(posting, clean, company)
+            except Exception as exc:  # one bad posting must not kill the company
+                logger.debug(
+                    "smartrecruiters/%s: skipping malformed posting %r: %s",
+                    clean, posting.get("id"), exc,
+                )
+                continue
+            if job is None:
+                logger.debug(
+                    "smartrecruiters/%s: skipping posting without title/id (id=%r)",
+                    clean, posting.get("id"),
+                )
+                continue
+            jobs.append(job)
+
+        offset += len(entries)
+        # A short page is the end of the board — the only stop condition that
+        # does not trust `totalFound`, which is why it is checked first.
+        if len(entries) < SMARTRECRUITERS_PAGE_LIMIT:
+            break
+        if total is not None and offset >= total:
+            break
+        if pages >= page_cap:
+            stopped_early = True
+            break
+
+    if stopped_early:
+        logger.warning(
+            "smartrecruiters/%s: stopped after %d page(s) at %d posting(s); the "
+            "company reports %s — the remaining postings were NOT fetched and "
+            "will not appear in the digest (cap SMARTRECRUITERS_MAX_PAGES=%d)",
+            clean, pages, len(jobs),
+            total if total is not None else "an unknown number",
+            SMARTRECRUITERS_MAX_PAGES,
+        )
+    elif total is not None and total > len(jobs):
+        # Not a truncation: postings without a title or an id are dropped by
+        # design, so parsed < reported is normal. Said out loud anyway, because
+        # "40 of your 250 roles are unparseable" is worth being able to find.
         logger.info(
-            "smartrecruiters/%s: %d posting(s) parsed; the company reports %d "
-            "(one page of at most %d is fetched)",
-            clean, len(jobs), int(total), SMARTRECRUITERS_PAGE_LIMIT,
+            "smartrecruiters/%s: %d posting(s) parsed from %d page(s); the "
+            "company reports %d (the difference is postings with no title "
+            "or no id)",
+            clean, len(jobs), pages, total,
         )
 
     if details:
@@ -1273,11 +1481,43 @@ def _personio_company(slug: str) -> str:
     return company_from_slug(label) if label else company_from_slug(slug)
 
 
+def _local_name(tag: Any) -> str:
+    """`"{urn:x}position"` -> `"position"`; a plain tag is returned unchanged."""
+    return str(tag).rsplit("}", 1)[-1].strip()
+
+
+def _find_child(element: Any, tag: str) -> Any:
+    """First direct child whose *local* name is `tag`, namespaced or not.
+
+    `ElementTree.find("id")` matches the literal tag, so on a feed served with
+    a default namespace (`<workzag-jobs xmlns="…">`) every child is really
+    called `{…}id` and every lookup returns None. The root gate below tolerates
+    a namespace; before this helper existed the children did not, so such a
+    feed parsed into **zero positions and raised nothing** — which reads, every
+    morning and forever, as a company that simply is not hiring. That is the
+    exact silent failure the root gate was added to prevent, arriving one level
+    further down.
+    """
+    if element is None:
+        return None
+    for child in element:
+        if _local_name(child.tag) == tag:
+            return child
+    return None
+
+
+def _iter_local(element: Any, tag: str) -> Iterable[Any]:
+    """Every descendant (self included) whose local name is `tag`."""
+    if element is None:
+        return
+    for node in element.iter():
+        if _local_name(node.tag) == tag:
+            yield node
+
+
 def _element_text(element: Any, tag: str) -> str:
     """Trimmed text of a direct child element, or "" when it is absent."""
-    if element is None:
-        return ""
-    found = element.find(tag)
+    found = _find_child(element, tag)
     if found is None:
         return ""
     return (found.text or "").strip()
@@ -1290,11 +1530,11 @@ def _personio_description(position: Any) -> str:
     "Dein Profil", "Was wir bieten"), and the profile section is where every
     requirement lives — the same reason Lever's `lists` blocks are kept.
     """
-    container = position.find("jobDescriptions")
+    container = _find_child(position, "jobDescriptions")
     if container is None:
         return ""
     blocks: list[tuple[str, Any]] = []
-    for section in container.iter("jobDescription"):
+    for section in _iter_local(container, "jobDescription"):
         blocks.append((_element_text(section, "name"), _element_text(section, "value")))
     return _joined_sections(blocks)
 
@@ -1374,20 +1614,26 @@ def _parse_personio_xml(text: str, host: str, company: str) -> list[Job]:
     Without the check, a tenant answering 200 with a login page or a Cloudflare
     challenge parses cleanly into zero positions and reads, every morning, as a
     company that simply is not hiring.
+
+    A namespace on the feed is tolerated rather than rejected, and — since
+    `_find_child` and `_iter_local` match on local names — tolerated all the
+    way down, not only at the root. A gate that admits a namespaced document
+    and then hands it to namespace-blind child lookups is worse than no gate:
+    it converts a loud "this is not a job feed" into a quiet zero.
     """
     import xml.etree.ElementTree as ElementTree  # stdlib, imported lazily
 
     root = ElementTree.fromstring(text)
     # Tolerate a namespace prefix ("{urn:x}workzag-jobs") without demanding one.
-    tag = str(root.tag).rsplit("}", 1)[-1].strip().lower()
-    if tag != PERSONIO_ROOT_TAG and root.find(".//position") is None:
+    tag = _local_name(root.tag).lower()
+    if tag != PERSONIO_ROOT_TAG and next(_iter_local(root, "position"), None) is None:
         raise ValueError(
             f"root element is <{tag}>, not <{PERSONIO_ROOT_TAG}> — this is not a "
             "Personio job feed (an error page, a login wall or the wrong host)"
         )
 
     jobs: list[Job] = []
-    for position in root.iter("position"):
+    for position in _iter_local(root, "position"):
         try:
             job = _parse_personio_position(position, host, company)
         except Exception as exc:  # one bad position must not kill the feed
@@ -1400,7 +1646,9 @@ def _parse_personio_xml(text: str, host: str, company: str) -> list[Job]:
     return jobs
 
 
-def fetch_personio(slug: str, *, session: Any = None) -> list[Job]:
+def fetch_personio(
+    slug: str, *, session: Any = None, language: str | None = None
+) -> list[Job]:
     """Fetch every published position from a Personio tenant's XML feed.
 
     Personio is the one board here that speaks XML rather than JSON, and the
@@ -1408,6 +1656,17 @@ def fetch_personio(slug: str, *, session: Any = None) -> list[Job]:
     a minority `.jobs.personio.com`. A 404 on the first is retried on the
     second, so the watchlist entry can stay a bare `acme` — write the full host
     (`acme.jobs.personio.com`) to skip the guess.
+
+    `language` is the documented `?language=` parameter (de/en/fr/es/nl/it/pt).
+    It defaults to **not being sent**, which makes the feed answer in the
+    tenant's own language. Forcing `en` on every tenant would be the obvious
+    move and the wrong one: a German SMB's posting may exist only in German,
+    and asking for a language the career site does not publish returns an empty
+    or degraded ad — a job made worse or invisible, to buy an English
+    description we do not need. `_REMOTE_RE` reads German, Spanish, French,
+    Italian, Dutch and Polish for exactly this reason, and the scoring model is
+    not monolingual either. Set it per entry when a tenant really does publish
+    a language you would rather read.
 
     Raises on transport/HTTP failure of the last host tried.
     """
@@ -1419,11 +1678,25 @@ def fetch_personio(slug: str, *, session: Any = None) -> list[Job]:
     if "personio." not in clean:
         hosts.append(PERSONIO_FALLBACK_HOST.format(slug=clean))
 
+    wanted = str(language or "").strip().lower()
+    if wanted and wanted not in PERSONIO_LANGUAGES:
+        # Drop it rather than send it: an unknown value risks an error page or
+        # an empty feed, and the tenant's own language is always a real answer.
+        logger.warning(
+            "personio/%s: ignoring unknown language %r (documented: %s) — "
+            "falling back to the tenant's own language",
+            clean, language, ", ".join(sorted(PERSONIO_LANGUAGES)),
+        )
+        wanted = ""
+    params = {"language": wanted} if wanted else None
+
     company = _personio_company(clean)
     last_error: Exception | None = None
     for index, host in enumerate(hosts):
         try:
-            response = http_get(PERSONIO_XML_URL.format(host=host), session=session)
+            response = http_get(
+                PERSONIO_XML_URL.format(host=host), params=params, session=session
+            )
         except Exception as exc:
             last_error = exc
             status = _HTTP_STATUS_RE.search(str(exc))
@@ -1466,7 +1739,7 @@ def _fetch_board(board: str, slug: str, *, session: Any = None, **kwargs: Any) -
     if board == "smartrecruiters":
         return fetch_smartrecruiters(slug, session=session, **kwargs)
     if board == "personio":
-        return fetch_personio(slug, session=session)
+        return fetch_personio(slug, session=session, **kwargs)
     raise ValueError(f"unknown board {board!r}")
 
 
@@ -1499,16 +1772,26 @@ def _slug_for(board: str, value: Any) -> str:
     return _clean_slug(value)
 
 
-def _watchlist_entries(raw: Any, board: str = "") -> list[tuple[str, str | None]]:
-    """Normalise a watchlist board section into `(slug, company_override)` pairs.
+#: Per-entry watchlist options each board's fetcher accepts, by board. Anything
+#: not listed here is ignored rather than raised: a typo in an option must cost
+#: the option, never the company's postings.
+_ENTRY_OPTIONS: dict[str, tuple[str, ...]] = {"personio": ("language",)}
 
-    Accepts the three shapes people actually write::
+
+def _watchlist_entries(
+    raw: Any, board: str = ""
+) -> list[tuple[str, str | None, dict[str, Any]]]:
+    """Normalise a watchlist board section into `(slug, company, options)`.
+
+    Accepts the shapes people actually write::
 
         greenhouse: [spotify, {slug: acme-corp, company: ACME Corporation}]
         greenhouse: {acme-corp: ACME Corporation}
         greenhouse: spotify
+        personio: [{slug: acme, language: en}]
 
-    `board` selects the slug convention; omitting it keeps the `host/SLUG` one.
+    `board` selects the slug convention (omitting it keeps the `host/SLUG` one)
+    and which per-entry options are recognised — see `_ENTRY_OPTIONS`.
     """
     if raw is None:
         return []
@@ -1520,10 +1803,12 @@ def _watchlist_entries(raw: Any, board: str = "") -> list[tuple[str, str | None]
         logger.warning("watchlist entry ignored, expected a list: %r", raw)
         return []
 
-    pairs: list[tuple[str, str | None]] = []
+    allowed = _ENTRY_OPTIONS.get(board, ())
+    pairs: list[tuple[str, str | None, dict[str, Any]]] = []
     seen: set[str] = set()
     for entry in raw:
         company: str | None = None
+        options: dict[str, Any] = {}
         if isinstance(entry, Mapping):
             slug = _slug_for(
                 board,
@@ -1532,6 +1817,10 @@ def _watchlist_entries(raw: Any, board: str = "") -> list[tuple[str, str | None]
             )
             override = entry.get("company") or entry.get("display_name")
             company = str(override).strip() if override else None
+            for key in allowed:
+                value = _text(entry.get(key))
+                if value:
+                    options[key] = value
         else:
             slug = _slug_for(board, entry)
         if not slug:
@@ -1540,7 +1829,7 @@ def _watchlist_entries(raw: Any, board: str = "") -> list[tuple[str, str | None]
         if slug.lower() in seen:
             continue
         seen.add(slug.lower())
-        pairs.append((slug, company or None))
+        pairs.append((slug, company or None, options))
     return pairs
 
 
@@ -1562,9 +1851,9 @@ def fetch(config: Config, *, session: Any = None, errors: list[str] | None = Non
             logger.warning("%s is enabled but watchlist.%s is empty", board, board)
             continue
 
-        for slug, company_override in entries:
+        for slug, company_override, options in entries:
             try:
-                found = _fetch_board(board, slug, session=session)
+                found = _fetch_board(board, slug, session=session, **options)
             except Exception as exc:
                 message = f"{board}/{slug}: {_describe_error(exc)}"
                 logger.warning("%s", message)
@@ -1691,7 +1980,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         for board in BOARDS:
             targets.extend(
-                (board, slug) for slug, _company in _watchlist_entries(
+                (board, slug) for slug, _company, _options in _watchlist_entries(
                     config.watchlist.get(board), board
                 )
             )

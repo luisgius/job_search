@@ -111,6 +111,34 @@ def test_empty_slug_raises_rather_than_hitting_the_network(bad):
         fetch_personio(bad, session=FakeSession())
 
 
+@pytest.mark.parametrize("written", [
+    "vandelay",
+    "vandelay.jobs.personio.de",
+    "https://vandelay.jobs.personio.de/job/12345",
+    "https://vandelay.jobs.personio.de/xml",
+])
+def test_a_pasted_personio_url_survives_the_watchlist(written, tmp_path: Path):
+    """`watchlist.yaml` promises in as many words that "Pasting the whole URL
+    works too", and `_slug_for` is the only thing that keeps that promise for
+    this vendor: every other board is `host/SLUG`, so the generic rule throws
+    the host away and keeps the first path segment — which for Personio, where
+    the slug *is* the host, turns `acme.jobs.personio.de/job/12345` into the
+    tenant `job`.
+
+    The parametrised test above proves `fetch_personio` re-normalises its own
+    argument, so it passes with or without that branch. This one goes through
+    `fetch()`, which is the path a watchlist entry actually takes, and it is
+    the only place the branch is exercised at all."""
+    cfg = write_config(tmp_path, {"sources": {"greenhouse": False, "personio": True}},
+                       watchlist={"personio": [written]})
+    session = pn_session()
+    jobs = fetch(cfg, session=session)
+
+    assert session.calls[0]["url"] == "https://vandelay.jobs.personio.de/xml"
+    assert len(jobs) == 4
+    assert jobs[0].company == "Vandelay"
+
+
 # ==========================================================================
 # parsing
 # ==========================================================================
@@ -167,6 +195,28 @@ def test_personio_undated_position_yields_none_not_a_guess():
     """`freshness.skip_undated` decides what happens to a dateless posting.
     Inventing "now" here would defeat that setting silently."""
     assert by_id(fetch_personio("vandelay", session=pn_session()))["4103003"].posted_at is None
+
+
+def test_personio_ignores_updated_at_as_a_publication_date():
+    """The mirror of `test_ashby_ignores_updated_at_as_a_publication_date`, and
+    the test this file did not have.
+
+    The fixture's flagship position carries both `createdAt` (07:00, when it
+    went live) and `updatedAt` (08:45, when somebody fixed a typo). Reading the
+    later one makes a three-month-old req look like today's news, and there is
+    no way to tell from the digest that it happened."""
+    job = by_id(fetch_personio("vandelay", session=pn_session()))["4103001"]
+    assert job.raw["created_at"] == "2026-08-04T07:00:00+0200"
+    assert job.posted_at == datetime(2026, 8, 4, 5, 0, tzinfo=UTC)
+
+
+def test_personio_will_not_date_a_position_from_updated_at_alone():
+    """No date is more honest than an inflated one — `skip_undated` can then
+    make the decision where the user can see it."""
+    body = ("<workzag-jobs><position><id>1</id><name>Engineer</name>"
+            "<updatedAt>2026-08-04T08:45:00+0200</updatedAt></position>"
+            "</workzag-jobs>")
+    assert fetch_personio("vandelay", session=pn_session(body))[0].posted_at is None
 
 
 def test_personio_skips_an_unnamed_position_without_dropping_the_feed():
@@ -240,6 +290,127 @@ def test_personio_drops_a_position_with_no_id():
     body = ("<workzag-jobs><position><name>Engineer</name>"
             "<office>Madrid</office></position></workzag-jobs>")
     assert fetch_personio("vandelay", session=pn_session(body)) == []
+
+
+def test_a_namespaced_feed_parses_rather_than_returning_a_quiet_zero():
+    """The gate on the root element tolerates a namespace, and said so in its
+    docstring — but every child lookup underneath it was `find("id")`, which
+    matches a *literal* tag. On a feed served with a default namespace every
+    element is really called `{…}id`, so every lookup returned None, every
+    position was dropped for having no name, and the feed parsed to **zero
+    jobs and raised nothing**.
+
+    That reads as "this company is not hiring", every morning, forever. It is
+    the precise silent failure the root-tag check was added to prevent, one
+    level further down — a gate that admits a document and then cannot read it
+    is worse than no gate at all."""
+    body = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<workzag-jobs xmlns="http://www.personio.de/xml">'
+        "<position><id>4103001</id><name>Senior Backend Engineer</name>"
+        "<office>Valencia</office><employmentType>permanent</employmentType>"
+        "<createdAt>2026-08-04T07:00:00+0200</createdAt>"
+        "<jobDescriptions>"
+        "<jobDescription><name>Dein Profil</name>"
+        "<value><![CDATA[<ul><li>6+ Jahre Python</li></ul>]]></value>"
+        "</jobDescription></jobDescriptions>"
+        "</position></workzag-jobs>"
+    )
+    jobs = fetch_personio("vandelay", session=pn_session(body))
+
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job.title == "Senior Backend Engineer"
+    assert job.ats_job_id == "4103001"
+    assert job.url == "https://vandelay.jobs.personio.de/job/4103001"
+    assert job.location == "Valencia"
+    assert job.posted_at == datetime(2026, 8, 4, 5, 0, tzinfo=UTC)
+    assert job.raw["employment_type"] == "permanent"
+    assert "6+ Jahre Python" in job.description
+    assert "Dein Profil" in job.description
+
+
+def test_a_prefixed_namespace_is_read_the_same_way():
+    """`<p:workzag-jobs xmlns:p="…">` is the other shape the same change of
+    serialiser produces."""
+    body = (
+        '<p:workzag-jobs xmlns:p="http://www.personio.de/xml">'
+        "<p:position><p:id>7</p:id><p:name>Engineer</p:name>"
+        "<p:office>Madrid</p:office></p:position></p:workzag-jobs>"
+    )
+    job = fetch_personio("vandelay", session=pn_session(body))[0]
+    assert job.title == "Engineer" and job.location == "Madrid"
+
+
+def test_a_namespaced_error_page_is_still_rejected():
+    """Tolerating a namespace must not become tolerating anything. An XHTML
+    error page is well-formed, namespaced XML with no positions in it, and
+    returning `[]` for it is what makes a login wall look like a quiet
+    company."""
+    body = ('<html xmlns="http://www.w3.org/1999/xhtml">'
+            "<body>Not found</body></html>")
+    with pytest.raises(Exception):
+        fetch_personio("vandelay", session=pn_session(body))
+
+
+# ==========================================================================
+# language
+# ==========================================================================
+
+
+def test_personio_asks_for_no_language_by_default():
+    """The feed defaults to the tenant's own language, and that is the right
+    default to keep: a German SMB's ad may exist *only* in German, and asking
+    for a language its career site does not publish returns an empty or
+    degraded description — a job made worse, or lost, to buy an English
+    translation nobody needed. `_REMOTE_RE` reads German for this reason."""
+    session = pn_session()
+    fetch_personio("vandelay", session=session)
+    assert not session.calls[0]["params"]
+
+
+@pytest.mark.parametrize("language", ["de", "en", "fr", "es", "nl", "it", "pt"])
+def test_personio_sends_a_language_when_the_watchlist_asks_for_one(language):
+    """Documented and opt-in, per tenant: `{slug: acme, language: en}`."""
+    session = pn_session()
+    fetch_personio("vandelay", session=session, language=language)
+    assert session.calls[0]["params"] == {"language": language}
+
+
+def test_a_watchlist_entry_can_set_the_language(tmp_path: Path):
+    """Through `fetch()`, which is the path the watchlist actually takes."""
+    cfg = write_config(tmp_path, {"sources": {"greenhouse": False, "personio": True}},
+                       watchlist={"personio": [{"slug": "vandelay",
+                                                "language": "en"}]})
+    session = pn_session()
+    assert len(fetch(cfg, session=session)) == 4
+    assert session.calls[0]["params"] == {"language": "en"}
+
+
+def test_an_undocumented_language_is_dropped_rather_than_sent(caplog):
+    """The job-losing direction is asking for something the tenant cannot
+    serve. An unknown value costs the option and keeps the postings."""
+    import logging
+
+    session = pn_session()
+    with caplog.at_level(logging.WARNING, logger="src.sources.ats_boards"):
+        jobs = fetch_personio("vandelay", session=session, language="klingon")
+
+    assert len(jobs) == 4
+    assert not session.calls[0]["params"]
+    assert "klingon" in caplog.text
+
+
+def test_an_unknown_watchlist_option_costs_the_option_and_not_the_company(
+    tmp_path: Path,
+):
+    """A typo in a per-entry option must never delete a company's postings."""
+    cfg = write_config(tmp_path, {"sources": {"greenhouse": False, "personio": True}},
+                       watchlist={"personio": [{"slug": "vandelay",
+                                                "langauge": "en", "colour": "blue"}]})
+    session = pn_session()
+    assert len(fetch(cfg, session=session)) == 4
+    assert not session.calls[0]["params"]
 
 
 def test_malformed_xml_is_reported_rather_than_silently_empty():
