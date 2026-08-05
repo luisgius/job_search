@@ -1,0 +1,59 @@
+{
+  "offset": 0,
+  "limit": 100,
+  "totalFound": 4,
+  "content": [
+    {
+      "id": "743999900000001",
+      "uuid": "6d1f9c20-1111-4d55-8b77-000000000001",
+      "name": "Senior Backend Engineer (m/f/d)",
+      "refNumber": "REF-301",
+      "company": { "identifier": "Umbrella", "name": "Umbrella Iberia S.L." },
+      "location": {
+        "city": "Valencia",
+        "region": "Comunidad Valenciana",
+        "country": "es",
+        "remote": false
+      },
+      "department": { "label": "Engineering" },
+      "typeOfEmployment": { "label": "Permanent" },
+      "experienceLevel": { "id": "senior", "label": "Mid-Senior Level" },
+      "releasedDate": "2026-08-04T07:00:00.000Z",
+      "ref": "https://api.smartrecruiters.com/v1/companies/Umbrella/postings/743999900000001"
+    },
+    {
+      "id": "743999900000002",
+      "uuid": "6d1f9c20-2222-4d55-8b77-000000000002",
+      "name": "Data Engineer",
+      "refNumber": "REF-302",
+      "company": { "identifier": "Umbrella", "name": "Umbrella Iberia S.L." },
+      "location": { "city": null, "region": null, "country": null, "remote": true },
+      "department": { "label": "Data" },
+      "typeOfEmployment": { "label": "Permanent" },
+      "experienceLevel": { "id": "mid", "label": "Associate" },
+      "releasedDate": "2026-08-04T05:00:00.000Z",
+      "ref": "https://api.smartrecruiters.com/v1/companies/Umbrella/postings/743999900000002"
+    },
+    {
+      "id": "743999900000003",
+      "uuid": "6d1f9c20-3333-4d55-8b77-000000000003",
+      "name": "Werkstudent Operations",
+      "refNumber": "REF-303",
+      "company": { "identifier": "Umbrella", "name": "Umbrella Iberia S.L." },
+      "location": { "city": "Berlin", "region": "Berlin", "country": "de", "remote": false },
+      "department": { "label": "Operations" },
+      "typeOfEmployment": { "label": "Internship" },
+      "releasedDate": null,
+      "ref": "https://api.smartrecruiters.com/v1/companies/Umbrella/postings/743999900000003"
+    },
+    {
+      "id": "743999900000004",
+      "uuid": "6d1f9c20-4444-4d55-8b77-000000000004",
+      "name": null,
+      "refNumber": "REF-304",
+      "company": { "identifier": "Umbrella", "name": "Umbrella Iberia S.L." },
+      "location": { "city": "Madrid", "region": null, "country": "es", "remote": false },
+      "releasedDate": "2026-08-04T06:00:00.000Z"
+    }
+  ]
+}

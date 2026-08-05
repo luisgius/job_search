@@ -1,0 +1,103 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "3a1f9c20-1111-4d55-8b77-000000000001",
+      "title": "Senior Python Engineer",
+      "department": "Engineering",
+      "team": "Platform",
+      "employmentType": "FullTime",
+      "location": "Valencia",
+      "secondaryLocations": [
+        { "location": "Madrid", "address": { "postalAddress": { "addressLocality": "Madrid", "addressRegion": "Comunidad de Madrid", "addressCountry": "Spain" } } },
+        { "location": "Berlin", "address": { "postalAddress": { "addressLocality": "Berlin", "addressRegion": "Berlin", "addressCountry": "Germany" } } }
+      ],
+      "address": { "postalAddress": { "addressLocality": "Valencia", "addressRegion": "Comunidad Valenciana", "addressCountry": "Spain" } },
+      "isListed": true,
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "publishedAt": "2026-08-04T07:00:00.000+00:00",
+      "jobUrl": "https://jobs.ashbyhq.com/initech/3a1f9c20-1111-4d55-8b77-000000000001",
+      "applyUrl": "https://jobs.ashbyhq.com/initech/3a1f9c20-1111-4d55-8b77-000000000001/application",
+      "descriptionPlain": "Own our ingestion services in Python. You will scale Kafka consumers and mentor two engineers.",
+      "descriptionHtml": "<p>Own our ingestion services in Python.</p>",
+      "compensation": {
+        "compensationTierSummary": "€70K – €90K",
+        "scrapeableCompensationSalarySummary": "€70,000 - €90,000"
+      }
+    },
+    {
+      "id": "3a1f9c20-2222-4d55-8b77-000000000002",
+      "title": "Site Reliability Engineer",
+      "department": "Engineering",
+      "team": "Infrastructure",
+      "employmentType": "FullTime",
+      "location": "Remote - Europe",
+      "secondaryLocations": [],
+      "address": null,
+      "isListed": true,
+      "isRemote": true,
+      "workplaceType": "Remote",
+      "publishedAt": "2026-08-04T05:00:00.000+00:00",
+      "jobUrl": "https://jobs.ashbyhq.com/initech/3a1f9c20-2222-4d55-8b77-000000000002",
+      "applyUrl": "https://jobs.ashbyhq.com/initech/3a1f9c20-2222-4d55-8b77-000000000002/application",
+      "descriptionPlain": "",
+      "descriptionHtml": "<p>Keep the fleet alive. <strong>Terraform</strong>, Kubernetes, Go.</p>",
+      "compensation": {}
+    },
+    {
+      "id": "3a1f9c20-3333-4d55-8b77-000000000003",
+      "title": "Product Designer",
+      "department": "Design",
+      "team": null,
+      "employmentType": "Contract",
+      "location": null,
+      "secondaryLocations": null,
+      "address": null,
+      "isListed": true,
+      "isRemote": false,
+      "publishedAt": null,
+      "jobUrl": "https://jobs.ashbyhq.com/initech/3a1f9c20-3333-4d55-8b77-000000000003",
+      "applyUrl": null,
+      "descriptionPlain": "Design our onboarding.",
+      "descriptionHtml": "<p>Design our onboarding.</p>"
+    },
+    {
+      "id": "3a1f9c20-4444-4d55-8b77-000000000004",
+      "title": "Engineering Intern",
+      "department": "Engineering",
+      "employmentType": "Intern",
+      "location": "Lisbon",
+      "secondaryLocations": [],
+      "address": { "postalAddress": { "addressLocality": "Lisbon", "addressCountry": "Portugal" } },
+      "isListed": true,
+      "isRemote": false,
+      "publishedAt": "2026-08-04T06:00:00.000+00:00",
+      "jobUrl": "https://jobs.ashbyhq.com/initech/3a1f9c20-4444-4d55-8b77-000000000004",
+      "descriptionPlain": "A six-month internship on the backend team.",
+      "descriptionHtml": "<p>A six-month internship on the backend team.</p>"
+    },
+    {
+      "id": "3a1f9c20-5555-4d55-8b77-000000000005",
+      "title": "Head of Sales",
+      "department": "Sales",
+      "employmentType": "FullTime",
+      "location": "Milan, Italy",
+      "isListed": false,
+      "isRemote": false,
+      "publishedAt": "2026-08-04T06:30:00.000+00:00",
+      "jobUrl": "https://jobs.ashbyhq.com/initech/3a1f9c20-5555-4d55-8b77-000000000005",
+      "descriptionPlain": "Not shown on the board yet."
+    },
+    {
+      "id": "3a1f9c20-6666-4d55-8b77-000000000006",
+      "title": null,
+      "department": "Engineering",
+      "location": "Barcelona, Spain",
+      "isListed": true,
+      "publishedAt": "2026-08-04T06:45:00.000+00:00",
+      "jobUrl": "https://jobs.ashbyhq.com/initech/3a1f9c20-6666-4d55-8b77-000000000006",
+      "descriptionPlain": "A posting with no title at all."
+    }
+  ]
+}

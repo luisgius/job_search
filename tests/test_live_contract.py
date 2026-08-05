@@ -35,7 +35,19 @@ from datetime import timedelta
 import pytest
 
 from src.models import utcnow
-from src.sources.ats_boards import fetch_greenhouse, fetch_lever
+from src.sources.ats_boards import (
+    ASHBY_JOB_BOARD_URL,
+    PERSONIO_XML_URL,
+    SMARTRECRUITERS_POSTING_URL,
+    SMARTRECRUITERS_POSTINGS_URL,
+    WORKABLE_ACCOUNT_URL,
+    fetch_ashby,
+    fetch_greenhouse,
+    fetch_lever,
+    fetch_personio,
+    fetch_smartrecruiters,
+    fetch_workable,
+)
 from src.util import HttpError
 
 pytestmark = pytest.mark.network
@@ -45,6 +57,27 @@ pytestmark = pytest.mark.network
 GREENHOUSE_SLUGS = ["gitlab", "datadog"]
 LEVER_SLUGS = ["plaid"]
 
+# --------------------------------------------------------------------------
+# The four European boards.
+#
+# Read this before trusting a green run here. These parsers were written
+# offline, against vendor documentation and known payload shapes, on a machine
+# with **no outbound network** — not one byte of a real response was ever seen.
+# Every assertion below is therefore a *hypothesis about the payload*, and this
+# file is where those hypotheses get tested for the first time.
+#
+# The slugs are each vendor's own careers board, chosen because a vendor
+# self-hosting is the likeliest slug to still exist — but they too are
+# unverified. A 404 here means "fix the slug", not "the parser is broken";
+# `--check` distinguishes the two in one command:
+#
+#     python -m src.sources.ats_boards --check workable <slug>
+# --------------------------------------------------------------------------
+WORKABLE_SLUGS = ["workable"]
+ASHBY_SLUGS = ["ashby"]
+SMARTRECRUITERS_SLUGS = ["smartrecruiters"]
+PERSONIO_SLUGS = ["personio"]
+
 #: Fields the parsers actually read. Losing any one of them silently degrades
 #: the pipeline rather than crashing it, which is why they are asserted here
 #: rather than left to a try/except.
@@ -52,6 +85,27 @@ GREENHOUSE_REQUIRED = ("id", "title", "absolute_url")
 GREENHOUSE_EXPECTED = ("location", "content", "updated_at")
 LEVER_REQUIRED = ("id", "text", "hostedUrl")
 LEVER_EXPECTED = ("categories", "createdAt")
+
+#: `shortcode` is `Job.key`; without a title or a URL the posting is unusable.
+WORKABLE_REQUIRED = ("title", "shortcode")
+#: Everything the parser bets on beyond bare usability. `requirements` and
+#: `benefits` only appear with `?details=true`, and they are half the ad.
+WORKABLE_EXPECTED = ("state", "location", "created_at", "description",
+                     "requirements", "benefits", "employment_type")
+
+ASHBY_REQUIRED = ("id", "title")
+ASHBY_EXPECTED = ("location", "secondaryLocations", "isListed", "publishedAt",
+                  "employmentType", "descriptionPlain", "jobUrl", "applyUrl")
+
+SMARTRECRUITERS_REQUIRED = ("id", "name")
+SMARTRECRUITERS_EXPECTED = ("location", "typeOfEmployment", "releasedDate",
+                            "company")
+#: The `jobAd.sections` keys the description is assembled from.
+SMARTRECRUITERS_SECTION_KEYS = ("jobDescription", "qualifications")
+
+#: Elements on a `<position>` the Personio parser reads.
+PERSONIO_REQUIRED = ("id", "name")
+PERSONIO_EXPECTED = ("office", "employmentType", "createdAt", "jobDescriptions")
 
 
 #: An actual status code, not the letters "HTTP" — `HTTPSConnectionPool`
@@ -82,6 +136,30 @@ def _raw_payload(url: str, params: dict | None = None):
         return http_get_json(url, params=params)
     except Exception as exc:
         pytest.skip(f"network unreachable: {exc}")
+
+
+def _raw_text(url: str, params: dict | None = None) -> str:
+    """The response body as text — Personio's feed is XML, not JSON."""
+    from src.util import http_get
+
+    try:
+        return getattr(http_get(url, params=params), "text", "") or ""
+    except Exception as exc:
+        pytest.skip(f"network unreachable: {exc}")
+
+
+def _union_of_keys(postings, limit: int = 25) -> set[str]:
+    """Every field name seen across the first `limit` live postings.
+
+    A single posting legitimately omits optional fields, so comparing a fixture
+    against `postings[0]` alone reports fields as "invented" that the API does
+    return — on the next posting. The union is the honest comparison.
+    """
+    keys: set[str] = set()
+    for posting in postings[:limit]:
+        if isinstance(posting, dict):
+            keys.update(posting.keys())
+    return keys
 
 
 # ==========================================================================
@@ -229,6 +307,453 @@ def test_lever_jobs_parse_into_usable_records(slug):
 
 
 # ==========================================================================
+# Workable
+#
+# Everything below is a hypothesis written without ever seeing a real payload.
+# ==========================================================================
+
+
+@pytest.mark.parametrize("slug", WORKABLE_SLUGS)
+def test_workable_account_still_answers(slug):
+    jobs = _reachable(fetch_workable, slug)
+    assert jobs, f"workable/{slug} returned zero postings — has the slug moved?"
+
+
+@pytest.mark.parametrize("slug", WORKABLE_SLUGS[:1])
+def test_workable_payload_still_has_the_fields_we_parse(slug):
+    payload = _raw_payload(WORKABLE_ACCOUNT_URL.format(slug=slug), {"details": "true"})
+    assert isinstance(payload, dict), "workable no longer returns an object"
+    assert isinstance(payload.get("jobs"), list), "workable no longer returns `jobs`"
+    postings = payload["jobs"]
+    assert postings, "the account answered with no jobs at all"
+
+    seen = _union_of_keys(postings)
+    missing = [f for f in WORKABLE_REQUIRED if f not in seen]
+    assert not missing, (
+        f"workable dropped required field(s): {missing} — `shortcode` is "
+        "`Job.key`, so losing it re-keys every posting on the board"
+    )
+    absent = [f for f in WORKABLE_EXPECTED if f not in seen]
+    assert not absent, (
+        f"workable no longer returns {absent} — the parser degrades silently "
+        "when these vanish (no date, no location, or half the ad missing)"
+    )
+
+
+@pytest.mark.parametrize("slug", WORKABLE_SLUGS[:1])
+def test_workable_details_flag_is_what_produces_the_description(slug):
+    """The whole reason `?details=true` is sent. Without it the payload is
+    title-and-location only, and every score would be based on a job title —
+    a failure that produces plausible-looking numbers rather than an error."""
+    thin = _raw_payload(WORKABLE_ACCOUNT_URL.format(slug=slug))
+    fat = _raw_payload(WORKABLE_ACCOUNT_URL.format(slug=slug), {"details": "true"})
+    with_text = [j for j in fat.get("jobs", []) if str(j.get("description") or "").strip()]
+    assert with_text, (
+        "`?details=true` no longer returns descriptions — the scorer would be "
+        "judging job titles"
+    )
+    without = [j for j in thin.get("jobs", []) if str(j.get("description") or "").strip()]
+    if without:
+        pytest.skip("workable now returns descriptions without ?details=true too")
+
+
+@pytest.mark.parametrize("slug", WORKABLE_SLUGS[:1])
+def test_workable_requirements_and_benefits_are_separate_blocks(slug):
+    """The parser concatenates description + requirements + benefits, the way
+    the Lever parser concatenates `lists`. If Workable folded them into
+    `description` the concatenation is harmless; if it renamed them, half of
+    every ad — the half with the years-of-experience in it — disappears."""
+    payload = _raw_payload(WORKABLE_ACCOUNT_URL.format(slug=slug), {"details": "true"})
+    postings = payload.get("jobs", [])
+    assert any(str(j.get("requirements") or "").strip() for j in postings[:25]), (
+        "no posting carries `requirements` — the most scoring-relevant part of "
+        "the ad is no longer being read"
+    )
+
+
+@pytest.mark.parametrize("slug", WORKABLE_SLUGS[:1])
+def test_workable_location_is_still_structured_parts(slug):
+    """`Job.location` is assembled here from city/region/country because
+    Workable never sends a sentence. The country key has two known spellings
+    (`countryCode` and `country_code`) and the parser reads both — this test
+    exists to record which one is actually live."""
+    payload = _raw_payload(WORKABLE_ACCOUNT_URL.format(slug=slug), {"details": "true"})
+    locations = [j.get("location") for j in payload.get("jobs", [])[:25]]
+    objects = [loc for loc in locations if isinstance(loc, dict)]
+    assert objects, "workable `location` is no longer an object"
+    keys = set()
+    for loc in objects:
+        keys.update(loc.keys())
+    assert "city" in keys or "country" in keys, (
+        f"workable location no longer carries city/country, only {sorted(keys)} — "
+        "Job.location would be empty and every posting would fail the geo filter"
+    )
+    assert "telecommuting" in keys, (
+        "workable no longer states `telecommuting` — remote postings would have "
+        "an empty location and be dropped as unresolvable"
+    )
+
+
+@pytest.mark.parametrize("slug", WORKABLE_SLUGS[:1])
+def test_workable_jobs_parse_into_usable_records(slug):
+    jobs = _reachable(fetch_workable, slug)
+    assert all(j.title and j.url for j in jobs)
+    assert all(j.ats == "workable" and j.ats_job_id for j in jobs)
+    assert any(len(j.description) > 200 for j in jobs), (
+        "every description came back nearly empty — the parser is reading the "
+        "wrong fields"
+    )
+    dated = [j for j in jobs if j.posted_at]
+    assert dated, "not one posting carried a parseable date"
+    now = utcnow()
+    for job in dated[:50]:
+        assert job.posted_at < now + timedelta(days=2), f"future date: {job.posted_at}"
+        assert job.posted_at > now - timedelta(days=365 * 20)
+
+
+# ==========================================================================
+# Ashby
+# ==========================================================================
+
+
+@pytest.mark.parametrize("slug", ASHBY_SLUGS)
+def test_ashby_board_still_answers(slug):
+    jobs = _reachable(fetch_ashby, slug)
+    assert jobs, f"ashby/{slug} returned zero postings — has the slug moved?"
+
+
+@pytest.mark.parametrize("slug", ASHBY_SLUGS[:1])
+def test_ashby_payload_still_has_the_fields_we_parse(slug):
+    payload = _raw_payload(ASHBY_JOB_BOARD_URL.format(slug=slug),
+                           {"includeCompensation": "true"})
+    assert isinstance(payload, dict), "ashby no longer returns an object"
+    assert isinstance(payload.get("jobs"), list), "ashby no longer returns `jobs`"
+    postings = payload["jobs"]
+    assert postings, "the board answered with no jobs at all"
+
+    seen = _union_of_keys(postings)
+    missing = [f for f in ASHBY_REQUIRED if f not in seen]
+    assert not missing, f"ashby dropped required field(s): {missing}"
+    absent = [f for f in ASHBY_EXPECTED if f not in seen]
+    assert not absent, (
+        f"ashby no longer returns {absent} — losing `isListed` would surface "
+        "drafts, and losing `secondaryLocations` pins every multi-city role to "
+        "its primary office"
+    )
+
+
+@pytest.mark.parametrize("slug", ASHBY_SLUGS[:1])
+def test_ashby_secondary_locations_are_objects_with_a_location_field(slug):
+    """The parser accepts both objects and bare strings, because the API
+    changed shape once already. This test records which one is live, so the
+    day the other disappears is a day someone finds out."""
+    payload = _raw_payload(ASHBY_JOB_BOARD_URL.format(slug=slug),
+                           {"includeCompensation": "true"})
+    entries = [
+        entry
+        for job in payload.get("jobs", [])[:40]
+        for entry in (job.get("secondaryLocations") or [])
+    ]
+    if not entries:
+        pytest.skip("no posting on this board is open in more than one place")
+    for entry in entries[:10]:
+        assert isinstance(entry, (dict, str)), (
+            f"secondaryLocations entries are now {type(entry).__name__} — the "
+            "parser reads objects and strings and would drop every extra city"
+        )
+        if isinstance(entry, dict):
+            assert entry.get("location") or entry.get("name"), (
+                f"a secondaryLocations object has no readable name: {sorted(entry)}"
+            )
+
+
+@pytest.mark.parametrize("slug", ASHBY_SLUGS[:1])
+def test_ashby_still_publishes_published_at(slug):
+    """The parser deliberately refuses `updatedAt`, which moves on any edit.
+    If `publishedAt` disappears every posting becomes undated, and
+    `freshness.skip_undated` (on by default) then drops the entire board —
+    silently, because undated jobs just vanish."""
+    payload = _raw_payload(ASHBY_JOB_BOARD_URL.format(slug=slug),
+                           {"includeCompensation": "true"})
+    have = sum(1 for j in payload.get("jobs", [])[:50] if j.get("publishedAt"))
+    assert have, (
+        "no posting carries `publishedAt` — with skip_undated on, this board "
+        "now contributes nothing at all"
+    )
+
+
+@pytest.mark.parametrize("slug", ASHBY_SLUGS[:1])
+def test_ashby_jobs_parse_into_usable_records(slug):
+    jobs = _reachable(fetch_ashby, slug)
+    assert all(j.title and j.url for j in jobs)
+    assert all(j.ats == "ashby" and j.ats_job_id for j in jobs)
+    assert any(len(j.description) > 200 for j in jobs), (
+        "every description came back nearly empty — the parser is reading the "
+        "wrong fields"
+    )
+
+
+# ==========================================================================
+# SmartRecruiters
+# ==========================================================================
+
+
+@pytest.mark.parametrize("slug", SMARTRECRUITERS_SLUGS)
+def test_smartrecruiters_company_still_answers(slug):
+    jobs = _reachable(fetch_smartrecruiters, slug, details=False)
+    assert jobs, f"smartrecruiters/{slug} returned zero postings — slug moved?"
+
+
+@pytest.mark.parametrize("slug", SMARTRECRUITERS_SLUGS[:1])
+def test_smartrecruiters_listing_still_has_the_fields_we_parse(slug):
+    payload = _raw_payload(SMARTRECRUITERS_POSTINGS_URL.format(slug=slug),
+                           {"limit": 100})
+    assert isinstance(payload, dict), "smartrecruiters no longer returns an object"
+    assert isinstance(payload.get("content"), list), (
+        "smartrecruiters no longer returns `content` — the parser would see "
+        "zero postings on a company that is hiring"
+    )
+    postings = payload["content"]
+    assert postings, "the company answered with no postings at all"
+
+    seen = _union_of_keys(postings)
+    missing = [f for f in SMARTRECRUITERS_REQUIRED if f not in seen]
+    assert not missing, f"smartrecruiters dropped required field(s): {missing}"
+    absent = [f for f in SMARTRECRUITERS_EXPECTED if f not in seen]
+    assert not absent, f"smartrecruiters no longer returns {absent}"
+
+
+@pytest.mark.parametrize("slug", SMARTRECRUITERS_SLUGS[:1])
+def test_the_smartrecruiters_listing_still_carries_no_description(slug):
+    """The single fact that shapes this source. If SmartRecruiters ever put the
+    ad in the listing, the per-posting detail call — one HTTP request per job,
+    capped, and the most expensive thing in the fetch stage — becomes pure
+    waste and should be deleted."""
+    payload = _raw_payload(SMARTRECRUITERS_POSTINGS_URL.format(slug=slug),
+                           {"limit": 100})
+    postings = payload.get("content", [])
+    if any(p.get("jobAd") for p in postings[:25]):
+        pytest.skip(
+            "the listing now carries `jobAd` — the per-posting detail fetch in "
+            "src/sources/ats_boards.py is now unnecessary and can be removed"
+        )
+
+
+@pytest.mark.parametrize("slug", SMARTRECRUITERS_SLUGS[:1])
+def test_smartrecruiters_detail_still_carries_jobad_sections(slug):
+    """Where the entire description comes from. `jobAd.sections.*.text` is the
+    only route to an ad on this vendor, so a rename here means every
+    SmartRecruiters job is scored on its title."""
+    listing = _raw_payload(SMARTRECRUITERS_POSTINGS_URL.format(slug=slug),
+                           {"limit": 100})
+    postings = [p for p in listing.get("content", []) if p.get("id")]
+    if not postings:
+        pytest.skip("no posting carries an id")
+
+    detail = _raw_payload(SMARTRECRUITERS_POSTING_URL.format(
+        slug=slug, posting_id=postings[0]["id"]))
+    assert isinstance(detail, dict)
+    job_ad = detail.get("jobAd")
+    assert isinstance(job_ad, dict), "the detail payload no longer carries `jobAd`"
+    sections = job_ad.get("sections")
+    assert isinstance(sections, dict), "`jobAd.sections` is no longer an object"
+
+    present = [k for k in SMARTRECRUITERS_SECTION_KEYS if isinstance(sections.get(k), dict)]
+    assert present, (
+        f"none of {list(SMARTRECRUITERS_SECTION_KEYS)} is in "
+        f"jobAd.sections ({sorted(sections)}) — every description is now empty"
+    )
+    assert any(str(sections[k].get("text") or "").strip() for k in present), (
+        "the section objects no longer carry `text`"
+    )
+
+
+@pytest.mark.parametrize("slug", SMARTRECRUITERS_SLUGS[:1])
+def test_smartrecruiters_apply_url_pattern_still_resolves(slug):
+    """`jobs.smartrecruiters.com/{company}/{id}` is constructed rather than read
+    out of the payload — the listing's `ref` is the API URL, which is JSON and
+    useless to a human. A change here means every digest link 404s."""
+    from src.util import http_get
+
+    jobs = _reachable(fetch_smartrecruiters, slug, details=False)
+    assert jobs
+    url = jobs[0].url
+    assert url.startswith("https://jobs.smartrecruiters.com/")
+    try:
+        response = http_get(url)
+    except Exception as exc:
+        pytest.skip(f"could not reach the applicant-facing host: {exc}")
+    assert getattr(response, "status_code", 0) < 400, (
+        f"the constructed apply URL is dead: {url} — every SmartRecruiters card "
+        "in the digest links nowhere"
+    )
+
+
+@pytest.mark.parametrize("slug", SMARTRECRUITERS_SLUGS[:1])
+def test_smartrecruiters_jobs_parse_into_usable_records(slug):
+    jobs = _reachable(fetch_smartrecruiters, slug, max_descriptions=3)
+    assert all(j.title and j.url for j in jobs)
+    assert all(j.ats == "smartrecruiters" and j.ats_job_id for j in jobs)
+    assert any(len(j.description) > 200 for j in jobs[:3]), (
+        "not one of the first three postings got a description — the detail "
+        "call or the section parsing is reading the wrong fields"
+    )
+
+
+# ==========================================================================
+# Personio
+# ==========================================================================
+
+
+@pytest.mark.parametrize("slug", PERSONIO_SLUGS)
+def test_personio_feed_still_answers(slug):
+    jobs = _reachable(fetch_personio, slug)
+    assert jobs, f"personio/{slug} returned zero positions — has the tenant moved?"
+
+
+@pytest.mark.parametrize("slug", PERSONIO_SLUGS[:1])
+def test_personio_still_serves_workzag_jobs_xml(slug):
+    """The feed is XML with a `<workzag-jobs>` root — a name from Personio's
+    pre-rebrand days that has outlived it. The parser rejects any other root
+    outright, because an HTML error page is well-formed XML and would otherwise
+    parse into zero positions and read as a company that is not hiring."""
+    import xml.etree.ElementTree as ElementTree
+
+    body = _raw_text(PERSONIO_XML_URL.format(host=f"{slug}.jobs.personio.de"))
+    assert body.strip(), "the feed is empty"
+    root = ElementTree.fromstring(body)
+    assert str(root.tag).rsplit("}", 1)[-1] == "workzag-jobs", (
+        f"the Personio feed root is now <{root.tag}> — src/sources/ats_boards.py "
+        "rejects anything else and this board now yields nothing"
+    )
+
+
+@pytest.mark.parametrize("slug", PERSONIO_SLUGS[:1])
+def test_personio_position_still_has_the_elements_we_parse(slug):
+    import xml.etree.ElementTree as ElementTree
+
+    body = _raw_text(PERSONIO_XML_URL.format(host=f"{slug}.jobs.personio.de"))
+    root = ElementTree.fromstring(body)
+    positions = list(root.iter("position"))
+    assert positions, "the feed carries no <position> elements"
+
+    seen: set[str] = set()
+    for position in positions[:25]:
+        seen.update(str(child.tag).rsplit("}", 1)[-1] for child in position)
+
+    missing = [f for f in PERSONIO_REQUIRED if f not in seen]
+    assert not missing, (
+        f"personio dropped required element(s): {missing} — `id` is `Job.key` "
+        "and the apply URL, `name` is the title"
+    )
+    absent = [f for f in PERSONIO_EXPECTED if f not in seen]
+    assert not absent, (
+        f"personio no longer sends {absent} — `office` is the ONLY geography "
+        "this feed states, so losing it fails every posting at the geo filter"
+    )
+
+
+@pytest.mark.parametrize("slug", PERSONIO_SLUGS[:1])
+def test_personio_job_descriptions_are_still_titled_html_sections(slug):
+    """Each `<jobDescription>` is a `<name>` heading plus a CDATA-wrapped HTML
+    `<value>`, and the profile section is where every requirement lives. The
+    parser concatenates them the way it concatenates Lever's `lists`."""
+    import xml.etree.ElementTree as ElementTree
+
+    body = _raw_text(PERSONIO_XML_URL.format(host=f"{slug}.jobs.personio.de"))
+    root = ElementTree.fromstring(body)
+    sections = [
+        section
+        for position in list(root.iter("position"))[:25]
+        for section in position.iter("jobDescription")
+    ]
+    assert sections, (
+        "no position carries a <jobDescription> — every ad would be empty"
+    )
+    assert any((s.findtext("value") or "").strip() for s in sections), (
+        "no <jobDescription> carries a <value> — the description is the field, "
+        "not the heading"
+    )
+
+
+@pytest.mark.parametrize("slug", PERSONIO_SLUGS[:1])
+def test_personio_created_at_offset_is_still_parseable(slug):
+    """Personio writes the offset without a colon ("+0200"), which
+    `datetime.fromisoformat` only accepts on Python 3.11+. If that ever became
+    a format `util.parse_datetime` could not read, every position would be
+    undated and `skip_undated` would drop the whole tenant in silence."""
+    from src.util import parse_datetime
+
+    import xml.etree.ElementTree as ElementTree
+
+    body = _raw_text(PERSONIO_XML_URL.format(host=f"{slug}.jobs.personio.de"))
+    root = ElementTree.fromstring(body)
+    stamps = [
+        (p.findtext("createdAt") or "").strip()
+        for p in list(root.iter("position"))[:25]
+    ]
+    stamps = [s for s in stamps if s]
+    if not stamps:
+        pytest.skip("no position carries createdAt")
+    unparseable = [s for s in stamps if parse_datetime(s) is None]
+    assert not unparseable, (
+        f"util.parse_datetime cannot read Personio's dates any more: "
+        f"{unparseable[:3]} — every position becomes undated and is dropped"
+    )
+
+
+@pytest.mark.parametrize("slug", PERSONIO_SLUGS[:1])
+def test_personio_jobs_parse_into_usable_records(slug):
+    jobs = _reachable(fetch_personio, slug)
+    assert all(j.title and j.url for j in jobs)
+    assert all(j.ats == "personio" and j.ats_job_id for j in jobs)
+    assert all(".jobs.personio." in j.url for j in jobs)
+    assert any(len(j.description) > 200 for j in jobs), (
+        "every description came back nearly empty — the parser is reading the "
+        "wrong elements"
+    )
+
+
+# ==========================================================================
+# none of these may be auto-appliable
+# ==========================================================================
+
+
+def test_no_live_board_produces_a_job_autoapply_would_submit():
+    """The safety claim, checked against real URLs rather than fixtures.
+
+    `autoapply` has only ever been hardened against Greenhouse and Lever forms.
+    A live posting whose URL `detect_ats` accepts — a company that redirects its
+    Ashby board to a Greenhouse form, say — would put the bot in front of a form
+    no test has ever seen.
+    """
+    from src.apply.autoapply import SUPPORTED_ATS, detect_ats
+
+    fetchers = [
+        (fetch_workable, WORKABLE_SLUGS), (fetch_ashby, ASHBY_SLUGS),
+        (fetch_smartrecruiters, SMARTRECRUITERS_SLUGS),
+        (fetch_personio, PERSONIO_SLUGS),
+    ]
+    checked = 0
+    for fetcher, slugs in fetchers:
+        try:
+            jobs = fetcher(slugs[0])
+        except Exception:
+            continue          # covered by that board's own test above
+        checked += 1
+        for job in jobs[:50]:
+            assert job.ats not in SUPPORTED_ATS, (
+                f"{job.ats} now claims to be an auto-appliable ATS"
+            )
+            assert detect_ats(job.url) is None, (
+                f"{job.url} would be auto-applied to by a bot that has never "
+                "been tested against this vendor's form"
+            )
+    if not checked:
+        pytest.skip("no European board was reachable")
+
+
+# ==========================================================================
 # our fixtures vs reality
 # ==========================================================================
 
@@ -253,4 +778,77 @@ def test_the_offline_fixtures_match_the_shape_of_the_live_payload():
     assert not invented, (
         f"the fixture claims field(s) the live API does not return: {sorted(invented)} "
         "— the offline tests are validating a payload that does not exist"
+    )
+
+
+@pytest.mark.parametrize(
+    "fixture_name,fixture_key,url,params,live_key,slug",
+    [
+        ("workable_jobs.json", "jobs",
+         WORKABLE_ACCOUNT_URL, {"details": "true"}, "jobs", WORKABLE_SLUGS[0]),
+        ("ashby_jobs.json", "jobs",
+         ASHBY_JOB_BOARD_URL, {"includeCompensation": "true"}, "jobs", ASHBY_SLUGS[0]),
+        ("smartrecruiters_postings.json", "content",
+         SMARTRECRUITERS_POSTINGS_URL, {"limit": 100}, "content",
+         SMARTRECRUITERS_SLUGS[0]),
+    ],
+)
+def test_the_european_fixtures_do_not_claim_fields_reality_never_sends(
+    fixture_name, fixture_key, url, params, live_key, slug
+):
+    """The most important test in this file for the four new boards.
+
+    Their fixtures were written from vendor documentation on a machine with no
+    network, so unlike `greenhouse_jobs.json` they have never once been checked
+    against a real response. Every offline test for Workable, Ashby and
+    SmartRecruiters is only as true as these files. A field here that the live
+    API does not send means the parser is being exercised against a payload
+    that does not exist — green tests proving nothing.
+
+    Compared against the *union* of keys across many live postings, because one
+    posting legitimately omits optional fields.
+    """
+    from tests.conftest import load_json_fixture
+
+    live = _raw_payload(url.format(slug=slug), params)
+    postings = live.get(live_key) if isinstance(live, dict) else None
+    if not isinstance(postings, list) or not postings:
+        pytest.skip(f"{slug} returned no postings to compare against")
+
+    fixture = load_json_fixture(fixture_name)[fixture_key]
+    invented = _union_of_keys(fixture, limit=50) - _union_of_keys(postings, limit=50)
+    assert not invented, (
+        f"{fixture_name} claims field(s) the live API does not return: "
+        f"{sorted(invented)} — every offline test for this source is validating "
+        "a payload that does not exist"
+    )
+
+
+def test_the_personio_fixture_does_not_claim_elements_reality_never_sends():
+    """The XML twin of the test above, for the same reason."""
+    import xml.etree.ElementTree as ElementTree
+
+    from tests.conftest import load_fixture
+
+    body = _raw_text(
+        PERSONIO_XML_URL.format(host=f"{PERSONIO_SLUGS[0]}.jobs.personio.de")
+    )
+    live_positions = list(ElementTree.fromstring(body).iter("position"))
+    if not live_positions:
+        pytest.skip("the live feed carries no positions to compare against")
+
+    def tags(positions):
+        return {
+            str(child.tag).rsplit("}", 1)[-1]
+            for position in positions[:50] for child in position
+        }
+
+    fixture_positions = list(
+        ElementTree.fromstring(load_fixture("personio_positions.xml")).iter("position")
+    )
+    invented = tags(fixture_positions) - tags(live_positions)
+    assert not invented, (
+        f"personio_positions.xml claims element(s) the live feed does not send: "
+        f"{sorted(invented)} — the offline Personio tests are validating a "
+        "document that does not exist"
     )

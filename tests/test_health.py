@@ -259,6 +259,36 @@ def test_a_source_that_used_to_work_going_silent_is_reported():
     assert "renamed" in alert.detail
 
 
+@pytest.mark.parametrize(
+    "board", ["workable", "ashby", "smartrecruiters", "personio"]
+)
+def test_a_european_board_going_silent_is_reported_too(board):
+    """`assess` is generic over source names, but "generic" is a claim, not a
+    fact: the alert only reaches the user if `main` puts the source in
+    `active_sources` and the fetcher stamps `Job.source` with the same string.
+    A Personio tenant that renames itself returns an empty feed forever and
+    looks exactly like a company that stopped hiring."""
+    history = healthy_history(counts={"greenhouse": 40, board: 12})
+    report = assess(
+        stats(fetched=40, source_counts={"greenhouse": 40, board: 0}),
+        previous_runs=history, digest_path="/tmp/d.html", now=NOW,
+        active_sources=["greenhouse", board],
+    )
+    assert "source_zero" in report.kinds()
+    alert = next(a for a in report.alerts if a.kind == "source_zero")
+    assert board in alert.detail
+
+
+def test_every_board_source_can_be_seen_by_the_health_check():
+    """The names `main` reports as active and the names the fetchers stamp on
+    `Job.source` have to be the same strings, or `source_zero` silently never
+    fires for the mismatched one."""
+    from src.config import BOARD_SOURCE_NAMES
+    from src.sources.ats_boards import BOARDS
+
+    assert set(BOARDS) == set(BOARD_SOURCE_NAMES)
+
+
 def test_a_source_that_never_produced_much_is_not_missed():
     """One posting a week from a tiny board going quiet is not news."""
     history = healthy_history(counts={"greenhouse": 40,

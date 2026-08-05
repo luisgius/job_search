@@ -395,6 +395,31 @@ def test_parser_accepts_the_documented_flags():
     assert args.sources == ["greenhouse", "lever"]
 
 
+@pytest.mark.parametrize(
+    "name",
+    ["greenhouse", "lever", "workable", "ashby", "smartrecruiters", "personio",
+     "adzuna", "linkedin_email"],
+)
+def test_every_source_can_be_named_on_the_cli(name):
+    """`--source` is how you prove one board in isolation. A source missing
+    from `SOURCE_NAMES` is rejected by argparse, so the flag that exists to
+    debug it cannot be used on it."""
+    from src.main import SOURCE_NAMES
+
+    assert name in SOURCE_NAMES
+    assert build_parser().parse_args(["--source", name]).sources == [name]
+
+
+def test_the_board_sources_are_exactly_the_ones_ats_boards_serves():
+    """`_fetch_all` calls `ats_boards.fetch` once and then keeps only the jobs
+    whose `source` is in `BOARD_SOURCES`. A vendor missing from that set is
+    fetched over the network and then silently thrown away."""
+    from src.main import BOARD_SOURCES
+    from src.sources.ats_boards import BOARDS
+
+    assert BOARD_SOURCES == frozenset(BOARDS)
+
+
 def test_dry_run_and_no_dry_run_are_mutually_exclusive():
     with pytest.raises(SystemExit):
         build_parser().parse_args(["--dry-run", "--no-dry-run"])

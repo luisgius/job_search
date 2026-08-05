@@ -1,0 +1,35 @@
+{
+  "id": "743999900000001",
+  "uuid": "6d1f9c20-1111-4d55-8b77-000000000001",
+  "name": "Senior Backend Engineer (m/f/d)",
+  "refNumber": "REF-301",
+  "company": { "identifier": "Umbrella", "name": "Umbrella Iberia S.L." },
+  "location": {
+    "city": "Valencia",
+    "region": "Comunidad Valenciana",
+    "country": "es",
+    "remote": false
+  },
+  "typeOfEmployment": { "label": "Permanent" },
+  "releasedDate": "2026-08-04T07:00:00.000Z",
+  "jobAd": {
+    "sections": {
+      "companyDescription": {
+        "title": "Company Description",
+        "text": "<p>Umbrella Iberia builds logistics software from Valencia.</p>"
+      },
+      "jobDescription": {
+        "title": "Job Description",
+        "text": "<p>Own our routing services in Python and PostgreSQL.</p>"
+      },
+      "qualifications": {
+        "title": "Qualifications",
+        "text": "<ul><li>6+ years of Python</li><li>Strong SQL</li><li>EU work authorisation</li></ul>"
+      },
+      "additionalInformation": {
+        "title": "Additional Information",
+        "text": "<p>Relocation support to Valencia is available.</p>"
+      }
+    }
+  }
+}

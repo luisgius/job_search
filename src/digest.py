@@ -35,6 +35,7 @@ from urllib.parse import quote
 # is the one third-party import allowed at module scope in this file.
 from jinja2 import Environment, FileSystemLoader
 
+from . import config as config_module
 from .models import ApplyStatus, ScoredJob, ensure_utc, utcnow
 from .util import ensure_dir, get_logger, html_to_text, truncate
 
@@ -49,7 +50,9 @@ DESCRIPTION_EXCERPT_CHARS = 400
 COVER_PREVIEW_CHARS = 250
 
 DEFAULT_THRESHOLD = 65
-SOURCE_NAMES: tuple[str, ...] = ("greenhouse", "lever", "adzuna", "linkedin_email")
+#: Imported rather than repeated: a source the page does not know about is a
+#: source whose "0 jobs today" never reaches the reader.
+SOURCE_NAMES: tuple[str, ...] = config_module.SOURCE_NAMES
 
 #: (context key, status) — the five outcome buckets the page is built around.
 #: Any status not listed here lands in `other`, so a new `ApplyStatus` shows up

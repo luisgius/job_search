@@ -28,6 +28,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+from . import config as config_module
 from . import digest, filters, health, notify, pdf, scoring, tailor
 from .apply import autoapply
 from .config import Config, ConfigError
@@ -38,11 +39,13 @@ from .util import get_logger, open_in_browser, setup_logging
 
 logger = get_logger(__name__)
 
-#: Every source name the config knows about, in fetch order.
-SOURCE_NAMES: tuple[str, ...] = ("greenhouse", "lever", "adzuna", "linkedin_email")
+#: Every source name the config knows about, in fetch order. Defined in
+#: `config.py` so the defaults, the validator and the CLI can never disagree
+#: about which sources exist.
+SOURCE_NAMES: tuple[str, ...] = config_module.SOURCE_NAMES
 
-#: The two sources `ats_boards.fetch` serves in a single call.
-BOARD_SOURCES: frozenset[str] = frozenset({"greenhouse", "lever"})
+#: The six board sources `ats_boards.fetch` serves in a single call.
+BOARD_SOURCES: frozenset[str] = frozenset(config_module.BOARD_SOURCE_NAMES)
 
 #: A CV shorter than this cannot produce a meaningful score or a tailored
 #: document. Treated as a config error rather than an empty run, because the
@@ -265,14 +268,15 @@ def _fetch_all(config: Any, active: set[str], stats: RunStats) -> list[Job]:
     """
     jobs: list[Job] = []
 
-    # `ats_boards.fetch` serves greenhouse *and* lever in one call and checks
+    # `ats_boards.fetch` serves every board vendor in one call and checks
     # `config.source_enabled` itself, so it is called once and its output is
     # filtered afterwards. The CLI path also narrows `sources.*` in the config
-    # (see `apply_cli_overrides`), so `--source greenhouse` skips the Lever
-    # request entirely rather than fetching and discarding it.
+    # (see `apply_cli_overrides`), so `--source greenhouse` skips the Lever,
+    # Workable, Ashby, SmartRecruiters and Personio requests entirely rather
+    # than fetching and discarding them.
     boards = active & BOARD_SOURCES
     if boards:
-        found = _safe_fetch("greenhouse/lever", ats_boards.fetch, config, stats)
+        found = _safe_fetch("/".join(sorted(boards)), ats_boards.fetch, config, stats)
         jobs.extend(job for job in found if (job.source or "").lower() in boards)
 
     if "adzuna" in active:

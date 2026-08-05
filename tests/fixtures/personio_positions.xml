@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<workzag-jobs>
+  <position>
+    <id>4103001</id>
+    <subcompany>Vandelay Iberia S.L.</subcompany>
+    <office>Valencia</office>
+    <department>Engineering</department>
+    <recruitingCategory>Tech</recruitingCategory>
+    <name>Senior Backend Engineer (m/w/d)</name>
+    <employmentType>permanent</employmentType>
+    <seniority>experienced</seniority>
+    <schedule>full-time</schedule>
+    <yearsOfExperience>5-7</yearsOfExperience>
+    <occupation>software_development</occupation>
+    <occupationCategory>it_and_software_development</occupationCategory>
+    <createdAt>2026-08-04T07:00:00+0200</createdAt>
+    <jobDescriptions>
+      <jobDescription>
+        <name><![CDATA[Deine Aufgaben]]></name>
+        <value><![CDATA[<p>Du betreust unsere Zahlungsdienste in Python.</p>]]></value>
+      </jobDescription>
+      <jobDescription>
+        <name><![CDATA[Dein Profil]]></name>
+        <value><![CDATA[<ul><li>6+ Jahre Python</li><li>PostgreSQL</li><li>EU work authorisation</li></ul>]]></value>
+      </jobDescription>
+      <jobDescription>
+        <name><![CDATA[Was wir bieten]]></name>
+        <value><![CDATA[<p>Umzugsunterstützung nach Valencia.</p>]]></value>
+      </jobDescription>
+    </jobDescriptions>
+  </position>
+  <position>
+    <id>4103002</id>
+    <subcompany></subcompany>
+    <office>Remote</office>
+    <department>Data</department>
+    <recruitingCategory>Tech</recruitingCategory>
+    <name>Data Engineer</name>
+    <employmentType>permanent</employmentType>
+    <seniority>experienced</seniority>
+    <schedule>full-time</schedule>
+    <yearsOfExperience>2-5</yearsOfExperience>
+    <occupation>data_engineering</occupation>
+    <createdAt>2026-08-04T05:30:00+0200</createdAt>
+    <jobDescriptions>
+      <jobDescription>
+        <name><![CDATA[Your tasks]]></name>
+        <value><![CDATA[<p>Own the lakehouse. Spark, dbt, Airflow.</p>]]></value>
+      </jobDescription>
+    </jobDescriptions>
+  </position>
+  <position>
+    <id>4103003</id>
+    <office></office>
+    <department>Platform</department>
+    <name>Platform Engineer</name>
+    <employmentType>permanent</employmentType>
+    <schedule>full-time</schedule>
+    <createdAt></createdAt>
+    <jobDescriptions>
+      <jobDescription>
+        <name><![CDATA[Your tasks]]></name>
+        <value><![CDATA[<p>Kubernetes, Terraform, Go.</p>]]></value>
+      </jobDescription>
+    </jobDescriptions>
+  </position>
+  <position>
+    <id>4103004</id>
+    <office>München</office>
+    <department>Support</department>
+    <name>Support Specialist</name>
+    <employmentType>intern</employmentType>
+    <seniority>entry-level</seniority>
+    <schedule>part-time</schedule>
+    <createdAt>2026-08-04T06:00:00+0200</createdAt>
+    <jobDescriptions>
+      <jobDescription>
+        <name><![CDATA[Your tasks]]></name>
+        <value><![CDATA[<p>Six-month placement on the support desk.</p>]]></value>
+      </jobDescription>
+    </jobDescriptions>
+  </position>
+  <position>
+    <id>4103005</id>
+    <office>Madrid</office>
+    <department>Engineering</department>
+    <name></name>
+    <employmentType>permanent</employmentType>
+    <createdAt>2026-08-04T06:30:00+0200</createdAt>
+    <jobDescriptions>
+      <jobDescription>
+        <name><![CDATA[Your tasks]]></name>
+        <value><![CDATA[<p>A position with no name at all.</p>]]></value>
+      </jobDescription>
+    </jobDescriptions>
+  </position>
+</workzag-jobs>

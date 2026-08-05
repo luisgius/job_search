@@ -15,6 +15,7 @@ import pytest
 import yaml
 
 from src.config import DEFAULTS, Config, ConfigError, deep_merge
+from src.config import WATCHLIST_DEFAULTS as DEFAULTS_WATCHLIST
 from tests.conftest import write_config
 
 
@@ -236,6 +237,51 @@ def test_validate_flags_enabled_board_with_empty_watchlist(tmp_path: Path):
     cfg = write_config(tmp_path, {"sources": {"greenhouse": True}},
                        watchlist={"greenhouse": []})
     assert any("watchlist.greenhouse is empty" in p for p in cfg.validate())
+
+
+@pytest.mark.parametrize(
+    "board", ["greenhouse", "lever", "workable", "ashby", "smartrecruiters", "personio"]
+)
+def test_validate_flags_every_board_source_with_an_empty_watchlist(
+    tmp_path: Path, board
+):
+    """An enabled board with nothing to fetch is the silent failure this check
+    exists for: it produces zero jobs, run after run, and looks exactly like a
+    quiet market. Parametrised over every vendor so adding a seventh board
+    without wiring it in fails here rather than in six months of empty
+    digests."""
+    cfg = write_config(tmp_path, {"sources": {board: True}}, watchlist={board: []})
+    assert any(f"watchlist.{board} is empty" in p for p in cfg.validate())
+
+
+@pytest.mark.parametrize(
+    "board", ["workable", "ashby", "smartrecruiters", "personio"]
+)
+def test_a_populated_watchlist_silences_the_warning(tmp_path: Path, board):
+    cfg = write_config(tmp_path, {"sources": {board: True}},
+                       watchlist={board: ["acme"]})
+    assert not any(f"watchlist.{board}" in p for p in cfg.validate())
+
+
+def test_the_european_boards_ship_off_by_default():
+    """They are useless until the watchlist names companies, and shipping them
+    on would mean every fresh checkout starts by printing four validation
+    problems the user cannot act on yet."""
+    from src.config import DEFAULTS
+
+    for board in ("workable", "ashby", "smartrecruiters", "personio"):
+        assert DEFAULTS["sources"][board] is False
+        assert DEFAULTS_WATCHLIST[board] == []
+
+
+def test_every_board_source_has_a_watchlist_default():
+    """A source in `SOURCE_NAMES` with no `WATCHLIST_DEFAULTS` entry reads its
+    slugs from `None` and fetches nothing, forever, with no warning."""
+    from src.config import BOARD_SOURCE_NAMES, DEFAULTS
+
+    for name in BOARD_SOURCE_NAMES:
+        assert name in DEFAULTS["sources"], f"{name} missing from sources defaults"
+        assert name in DEFAULTS_WATCHLIST, f"{name} missing from WATCHLIST_DEFAULTS"
 
 
 def test_validate_flags_missing_phone_only_when_live_applying(tmp_path: Path):

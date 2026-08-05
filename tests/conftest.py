@@ -316,6 +316,17 @@ def html_response(body: str, status: int = 200) -> FakeResponse:
                         headers={"Content-Type": "text/html"})
 
 
+def xml_response(body: str, status: int = 200) -> FakeResponse:
+    """A response whose payload is read via `.text`, not `.json()`.
+
+    Personio's board is XML, so its fetcher goes through `util.http_get`
+    rather than `http_get_json` — a `json_response` would hide the fact that
+    nothing in that path ever calls `.json()`.
+    """
+    return FakeResponse(status_code=status, text=body,
+                        headers={"Content-Type": "application/xml"})
+
+
 class FakeSession:
     """Routing fake for `requests`-style sessions.
 

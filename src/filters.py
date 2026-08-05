@@ -50,6 +50,8 @@ SOURCE_RANK: dict[str, int] = {
     "lever": 3,
     "ashby": 3,
     "workable": 3,
+    "smartrecruiters": 3,
+    "personio": 3,
     "adzuna": 2,
     "linkedin_email": 1,
 }

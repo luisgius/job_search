@@ -48,6 +48,15 @@ DEFAULTS: dict[str, Any] = {
     "sources": {
         "greenhouse": True,
         "lever": True,
+        # The four European boards ship OFF, like adzuna and linkedin_email
+        # and unlike greenhouse/lever, because they are useless until the
+        # watchlist names companies: there is no sensible default company list
+        # for "mid-size employers in Valencia". Populate `watchlist.yaml`,
+        # prove the slugs with `--check-all`, then flip these.
+        "workable": False,
+        "ashby": False,
+        "smartrecruiters": False,
+        "personio": False,
         "adzuna": False,
         "linkedin_email": False,
     },
@@ -187,9 +196,23 @@ DEFAULTS: dict[str, Any] = {
     },
 }
 
+#: Sources that are just a list of board slugs in the watchlist, in fetch
+#: order. `ats_boards.BOARDS` serves all of them in a single `fetch()` call,
+#: and `validate()` warns about each one that is enabled with nothing to fetch.
+BOARD_SOURCE_NAMES: tuple[str, ...] = (
+    "greenhouse", "lever", "workable", "ashby", "smartrecruiters", "personio",
+)
+
+#: Every source the config knows about, in fetch order.
+SOURCE_NAMES: tuple[str, ...] = BOARD_SOURCE_NAMES + ("adzuna", "linkedin_email")
+
 WATCHLIST_DEFAULTS: dict[str, Any] = {
     "greenhouse": [],
     "lever": [],
+    "workable": [],
+    "ashby": [],
+    "smartrecruiters": [],
+    "personio": [],
     "adzuna": {
         "countries": [],
         "queries": [],
@@ -429,15 +452,18 @@ class Config:
                     "(download OAuth desktop credentials from Google Cloud Console)"
                 )
 
-        enabled = [n for n in ("greenhouse", "lever", "adzuna", "linkedin_email")
-                   if self.source_enabled(n)]
+        enabled = [n for n in SOURCE_NAMES if self.source_enabled(n)]
         if not enabled:
             problems.append("every source is disabled — nothing to fetch")
 
-        if self.source_enabled("greenhouse") and not self.watchlist.get("greenhouse"):
-            problems.append("sources.greenhouse is on but watchlist.greenhouse is empty")
-        if self.source_enabled("lever") and not self.watchlist.get("lever"):
-            problems.append("sources.lever is on but watchlist.lever is empty")
+        # An enabled board with an empty watchlist is the silent failure this
+        # whole check exists for: it produces zero jobs and looks exactly like
+        # a quiet day, run after run, with nothing in the log to act on.
+        for name in BOARD_SOURCE_NAMES:
+            if self.source_enabled(name) and not self.watchlist.get(name):
+                problems.append(
+                    f"sources.{name} is on but watchlist.{name} is empty"
+                )
 
         # Loud about the one setting that can send email on the user's behalf.
         if self.get("apply.enabled") and not self.get("apply.dry_run"):

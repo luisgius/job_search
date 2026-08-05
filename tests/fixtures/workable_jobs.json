@@ -1,0 +1,101 @@
+{
+  "name": "Contoso Iberia",
+  "description": "We build payments infrastructure for southern Europe.",
+  "jobs": [
+    {
+      "title": "Senior Backend Engineer (m/f/d)",
+      "shortcode": "A1B2C3D4E5",
+      "code": "REQ-201",
+      "state": "published",
+      "department": "Engineering",
+      "url": "https://apply.workable.com/contoso/j/A1B2C3D4E5/",
+      "application_url": "https://apply.workable.com/contoso/j/A1B2C3D4E5/apply/",
+      "shortlink": "https://apply.workable.com/j/A1B2C3D4E5",
+      "employment_type": "Full-time",
+      "created_at": "2026-08-04T07:00:00Z",
+      "location": {
+        "country": "Spain",
+        "countryCode": "ES",
+        "region": "Comunidad Valenciana",
+        "city": "Valencia",
+        "telecommuting": false
+      },
+      "description": "<p>Own our payment orchestration services.</p>",
+      "requirements": "<ul><li>6+ years of Python</li><li>PostgreSQL at scale</li><li>EU work authorisation</li></ul>",
+      "benefits": "<ul><li>Relocation support to Valencia</li><li>26 days holiday</li></ul>"
+    },
+    {
+      "title": "Staff Data Engineer",
+      "shortcode": "F6G7H8I9J0",
+      "code": "REQ-202",
+      "state": "published",
+      "department": "Data",
+      "url": "https://apply.workable.com/contoso/j/F6G7H8I9J0/",
+      "application_url": "https://apply.workable.com/contoso/j/F6G7H8I9J0/apply/",
+      "employment_type": "Full-time",
+      "created_at": "2026-08-04T05:30:00Z",
+      "location": {
+        "country": null,
+        "country_code": null,
+        "region": null,
+        "city": null,
+        "telecommuting": true
+      },
+      "description": "<p>Own the lakehouse. Spark, dbt, Airflow.</p>",
+      "requirements": "",
+      "benefits": ""
+    },
+    {
+      "title": "Platform Engineer",
+      "shortcode": "K1L2M3N4O5",
+      "code": "REQ-203",
+      "state": "published",
+      "department": "Platform",
+      "url": "https://apply.workable.com/contoso/j/K1L2M3N4O5/",
+      "employment_type": "Full-time",
+      "created_at": null,
+      "location": null,
+      "description": "<p>Kubernetes, Terraform, Go.</p>",
+      "requirements": "",
+      "benefits": ""
+    },
+    {
+      "title": "Working Student, Support",
+      "shortcode": "P6Q7R8S9T0",
+      "code": "REQ-204",
+      "state": "published",
+      "department": "Support",
+      "url": "https://apply.workable.com/contoso/j/P6Q7R8S9T0/",
+      "employment_type": "Internship",
+      "created_at": "2026-08-04T06:00:00Z",
+      "location": {
+        "country": "Germany",
+        "country_code": "DE",
+        "region": "Berlin",
+        "city": "Berlin",
+        "telecommuting": false
+      },
+      "description": "<p>Help our support team while you study.</p>",
+      "requirements": "",
+      "benefits": ""
+    },
+    {
+      "title": null,
+      "shortcode": "U1V2W3X4Y5",
+      "state": "published",
+      "url": "https://apply.workable.com/contoso/j/U1V2W3X4Y5/",
+      "location": { "country": "Spain", "city": "Madrid", "telecommuting": false },
+      "description": "<p>A posting with no title at all.</p>"
+    },
+    {
+      "title": "Retired Requisition",
+      "shortcode": "Z6A7B8C9D0",
+      "state": "closed",
+      "url": "https://apply.workable.com/contoso/j/Z6A7B8C9D0/",
+      "employment_type": "Full-time",
+      "created_at": "2026-08-04T04:00:00Z",
+      "location": { "country": "Spain", "city": "Barcelona", "telecommuting": false },
+      "description": "<p>This one is no longer open.</p>"
+    }
+  ]
+}

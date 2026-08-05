@@ -539,7 +539,7 @@ def test_cli_check_all_with_nothing_to_check_fails_loudly(stub_boards, tmp_path:
     write_config(tmp_path, watchlist={"greenhouse": [], "lever": []})
     assert main(["--check-all", "--config", str(tmp_path / "config.yaml"),
                  "--watchlist", str(tmp_path / "watchlist.yaml")]) == 1
-    assert "no greenhouse/lever slugs" in capsys.readouterr().out
+    assert "no board slugs found" in capsys.readouterr().out
 
 
 def test_cli_json_output_is_machine_readable(stub_boards, capsys):
