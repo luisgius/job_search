@@ -42,8 +42,46 @@ freshness:
   skip_undated: true
 
 filters:
-  # ISO-3166 alpha-2. Trim this to the countries you can actually work in.
-  countries: [DE, NL, ES, FR, IE, PT, SE, DK, FI, NO, PL, AT, BE, IT, CH, CZ, GB]
+  # ISO-3166 alpha-2 — the whole EU27 plus the EEA and the UK.
+  # Trim it to the countries you can actually work in: every country left here
+  # is one you are willing to see in the digest, and a shorter list is the
+  # cheapest way to cut noise. Leaving it wide is fine if you are open to
+  # relocating or the role is remote.
+  countries:
+    # EU-27
+    - AT   # Austria
+    - BE   # Belgium
+    - BG   # Bulgaria
+    - HR   # Croatia
+    - CY   # Cyprus
+    - CZ   # Czechia
+    - DK   # Denmark
+    - EE   # Estonia
+    - FI   # Finland
+    - FR   # France
+    - DE   # Germany
+    - GR   # Greece
+    - HU   # Hungary
+    - IE   # Ireland
+    - IT   # Italy
+    - LV   # Latvia
+    - LT   # Lithuania
+    - LU   # Luxembourg
+    - MT   # Malta
+    - NL   # Netherlands
+    - PL   # Poland
+    - PT   # Portugal
+    - RO   # Romania
+    - SK   # Slovakia
+    - SI   # Slovenia
+    - ES   # Spain
+    - SE   # Sweden
+    # EEA / EFTA / UK — outside the EU, the same job market
+    - IS   # Iceland
+    - LI   # Liechtenstein
+    - "NO" # Norway — MUST stay quoted: YAML reads a bare NO as false
+    - CH   # Switzerland
+    - GB   # United Kingdom
   allow_remote: true
   # "Remote" with no European hint anywhere is usually a US role.
   remote_requires_eu_hint: true
