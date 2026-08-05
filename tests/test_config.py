@@ -17,7 +17,6 @@ import yaml
 from src.config import (
     DEFAULT_MAX_AGE_HOURS,
     DEFAULT_REPOST_MIN_GAP_DAYS,
-    DEFAULT_STALE_AFTER_DAYS,
     DEFAULTS,
     Config,
     ConfigError,
@@ -98,13 +97,111 @@ def test_empty_yaml_file_is_treated_as_absent(tmp_path: Path):
     assert cfg.get("apply.dry_run") is True
 
 
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def _flatten(data, prefix=""):
+    """Nested mapping -> {"a.b.c": value}. An empty dict is a leaf."""
+    out = {}
+    for key, value in (data or {}).items():
+        dotted = f"{prefix}{key}"
+        if isinstance(value, dict) and value:
+            out.update(_flatten(value, dotted + "."))
+        else:
+            out[dotted] = value
+    return out
+
+
 def test_shipped_config_and_watchlist_parse():
     """The files a new user actually edits must load without surprises."""
-    root = Path(__file__).resolve().parent.parent
-    cfg = Config.load(root / "config.yaml", root / "watchlist.yaml", root=root, env={})
+    cfg = Config.load(ROOT / "config.yaml", ROOT / "watchlist.yaml", root=ROOT, env={})
     assert cfg.get("apply.dry_run") is True, "shipped config must default to dry run"
     assert cfg.get("scoring.threshold") == 65
     assert isinstance(cfg.watchlist.get("greenhouse"), list)
+
+
+def test_the_shipped_config_never_drifts_away_from_the_defaults():
+    """The fifth site, and the one that was never asserted.
+
+    `freshness.max_age_hours` was unified across four *code* sites and each
+    got a test. The shipped `config.yaml` is the fifth, it deep-merges **over**
+    `DEFAULTS`, and therefore it is the one that wins at runtime — and nothing
+    checked it. All three of these mutations survived the whole 1684-test
+    suite:
+
+        config.yaml  max_age_hours: 72 -> 24
+        config.yaml  repost_min_gap_days: 14 -> 0
+        config.yaml  filters.countries: (drop half of them)
+
+    In other words the shipped file could silently revert an entire commit and
+    the suite stayed green.
+
+    Asserted as an exact set comparison rather than a handful of spot checks,
+    because a spot check only defends the settings somebody thought of. Any
+    intentional divergence goes in `DELIBERATE` below with a reason — if the
+    file is *meant* to differ from the default, that belongs in the test, not
+    in a reader's memory.
+    """
+    shipped = _flatten(yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8")))
+    defaults = _flatten(DEFAULTS)
+
+    #: dotted key -> why the shipped file deliberately differs.
+    DELIBERATE: dict[str, str] = {}
+
+    unknown = sorted(set(shipped) - set(defaults) - set(DELIBERATE))
+    assert not unknown, (
+        f"config.yaml sets keys DEFAULTS has never heard of: {unknown}. "
+        "Either the key is a typo and does nothing, or DEFAULTS is missing it "
+        "— both are silent."
+    )
+
+    drifted = {
+        key: (shipped[key], defaults[key])
+        for key in sorted(set(shipped) & set(defaults))
+        if key not in DELIBERATE and shipped[key] != defaults[key]
+    }
+    assert not drifted, (
+        "config.yaml disagrees with DEFAULTS, and config.yaml is the one that "
+        f"wins at runtime: {drifted}"
+    )
+
+
+def test_a_bare_yaml_keyword_key_never_reaches_the_shipped_config():
+    """The bug the exact-set comparison above caught on its first run.
+
+    YAML 1.1 reads a bare `on`, `off`, `yes` and `no` as booleans. `notify:`
+    had `on: [no_digest, ...]`, so the whole alert list landed under a key
+    named `True`, `notify.on` quietly fell back to `DEFAULTS`, and a user
+    editing that list in the file they were told to edit changed nothing at
+    all. It was invisible precisely because the two lists happened to agree.
+
+    `filters.countries` already carries a `# MUST stay quoted` comment for
+    exactly this on the Norway entry. This test is that comment, enforced.
+    """
+    raw = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
+    booleans = [
+        f"{section}.{key}"
+        for section, block in raw.items()
+        if isinstance(block, dict)
+        for key in block
+        if isinstance(key, bool)
+    ]
+    assert not booleans, (
+        f"a bare YAML keyword became a boolean key: {booleans}. Quote it."
+    )
+    assert raw["notify"]["on"], "notify.on must survive as a string key"
+
+
+def test_the_shipped_watchlist_names_only_real_sources():
+    """A typo'd source name in `watchlist.yaml` is the same silent failure as
+    an enabled board with an empty list: it fetches nothing and reads as a
+    quiet market. `validate()` cannot see it, because it only looks up the
+    sources it knows."""
+    watch = yaml.safe_load((ROOT / "watchlist.yaml").read_text(encoding="utf-8"))
+    assert set(watch) <= set(DEFAULTS_WATCHLIST), (
+        f"watchlist.yaml names sources that do not exist: "
+        f"{sorted(set(watch) - set(DEFAULTS_WATCHLIST))}"
+    )
 
 
 # ==========================================================================
@@ -227,22 +324,24 @@ def test_validate_rejects_bad_freshness(tmp_path: Path, hours):
     assert any("max_age_hours" in p for p in cfg.validate())
 
 
-@pytest.mark.parametrize("dotted", ["stale_after_days", "repost_min_gap_days"])
 @pytest.mark.parametrize("value", [-1, "soon", True])
-def test_validate_rejects_bad_ghost_job_thresholds(tmp_path: Path, dotted, value):
-    """These two only ever colour a card, so a bad value costs a wrong flag
-    rather than a lost posting — but a setting that is silently ignored is
-    worse than one that is rejected, because the user believes it took
-    effect."""
-    cfg = write_config(tmp_path, {"freshness": {dotted: value}})
-    assert any(dotted in p for p in cfg.validate())
+def test_validate_rejects_a_bad_repost_gap(tmp_path: Path, value):
+    """It only ever colours a card, so a bad value costs a wrong flag rather
+    than a lost posting — but a setting that is silently ignored is worse than
+    one that is rejected, because the user believes it took effect."""
+    cfg = write_config(tmp_path, {"freshness": {"repost_min_gap_days": value}})
+    assert any("repost_min_gap_days" in p for p in cfg.validate())
 
 
-@pytest.mark.parametrize("dotted", ["stale_after_days", "repost_min_gap_days"])
-def test_zero_is_a_legal_ghost_job_threshold(tmp_path: Path, dotted):
-    """The neighbouring case: 0 means "flag everything you can tell me about",
-    which is a coherent thing to ask for and must not be read as invalid."""
-    cfg = write_config(tmp_path, {"freshness": {dotted: 0}})
+def test_zero_is_a_legal_repost_gap_and_means_off(tmp_path: Path):
+    """The neighbouring case. 0 stays *legal* — but it now means "off", which
+    is what 0 means everywhere else in this config (`scoring.max_jobs: 0`
+    scores nothing; `should_surface(within_days=0)` applies no window). Read
+    the old way — "flag everything you can" — it turned the flag up to
+    maximum, and the only knob for quietening a noisy accusation was the one
+    that made it loudest. `test_digest` pins the behaviour; this pins that
+    validate still accepts it."""
+    cfg = write_config(tmp_path, {"freshness": {"repost_min_gap_days": 0}})
     assert cfg.validate() == []
 
 
@@ -298,15 +397,22 @@ def test_the_window_is_seventy_two_hours_not_twenty_four():
     assert DEFAULT_MAX_AGE_HOURS == 72
 
 
-def test_the_ghost_job_thresholds_have_defaults_worth_defending():
-    """30 days: past that, a posting is disproportionately one of the 18-27%
-    that is never filled. 14 days: comfortably longer than any cross-source
-    ingest lag, so an ordinary Greenhouse-plus-Adzuna duplicate is never
-    mistaken for a re-listing, and comfortably shorter than a hiring cycle."""
-    assert DEFAULT_STALE_AFTER_DAYS == 30
+def test_the_ghost_job_threshold_has_a_default_worth_defending():
+    """14 days: comfortably longer than any same-board ingest lag, so an
+    ordinary duplicate is never mistaken for a re-listing, and comfortably
+    shorter than a hiring cycle.
+
+    There is deliberately no age threshold beside it any more. One shipped —
+    `stale_after_days: 30`, nineteen lines from `max_age_hours: 72` — and the
+    two were mutually exclusive: a posting old enough to be flagged had been
+    deleted by the freshness filter 27 days earlier. The knob validated, the
+    tests passed, and it could not fire.
+    """
     assert DEFAULT_REPOST_MIN_GAP_DAYS == 14
-    assert DEFAULTS["freshness"]["stale_after_days"] == DEFAULT_STALE_AFTER_DAYS
     assert DEFAULTS["freshness"]["repost_min_gap_days"] == DEFAULT_REPOST_MIN_GAP_DAYS
+    assert set(DEFAULTS["freshness"]) == {
+        "max_age_hours", "skip_undated", "repost_min_gap_days",
+    }
 
 
 def test_validate_flags_adzuna_without_keys(tmp_path: Path):

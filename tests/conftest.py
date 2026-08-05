@@ -149,13 +149,17 @@ def jobs() -> list[Job]:
     retuned. It moved from 24h to 72h once already, and a fixture whose
     comment claims one thing while its number means another is the rot this
     suite exists to avoid.
+
+    `+ 1` and not some larger number: it says "one hour past the window", which
+    is the case worth fixturing. The `+ 26` it replaces was reverse-engineered
+    from the old literal 50 and expressed nothing at all.
     """
     return [
         make_job(company="Acme", title="Backend Engineer",
                  location="Berlin, Germany", hours_old=2, ats_job_id="1"),
         make_job(company="Globex", title="Data Engineer",
                  location="Amsterdam, Netherlands",
-                 hours_old=DEFAULT_MAX_AGE_HOURS + 26, ats_job_id="2"),
+                 hours_old=DEFAULT_MAX_AGE_HOURS + 1, ats_job_id="2"),
         make_job(company="Initech", title="Platform Engineer",
                  location="Madrid, Spain", hours_old=None, ats_job_id="3"),
         make_job(company="Hooli", title="Backend Engineer",

@@ -24,6 +24,7 @@ entire page can be exercised from hand-built fixtures.
 from __future__ import annotations
 
 import html as html_module
+import math
 import os
 from collections.abc import Iterable, Mapping
 from datetime import datetime
@@ -57,13 +58,12 @@ SOURCE_NAMES: tuple[str, ...] = config_module.SOURCE_NAMES
 #: Imported, never re-typed. The window is defined once in `config.py`; a
 #: literal here would let the page report a number the filter is not using.
 DEFAULT_MAX_AGE_HOURS: int = config_module.DEFAULT_MAX_AGE_HOURS
-DEFAULT_STALE_AFTER_DAYS: int = config_module.DEFAULT_STALE_AFTER_DAYS
 DEFAULT_REPOST_MIN_GAP_DAYS: int = config_module.DEFAULT_REPOST_MIN_GAP_DAYS
 
 #: Past this age `relative_time` prints a calendar date instead of a day
 #: count, because "2026-04-02" is easier to place than "124d ago". The card
-#: then prints the day count alongside it, since age is the whole point of
-#: showing a ghost-job flag next to it.
+#: then prints the day count alongside it, so "how old is this?" still has an
+#: answer on the postings where the date alone stops answering it.
 RELATIVE_DAYS_LIMIT = 60
 
 #: (context key, status) — the five outcome buckets the page is built around.
@@ -226,6 +226,18 @@ def posting_age_days(
     return (reference - moment).total_seconds() / 86400.0
 
 
+def _round_days(value: float) -> int:
+    """Days as a whole number, rounded half **up**.
+
+    Not `int()`, which truncates: it turned a true age of 30.5 days into the
+    sentence "on the market 30 days — past the 30-day mark", and a 23-hour-old
+    posting into an age of `0`. Not the builtin `round()` either — that is
+    banker's rounding, so `round(30.5)` is 30 and reproduces the first bug at
+    exactly the values a reader is most likely to notice.
+    """
+    return math.floor(float(value) + 0.5)
+
+
 def _format_datetime(dt: datetime | None) -> str:
     moment = ensure_utc(dt)
     return moment.strftime("%Y-%m-%d %H:%M UTC") if moment else ""
@@ -287,72 +299,90 @@ def _ghost_flags(
     job: Any,
     *,
     now: datetime,
-    age_days: float | None,
     tracker: Any = None,
-    stale_after_days: float = DEFAULT_STALE_AFTER_DAYS,
     repost_min_gap_days: float = DEFAULT_REPOST_MIN_GAP_DAYS,
-) -> tuple[list[str], bool, float | None]:
-    """The two ghost-job notes this card carries, if any.
+) -> tuple[list[str], float | None]:
+    """The ghost-job note this card carries, if any.
 
-    Returns `(sentences, is_stale, repost_gap_days)`.
+    Returns `(sentences, repost_gap_days)`.
 
-    **These are flags, not filters.** Nothing here drops, hides, reorders or
+    **This is a flag, not a filter.** Nothing here drops, hides, reorders or
     rejects a posting: the caller renders the card in full either way, and a
-    job with both flags set is still counted, still sorted by score and still
-    linked. That asymmetry is the whole design — a wrong flag costs a glance,
-    a wrong deletion costs an opportunity the user never learns existed.
+    flagged job is still counted, still sorted by score and still linked. That
+    asymmetry is the whole design — a wrong flag costs a glance, a wrong
+    deletion costs an opportunity the user never learns existed.
 
-    Two signals, both computable from data the tracker already stores, at zero
-    cost and with no network:
+    **There is one signal, and it is not posting age.** Age was tried and it
+    cannot work here: every card came through `filters.is_fresh`, so it is
+    younger than `freshness.max_age_hours` by construction. At the shipped 72
+    hours a "flag anything older than N days" rule can only fire for N < 3,
+    i.e. on everything. The knob that asked for 30 days was unreachable in
+    every run the pipeline could produce, and only looked alive because its
+    tests called this function directly with a hand-built `posted_at`.
 
-    * **Age.** Somewhere between 18% and 27% of online postings are never
-      filled, and Greenhouse's own study puts at least 1 in 5 US postings in
-      that bucket. Age is the cheapest correlate there is.
-    * **Re-listing.** The same role posted again under a new requisition id —
-      see `db.Tracker.repost_gap_days`, which is careful about the case where
-      a healthy job simply reached us from two sources at once.
+    What does work is the tracker's memory. A re-listed role gets a *new* date
+    each time, so it walks straight through the freshness window while the
+    tracker still holds the earlier sighting — which measures the thing worth
+    knowing, how long this role has been circulating. See
+    `db.Tracker.repost_gap_days` for what counts as an earlier sighting and,
+    just as importantly, what does not.
 
-    An undated posting gets **neither** flag. Not "not stale" as a judgement —
-    there is nothing to judge, and guessing an age from `first_seen_at` would
-    be exactly the fabrication `posting_age_days` refuses to make. The repost
-    check still runs on it, because that one does not need this job's date.
-
-    A tracker that raises costs the repost flag and nothing else. The digest
-    is the last artefact of a run whose money is already spent.
+    A tracker that raises, or hands back something that is not a number, costs
+    this one flag and nothing else. The digest is the last artefact of a run
+    whose money is already spent, so the card outlives any problem here.
     """
     flags: list[str] = []
-
-    stale = age_days is not None and age_days > float(stale_after_days)
-    if stale:
-        flags.append(
-            f"On the market {int(age_days or 0)} days — past the "
-            f"{int(stale_after_days)}-day mark set by freshness.stale_after_days. "
-            "Roughly one posting in five is never filled, and the old ones are "
-            "where they gather. Worth a look, not worth waiting on."
-        )
-
     gap: float | None = None
+
     if tracker is not None:
+        # The whole computation lives inside the `try`, not just the call.
+        # A stub that returns `"40"` or a `Mock()` used to raise `TypeError`
+        # out of here, out of `_item`, and into `build_context`'s "skipping
+        # unrenderable digest item" — deleting the card over an advisory line.
         try:
-            gap = tracker.repost_gap_days(
+            raw = tracker.repost_gap_days(
                 getattr(job, "dedupe_key", ""),
                 key=getattr(job, "key", ""),
+                source=getattr(job, "source", ""),
                 posted_at=getattr(job, "posted_at", None),
                 now=now,
             )
+            if raw is None:
+                gap = None
+            elif isinstance(raw, bool) or not isinstance(raw, (int, float)):
+                # Deliberately strict rather than coercive. `float("40")` would
+                # work, but a seam that answers with a string is a seam that is
+                # broken, and this flag names an employer — it does not get to
+                # run on a guess.
+                logger.debug(
+                    "repost check returned %r (not a number) for %s — ignoring",
+                    raw, getattr(job, "url", "?"),
+                )
+                gap = None
+            else:
+                gap = float(raw)
+                threshold = float(repost_min_gap_days)
+                # 0 turns the flag off, like every other 0 in this config.
+                # It is the one value that must NOT read as "flag everything":
+                # that would put a ghost-job accusation on the same-day
+                # duplicate this threshold exists to protect.
+                if threshold > 0 and gap >= threshold:
+                    flags.append(
+                        f"On the market {_round_days(gap)} days or more: the same "
+                        f"company, title and city were already listed on "
+                        f"{getattr(job, 'source', '') or 'this board'} under a "
+                        "different job id, that long before this posting went "
+                        "up. A role that keeps circulating can mean the first "
+                        "search failed, or that it is being advertised rather "
+                        "than filled — it can also just be a second headcount. "
+                        "Worth a look, not worth waiting on."
+                    )
         except Exception as exc:  # a tracker problem must not cost the page
             logger.debug("repost check failed for %s: %s", getattr(job, "url", "?"), exc)
             gap = None
+            flags = []
 
-    if gap is not None and gap >= float(repost_min_gap_days):
-        flags.append(
-            f"Re-listed: this same role was already on the market {int(gap)} days "
-            "ago under a different job id. A repost is the other cheap ghost-job "
-            "signal — it can mean the first search failed, and it can mean the "
-            "role is being advertised rather than filled."
-        )
-
-    return flags, stale, gap
+    return flags, gap
 
 
 def _item(
@@ -361,7 +391,6 @@ def _item(
     digest_dir: Path,
     now: datetime,
     tracker: Any = None,
-    stale_after_days: float = DEFAULT_STALE_AFTER_DAYS,
     repost_min_gap_days: float = DEFAULT_REPOST_MIN_GAP_DAYS,
 ) -> dict[str, Any]:
     """Flatten one `ScoredJob` into the plain dict the template renders.
@@ -402,12 +431,14 @@ def _item(
 
     relative = relative_time(job.posted_at, now)
     age_days = posting_age_days(job.posted_at, now)
-    flags, stale, repost_gap = _ghost_flags(
+    # Rounded, never truncated. `int()` turns 30.5 days into "30 days" and a
+    # 23-hour-old posting into "0 days" — a printed number that disagrees with
+    # the sentence around it, which is how a card ends up contradicting itself.
+    age_label = None if age_days is None else _round_days(age_days)
+    flags, repost_gap = _ghost_flags(
         job,
         now=now,
-        age_days=age_days,
         tracker=tracker,
-        stale_after_days=stale_after_days,
         repost_min_gap_days=repost_min_gap_days,
     )
 
@@ -417,10 +448,13 @@ def _item(
         # we happened to fetch it.
         posted_label = "no posting date"
     elif age_days is not None and age_days >= RELATIVE_DAYS_LIMIT:
-        # `relative_time` switches to a calendar date here, which is easier to
-        # place but stops answering the question the age is on the card to
-        # answer. Print both, so "how old is this?" always has an answer.
-        posted_label = f"posted {relative} — {int(age_days)} days ago"
+        # `relative_time` switches to a calendar date at exactly this age,
+        # which is easier to place but stops answering the question the age is
+        # on the card to answer. Print both, so "how old is this?" always has
+        # an answer. The boundary is `>=` because `relative_time`'s own is
+        # `days < RELATIVE_DAYS_LIMIT`: at exactly 60 days it has already
+        # switched, so this branch has to have switched too.
+        posted_label = f"posted {relative} — {age_label} days ago"
     else:
         posted_label = f"posted {relative}"
 
@@ -439,14 +473,13 @@ def _item(
         "posted_at_iso": job.posted_at.isoformat() if job.posted_at else "",
         "posted_relative": relative,
         "posted_label": posted_label,
-        # None, not 0: an undated posting has no age. The template prints
-        # neither, and `stale` is False for it — an unknown age is not evidence
-        # of an old posting.
-        "posted_age_days": None if age_days is None else int(age_days),
-        "stale": stale,
-        "repost_gap_days": None if repost_gap is None else int(repost_gap),
-        #: Advisory notes, rendered as the same `p.alert` line the scorer's
-        #: failure uses. Never a reason to leave the card off the page.
+        # None, not 0: an undated posting has no age, and an unknown age is
+        # not evidence of an old posting. The card says "no posting date".
+        "posted_age_days": age_label,
+        "repost_gap_days": None if repost_gap is None else _round_days(repost_gap),
+        #: Advisory notes, rendered as `p.advisory` — amber, deliberately not
+        #: the red `p.alert` an actual failure uses. Never a reason to leave
+        #: the card off the page.
         "flags": flags,
         "score": value,
         "unscored": unscored,
@@ -492,9 +525,9 @@ def _config_summary(config: Any) -> dict[str, Any]:
             _cfg(config, "freshness.max_age_hours", DEFAULT_MAX_AGE_HOURS),
             DEFAULT_MAX_AGE_HOURS,
         ),
-        "stale_after_days": _int(
-            _cfg(config, "freshness.stale_after_days", DEFAULT_STALE_AFTER_DAYS),
-            DEFAULT_STALE_AFTER_DAYS,
+        "repost_min_gap_days": _int(
+            _cfg(config, "freshness.repost_min_gap_days", DEFAULT_REPOST_MIN_GAP_DAYS),
+            DEFAULT_REPOST_MIN_GAP_DAYS,
         ),
         "countries": _strings(_cfg(config, "filters.countries", [])),
         "sources": sources,
@@ -528,11 +561,7 @@ def build_context(
     moment = ensure_utc(now) or utcnow()
     digest_dir = _resolved_path(config, "output.dir", "output")
     summary = _config_summary(config)
-    stale_after_days = summary["stale_after_days"]
-    repost_min_gap_days = _int(
-        _cfg(config, "freshness.repost_min_gap_days", DEFAULT_REPOST_MIN_GAP_DAYS),
-        DEFAULT_REPOST_MIN_GAP_DAYS,
-    )
+    repost_min_gap_days = summary["repost_min_gap_days"]
 
     buckets: dict[str, list[dict[str, Any]]] = {name: [] for name, _ in SECTIONS}
     buckets["other"] = []
@@ -547,7 +576,6 @@ def build_context(
                 digest_dir=digest_dir,
                 now=moment,
                 tracker=tracker,
-                stale_after_days=stale_after_days,
                 repost_min_gap_days=repost_min_gap_days,
             )
         except Exception as exc:  # one malformed record must not blank the page

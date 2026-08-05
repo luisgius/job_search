@@ -124,9 +124,10 @@ def test_get_job_returns_none_for_unknown_key(memory_tracker):
 #
 # The measurement behind the digest's repost flag. It is only ever used to
 # annotate a card, never to drop one, so every test below is about *accuracy*
-# rather than safety — but one case is worth as much as the double-apply tests
-# are: a simultaneous cross-source duplicate must not read as a re-listing,
-# because that would put a ghost-job warning on a perfectly healthy posting.
+# rather than safety — but accuracy here is worth as much as the double-apply
+# tests are, in the other direction: this flag accuses a named employer of
+# advertising a job it is not filling, and a heuristic that indicts healthy
+# postings is worse than no heuristic at all.
 
 
 def cross_source_twin(**overrides):
@@ -164,9 +165,14 @@ def test_a_simultaneous_cross_source_duplicate_is_not_a_repost(memory_tracker):
 
     One live job reaching us from Greenhouse and from Adzuna in the same run
     has one `dedupe_key` and two `Job.key`s — structurally identical to a
-    re-listing. What separates them is time, so the gap has to come out near
-    zero here. Flagging this would put a ghost-job warning on a healthy
-    posting, every day, until the reader stopped believing the flag.
+    re-listing. Flagging it would put a ghost-job warning on a healthy posting,
+    every day, until the reader stopped believing the flag.
+
+    Time used to be the only thing separating the two, and this pair *does*
+    come out at a gap of zero. But time only works when both sources agree on
+    the date, and an aggregator's date is its own ingest time — see the next
+    test. So the sightings no longer count across boards at all, and this case
+    is now excluded by construction rather than by arithmetic.
     """
     ats = make_job(hours_old=3)
     aggregator = cross_source_twin(hours_old=3)
@@ -176,12 +182,90 @@ def test_a_simultaneous_cross_source_duplicate_is_not_a_repost(memory_tracker):
     memory_tracker.record_job(ats, now=NOW)
     memory_tracker.record_job(aggregator, now=NOW)
 
-    gap = memory_tracker.repost_gap_days(
+    assert memory_tracker.repost_gap_days(
         aggregator.dedupe_key, key=aggregator.key,
         posted_at=aggregator.posted_at, now=NOW,
-    )
-    assert gap is not None          # there *is* an earlier row ...
-    assert abs(gap) < 1             # ... it is simply not a gap
+    ) is None
+
+
+def test_an_aggregator_re_dating_a_live_posting_is_not_a_repost(memory_tracker):
+    """The cross-source case time could not separate, which is why it is no
+    longer asked to.
+
+    Adzuna's `created` is its own ingest date, not the employer's. One live
+    Greenhouse posting syndicated there arrives carrying a date months away
+    from its twin's, so the gap comes out at 150 days rather than the zero the
+    duplicate defence relies on. The docstring's claim — "a duplicate arrives
+    beside its twin" — holds only when both sources agree about when, and this
+    is the source that routinely does not.
+    """
+    live = make_job(hours_old=2, ats_job_id="req-1")
+    syndicated = cross_source_twin(posted_at=NOW - timedelta(days=150))
+    memory_tracker.record_job(syndicated, now=NOW - timedelta(days=150))
+    memory_tracker.record_job(live, now=NOW)
+
+    assert memory_tracker.repost_gap_days(
+        live.dedupe_key, key=live.key, source=live.source,
+        posted_at=live.posted_at, now=NOW,
+    ) is None
+
+
+def test_an_ats_migration_is_not_a_board_full_of_reposts(memory_tracker):
+    """The worst false positive available, because it fires on every role at
+    one employer on the same morning.
+
+    A company moving Greenhouse -> Ashby re-lists its whole board under new
+    ids in one day. Each req then has an older sighting with the same
+    `dedupe_key`, a different `Job.key` and a gap of however long they were on
+    the old ATS. Four reqs, four accusations, one relocation — and the day
+    that happens is precisely the day the user most needs the digest to be
+    readable.
+    """
+    for i in range(4):
+        old = make_job(source="greenhouse", ats="greenhouse", ats_job_id=f"gh-{i}",
+                       title=f"Engineer {i}", posted_at=NOW - timedelta(days=118))
+        memory_tracker.record_job(old, now=NOW - timedelta(days=118))
+
+    for i in range(4):
+        moved = make_job(source="ashby", ats="ashby", ats_job_id=f"ashby-{i}",
+                         title=f"Engineer {i}", hours_old=2)
+        memory_tracker.record_job(moved, now=NOW)
+        assert memory_tracker.repost_gap_days(
+            moved.dedupe_key, key=moved.key, source=moved.source,
+            posted_at=moved.posted_at, now=NOW,
+        ) is None
+
+
+def test_a_repost_on_the_same_board_still_counts(memory_tracker):
+    """The neighbouring case for both tests above. Ignoring other boards must
+    not quietly ignore everything: a role re-opened on the board it was
+    originally advertised on is the signal, and it survives."""
+    old = make_job(ats_job_id="old", posted_at=NOW - timedelta(days=120))
+    memory_tracker.record_job(old, now=NOW - timedelta(days=120))
+    new = make_job(ats_job_id="new", posted_at=NOW)
+    memory_tracker.record_job(new, now=NOW)
+
+    gap = memory_tracker.repost_gap_days(
+        new.dedupe_key, key=new.key, source=new.source,
+        posted_at=new.posted_at, now=NOW)
+    assert gap == pytest.approx(120, abs=0.01)
+
+
+def test_the_source_argument_beats_the_stored_row(memory_tracker):
+    """`source=` is what the caller is holding; the stored row is the fallback
+    for a caller that is not. Passing it is what makes the answer right for a
+    job the tracker has never recorded — without it, an unrecorded job has no
+    knowable board and gets no measurement rather than a wrong one."""
+    old = make_job(ats_job_id="old", posted_at=NOW - timedelta(days=60))
+    memory_tracker.record_job(old, now=NOW - timedelta(days=60))
+    unrecorded = make_job(ats_job_id="new", posted_at=NOW)
+
+    assert memory_tracker.repost_gap_days(
+        unrecorded.dedupe_key, key=unrecorded.key,
+        posted_at=unrecorded.posted_at, now=NOW) is None
+    assert memory_tracker.repost_gap_days(
+        unrecorded.dedupe_key, key=unrecorded.key, source="greenhouse",
+        posted_at=unrecorded.posted_at, now=NOW) == pytest.approx(60, abs=0.01)
 
 
 def test_a_relisting_after_a_gap_is_measured_in_days(memory_tracker):
@@ -211,26 +295,57 @@ def test_an_undated_earlier_sighting_falls_back_to_when_we_first_saw_it(memory_t
 
     new = make_job(ats_job_id="new", posted_at=NOW)
     gap = memory_tracker.repost_gap_days(
-        new.dedupe_key, key=new.key, posted_at=new.posted_at, now=NOW)
+        new.dedupe_key, key=new.key, source=new.source,
+        posted_at=new.posted_at, now=NOW)
     assert gap == pytest.approx(90, abs=0.01)
 
 
-def test_an_undated_repost_is_measured_from_when_the_tracker_met_it(memory_tracker):
-    """Neither side has to be dated for the *gap* to be knowable: two
-    sightings ninety days apart are ninety days apart whatever the boards
-    claim."""
+def test_an_undated_current_listing_has_no_measurable_gap(memory_tracker):
+    """The substitution is only safe on one side, and this is the other one.
+
+    Falling back to `first_seen_at` for a *prior* row can only shrink the gap
+    (the test above). Doing it for the listing being judged — or worse, to
+    `now()` — moves the reference *later* and inflates. Concretely, these two
+    used to produce the identical `gap=200`:
+
+        the same 200-day-old role, still open, still undated  -> NOT a repost
+        a 200-day-old first listing, genuinely re-listed today -> a repost
+
+    Opposite ground truths, one number, and the flag accuses somebody either
+    way. Reachable whenever `freshness.skip_undated` is false, which is
+    documented and supported. With no date for this listing there is no
+    measurement to make, so there is none.
+    """
     old = make_job(ats_job_id="old", hours_old=None)
-    memory_tracker.record_job(old, now=NOW - timedelta(days=90))
+    memory_tracker.record_job(old, now=NOW - timedelta(days=200))
     new = make_job(ats_job_id="new", hours_old=None)
     memory_tracker.record_job(new, now=NOW)
 
+    assert memory_tracker.repost_gap_days(
+        new.dedupe_key, key=new.key, source=new.source,
+        posted_at=None, now=NOW) is None
+
+
+def test_a_stored_posted_at_is_used_when_the_caller_passes_none(memory_tracker):
+    """The neighbouring case, and the line between the two.
+
+    Reading this listing's date off its own stored row is not a fabrication —
+    it is the employer's claim, frozen by `record_job`'s COALESCE, and it is
+    the same value the caller would have passed. Only `first_seen_at` and the
+    clock are inventions, and only those are refused.
+    """
+    old = make_job(ats_job_id="old", posted_at=NOW - timedelta(days=90))
+    memory_tracker.record_job(old, now=NOW - timedelta(days=90))
+    new = make_job(ats_job_id="new", posted_at=NOW)
+    memory_tracker.record_job(new, now=NOW)
+
     gap = memory_tracker.repost_gap_days(
-        new.dedupe_key, key=new.key, posted_at=None, now=NOW)
+        new.dedupe_key, key=new.key, source=new.source, posted_at=None, now=NOW)
     assert gap == pytest.approx(90, abs=0.01)
 
 
 def test_a_cross_source_twin_does_not_mask_a_real_repost(memory_tracker):
-    """The earliest sighting decides the gap, not the nearest one.
+    """The earliest *qualifying* sighting decides the gap, not the nearest one.
 
     A role re-listed after three months does not stop being a re-listing
     because an aggregator also carries today's copy of it.
@@ -241,7 +356,8 @@ def test_a_cross_source_twin_does_not_mask_a_real_repost(memory_tracker):
 
     new = make_job(ats_job_id="new", posted_at=NOW)
     gap = memory_tracker.repost_gap_days(
-        new.dedupe_key, key=new.key, posted_at=new.posted_at, now=NOW)
+        new.dedupe_key, key=new.key, source=new.source,
+        posted_at=new.posted_at, now=NOW)
     assert gap == pytest.approx(90, abs=0.01)
 
 
@@ -275,7 +391,8 @@ def test_the_gap_is_not_shortened_by_the_old_listing_still_being_fetched(memory_
 
     new = make_job(ats_job_id="new", posted_at=NOW)
     gap = memory_tracker.repost_gap_days(
-        new.dedupe_key, key=new.key, posted_at=new.posted_at, now=NOW)
+        new.dedupe_key, key=new.key, source=new.source,
+        posted_at=new.posted_at, now=NOW)
     assert gap == pytest.approx(90, abs=0.01)
 
 
@@ -296,7 +413,8 @@ def test_repost_gap_days_reads_nothing_but_the_jobs_table(memory_tracker):
 
     assert memory_tracker.counts_by_status() == {}
     assert memory_tracker.repost_gap_days(
-        new.dedupe_key, key=new.key, posted_at=new.posted_at, now=NOW) is not None
+        new.dedupe_key, key=new.key, source=new.source,
+        posted_at=new.posted_at, now=NOW) is not None
     assert memory_tracker.counts_by_status() == {}
 
 

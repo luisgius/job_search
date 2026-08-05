@@ -1,6 +1,6 @@
 # Testing
 
-**1684 tests, ~43s, fully offline** (plus 44 network-only contract tests,
+**1700 tests, ~43s, fully offline** (plus 44 network-only contract tests,
 deselected by default).
 
 ```bash
@@ -18,24 +18,24 @@ pytest --cov=src --cov-report=term-missing
 | `test_ats_boards.py` | 108 | Greenhouse/Lever payload reality; slug + `--check` for all six |
 | `test_edge_fetch.py` | 86 | the shapes a real European job week produces |
 | `test_edge_match.py` | 76 | prompt injection; a model reply is untrusted input |
-| `test_main.py` | 60 | the pipeline end to end, offline |
+| `test_main.py` | 64 | the pipeline end to end, offline |
 | `test_util.py` | 59 | retries, HTML flattening, every ATS date shape |
 | `test_filters.py` | 58 | whole-word matching, dedupe richness |
 | `test_models.py` | 53 | job identity — the tracker's primary key |
 | `test_linkedin_email.py` | 52 | leniency under LinkedIn template change |
 | `test_scoring.py` | 52 | a job is never silently lost |
 | `test_llm_openrouter.py` | 50 | provider equivalence — same behaviour either way |
-| `test_config.py` | 48 | env-beats-file, validate-everything-at-once |
+| `test_config.py` | 58 | env-beats-file, validate-everything-at-once, **the shipped file vs `DEFAULTS`** |
 | `test_health.py` | 44 | a quiet day vs a broken pipeline |
 | `test_llm.py` | 43 | JSON recovery, retry policy |
 | `test_tailor.py` | 42 | **the anti-fabrication guarantee** |
-| `test_db.py` | 41 | **the double-apply guarantee** |
+| `test_db.py` | 57 | **the double-apply guarantee** |
 | `test_workable.py` | 69 | split description/requirements/benefits; assembled locations |
 | `test_live_contract.py` | 44 | **the live APIs still emit what we parse** (network-only) |
 | `test_live_contract_policy.py` | 22 | **that file skips only when it should** — offline |
 | `test_ashby.py` | 40 | `secondaryLocations`; unlisted drafts stay hidden |
 | `test_smartrecruiters.py` | 48 | the two-call shape — and its cap |
-| `test_digest.py` | 36 | escaping, and legibility of failure |
+| `test_digest.py` | 66 | escaping, and legibility of failure |
 | `test_adzuna.py` | 32 | snippets, duplicates, key redaction |
 | `test_personio.py` | 52 | XML, subdomain slugs, no external entities |
 | `test_notify.py` | 31 | no shell injection; one channel's death is contained |
@@ -187,10 +187,35 @@ actually occur in production payloads:
   attacker-controllable text from the open internet, so
   `<img src=x onerror=alert(1)>` must render escaped. Also: every section
   renders with zero items, and the whole page renders with zero jobs, so
-  "quiet day" is distinguishable from "pipeline broken".
+  "quiet day" is distinguishable from "pipeline broken" — and an *advisory* is
+  distinguishable from an *error*, which stopped being true when both rendered
+  the same red `p.alert`. The ghost-job flag is tested through the `tracker=`
+  seam adversarially, because that seam can delete a card: a tracker that
+  raises, that lacks the method, or that answers with a string or a `Mock()`
+  must each cost exactly one advisory line and nothing more. A wrong *type*
+  was the unhandled case, and it removed the job from the page entirely.
 - **`test_main.py`** — the pipeline end to end with a fake LLM, an in-memory
   tracker and no network, including the funnel counts and the CLI's exit
-  codes.
+  codes. Also the ordering guarantee: both `--limit` and `scoring.max_jobs`
+  slice from the front of the list, so the run sorts newest-first before
+  either bites — 40 postings two days old used to spend the whole ceiling and
+  leave the five posted two hours ago unscored.
+
+### Assertions that cannot fail are worse than none
+
+Three tests across `test_digest.py` and `test_main.py` claimed to defend
+"flagging never drops a job" by comparing funnel counters. `build_context`
+copies `stats` through untouched and the fixture is a hardcoded `RunStats`, so
+those assertions compared a constant to itself; in `test_main.py` the two
+counters are set at pipeline steps 3 and 6, before the digest is built at all.
+A mutation that deleted every flagged job from the page left all three
+passing, and both the commit message and `docs/ARCHITECTURE.md` cited them as
+the evidence.
+
+They now cross-check the funnel's `matched` against the cards actually on the
+page — two numbers computed at opposite ends of the run, which is what makes
+the comparison capable of failing. **If a docstring says "this is where it
+would show", re-apply the bug and confirm that it shows.**
 - **`test_health.py`** — every alert comes in a pair: a case that must fire it
   and a neighbouring case that must stay silent. Zero jobs from every board is
   an alert; two jobs instead of forty is a quiet Tuesday and is not. A

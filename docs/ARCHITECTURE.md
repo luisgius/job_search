@@ -58,12 +58,26 @@ digest.render        -> output/digest_YYYY-MM-DD.html
 `cfg.source_enabled(name)`, `cfg.validate(require_llm=)`. Defaults live in
 `DEFAULTS` / `WATCHLIST_DEFAULTS` — read them before inventing a key.
 
+Named constants, because a number written in two places is a number free to
+drift: `DEFAULT_MAX_AGE_HOURS` (72, the freshness window) and
+`DEFAULT_REPOST_MIN_GAP_DAYS` (14, the ghost-job flag). Both are imported by
+`filters` and `digest` rather than re-typed.
+
+**The shipped `config.yaml` is a fifth site and it wins at runtime**, because
+it deep-merges *over* `DEFAULTS`. `test_config` compares the two files key by
+key and fails on any divergence that is not listed as deliberate — without
+that, editing the shipped file could silently revert a change to `DEFAULTS`
+with every test still green. Two things it caught: `notify.on` had become the
+boolean key `True` (YAML 1.1 reads a bare `on` as true), so every edit to the
+shipped alert list did nothing; and `filters.description_exclude` had lost
+`ts/sci`. Quote any key YAML would read as a boolean — `"on"`, `"NO"`.
+
 ## Tracker (`src/db.py`) — already implemented
 
 `Tracker(path)`, `record_job(job, now=)`, `has_job(key)`,
 `record_status(key, status, detail=, score=, method=, artifacts_dir=, now=)`,
 `get_status(key)`, `has_applied(key)`, `has_applied_similar(dedupe_key)`,
-`repost_gap_days(dedupe_key, key=, posted_at=, now=)`,
+`repost_gap_days(dedupe_key, key=, source=, posted_at=, now=)`,
 `record_submit_attempt(key, url=, method=, now=)` /
 `clear_submit_attempt(key)` / `submit_attempted(key)`,
 `should_surface(key, within_days=, now=)`, `start_run` / `finish_run`,
@@ -76,13 +90,44 @@ eligible for a real application later.
 recruiter closing and re-opening a requisition produces a new ATS id for the
 same role, and `has_applied` cannot see that.
 
-`repost_gap_days` reads the same `dedupe_key` index to *measure* that
-re-opening — how many days before this listing the same role was already on
-the market — and returns `None` when it never was. It decides nothing: the
-threshold lives in `freshness.repost_min_gap_days` and the only consumer is an
-advisory line on a digest card. The gap is what separates a re-listing from
-one live job arriving via two sources at once, which has the same one
-`dedupe_key` / two `Job.key` shape.
+`repost_gap_days(dedupe_key, key=, source=, posted_at=, now=)` reads the same
+`dedupe_key` index to *measure* that re-opening — how many days before this
+listing the same role was already on the market — and returns `None` when it
+never was. It decides nothing: the threshold lives in
+`freshness.repost_min_gap_days` (**0 means off**) and the only consumer is an
+advisory line on a digest card.
+
+Two restrictions carry the accuracy, and both exist because this flag accuses
+a named employer:
+
+- **Only same-`source` sightings count.** A different board with the same
+  `dedupe_key` has three innocent readings and one guilty one: an ATS
+  migration re-lists a company's whole board under new ids in a day (four
+  reqs, four accusations, one relocation); an aggregator re-dates a live
+  posting, because Adzuna's `created` is its own ingest time; or it is a plain
+  cross-source duplicate. The gap alone was supposed to separate the last of
+  those and only can when both sources agree about *when* — which is exactly
+  what an aggregator does not do. Pass `source=`; the stored row is only a
+  fallback for a caller that has not got one.
+- **An undated *current* listing returns `None`.** Substituting `first_seen_at`
+  for a prior row can only shrink the gap, which is the safe direction.
+  Substituting it for the listing being judged moves the reference later and
+  *inflates*: a role open and undated for 200 days produced the same `gap=200`
+  as a role genuinely re-listed today. Reachable whenever
+  `freshness.skip_undated` is false.
+
+What is left is irreducible — an honest re-advertisement after a failed search
+looks exactly like a ghost job from outside — so the card's wording reports the
+measurement and names the innocent explanation rather than asserting a
+mechanism.
+
+**Posting age is deliberately not a second signal.** It cannot be one here:
+every card comes from `scored_jobs ⊆ fresh ⊆ apply_filters(...).kept`, so it is
+younger than `freshness.max_age_hours` by construction. A `stale_after_days: 30`
+knob shipped once beside `max_age_hours: 72` and could not fire on anything the
+pipeline was able to produce; it is gone from `config.yaml`, `DEFAULTS` and
+`validate()`. The gap survives that argument because a re-listing carries a
+brand new date and walks straight through the freshness window.
 
 The `submit_attempt*` trio is a write-ahead record of a submit *click*, taken
 before the click and cleared only on positive evidence that nothing was sent.
@@ -334,11 +379,34 @@ page object; Playwright is imported only inside `run`.
 def build_context(scored_jobs, stats, config, *, now=None, tracker=None) -> dict
 def render_html(context) -> str
 def write_digest(scored_jobs, stats, config, *, now=None, tracker=None) -> Path
+def posting_age_days(posted_at, now=None) -> float | None   # None, never 0
+def relative_time(dt, now=None) -> str                       # "3h ago" / a date
+RELATIVE_DAYS_LIMIT = 60      # past this, relative_time prints a calendar date
 ```
 `tracker=` is optional and read-only — it supplies the sighting history behind
-the repost flag. Every card renders identically with or without it, minus one
-advisory line: the ghost-job signals are **flags, never filters**, and the
-funnel is asserted to be unchanged by them.
+the repost flag. The ghost-job signal is a **flag, never a filter**: it never
+drops, hides, reorders or downweights a card. A card renders with or without a
+tracker, differing by one advisory line — and a tracker that raises, is
+missing the method, or answers with something that is not a number costs that
+same one line and nothing else. (It did not always: the `try` used to wrap
+only the call, so a stub returning `"40"` raised `TypeError` all the way into
+`build_context`'s "skipping unrenderable digest item" and *deleted the card*.)
+
+That guarantee is enforced by comparing the funnel against the cards on the
+page, not by comparing `stats` to itself — `build_context` copies `stats`
+through untouched, so a "the funnel is unchanged" assertion over a hardcoded
+`RunStats` is a constant compared to a constant and catches nothing.
+
+`posting_age_days` returns `None` for an undated posting — a third state,
+neither 0 nor "fresh" — and never falls back to `first_seen_at`, which is a
+fact about our cron schedule rather than about the employer. Day counts on the
+card are rounded half up, never truncated: `int()` printed a 23-hour-old
+posting as `0` days and 30.5 days as `30`, next to an untruncated threshold.
+
+Advisory notes render `p.advisory` (amber, `--warn`) and real failures render
+`p.alert` (red, `--bad`). They were the same class, which made "this posting
+may be old" indistinguishable from "your scorer is down".
+
 Jinja2 template at `src/templates/digest.html.j2`, self-contained (inline
 CSS, no CDN). Sections: **Needs your click** (digest status, sorted by score
 desc), **Auto-applied**, **Dry run — check these**, **Below threshold**,
@@ -356,3 +424,14 @@ Flags: `--no-browser`, `--dry-run/--no-dry-run`, `--config`, `--watchlist`,
 `--limit N`, `--source NAME` (repeatable), `--skip-apply`, `--verbose`,
 `--validate-only`. Exit codes: 0 ok, 1 config invalid, 2 unexpected error.
 Prints a compact summary and the digest path.
+
+**Jobs are sorted newest-first before anything truncates them.** Both
+`--limit` and `scoring.max_jobs` slice from the front of the list, and until
+this sort they sliced in *fetch* order — `_fetch_all` extends in source order,
+`apply_filters` and `_gate_on_tracker` append in input order — so board order
+decided who got scored. With the window at 72 hours, 40 postings two days old
+ahead of 5 posted two hours ago spent the entire ceiling on the older ones and
+scored none of the freshest. Undated postings sort **last**, in fetch order:
+`skip_undated` ships true, so they only get here when the user has turned it
+off and accepted some staleness, and a board endpoint returning every open
+requisition would otherwise evict every provably-fresh posting from the cap.

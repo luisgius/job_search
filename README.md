@@ -473,14 +473,24 @@ publishes late, an aggregator whose timestamp is its own ingest time).
 
 **Ghost jobs are flagged, never filtered.** Between 18% and 27% of online
 postings are never filled; Greenhouse's own study puts at least 1 in 5 US
-postings in that bucket. Two signals come free from what the tracker already
-stores, and both appear as a line on the card rather than as a rejection:
-a posting older than `freshness.stale_after_days` (30), and a role re-listed
-under a new job id at least `freshness.repost_min_gap_days` (14) after the
-first listing. The gap is what keeps an ordinary cross-source duplicate — one
-live job arriving from Greenhouse *and* Adzuna — from being called a repost.
-A wrong flag costs you a glance; a wrong deletion costs you a job you never
-hear about, so nothing here ever removes a card.
+postings in that bucket. There is **one** signal, it comes free from what the
+tracker already stores, and it appears as a line on the card rather than as a
+rejection: the same role re-listed under a new job id at least
+`freshness.repost_min_gap_days` (14) before the current listing. Set it to 0
+to turn the flag off.
+
+Posting *age* is deliberately not a second signal. Everything you are shown
+already came through the 72-hour window, so it is fresh by construction and a
+"this posting is old" flag can never fire on it — an earlier version shipped
+that knob anyway and it was dead code. The re-listing gap is reachable because
+a re-posted role carries a brand new date, and it measures the better thing:
+how long the *role* has been circulating, not how long this listing has been up.
+
+Only sightings on the same board count, so an ATS migration or an aggregator
+re-dating a live posting is not mistaken for a repost. Even so the flag hedges,
+because a company that failed to fill a role and honestly re-advertised it
+looks identical from outside. A wrong flag costs you a glance; a wrong deletion
+costs you a job you never hear about, so nothing here ever removes a card.
 
 **The ATS APIs are unofficial-but-public.** They have been stable for years,
 but nothing obliges them to stay that way, and a format change degrades into

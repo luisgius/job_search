@@ -68,32 +68,66 @@ most a few extra days of postings; `skip_undated: false` admits every undated
 posting a board has ever left open, because ATS board endpoints return the
 whole set of open requisitions rather than the recent ones. That is bounded in
 time — `db.skip_seen_days` suppresses them from the second run onwards — but on
-the run where it happens it can push genuinely fresh jobs past
-`scoring.max_jobs`, which drops them from that run entirely. The honest advice
-stays the one above: watch the `undated` count for a week, then flip it *for a
-reason*, knowing what the first morning will look like.
+the run where it happens it is a flood. It used to be able to push genuinely
+fresh postings past `scoring.max_jobs` and drop them from that run entirely;
+the run now sorts newest-first before the cap bites and undated postings queue
+behind every dated one, so the flood costs *them* rather than the postings you
+can prove are fresh. The trade is stated in `main._newest_first`. The honest
+advice stays the one above: watch the `undated` count for a week, then flip it
+*for a reason*, knowing what the first morning will look like.
 
-## 2b. Ghost jobs are flagged, not filtered
+**The cost ceiling is spent newest-first.** `scoring.max_jobs` slices the batch,
+and until it was sorted it sliced in *board* order — so 40 postings two days
+old, fetched before 5 posted two hours ago, consumed the entire ceiling and the
+freshest five went unscored. Nothing was lost permanently (a posting cut before
+scoring never gets an `applications` row, so it returns tomorrow), but it meant
+that on any given morning you were least likely to see the postings you most
+wanted. Widening the window from 24h to 72h is what made the cap bind often
+enough to matter; the fix was the ordering, not the window.
+
+## 2b. Ghost jobs are flagged, not filtered — and there is only one signal
 
 Between 18% and 27% of online postings are estimated never to be filled, and
 Greenhouse's own study found at least 1 in 5 US postings falls in that bucket;
-45% of surveyed HR professionals say they post them routinely. Two signals are
-computable from data the tracker already stores, for free and with no network:
+45% of surveyed HR professionals say they post them routinely.
 
-- **age** — a posting past `freshness.stale_after_days` (default 30);
-- **re-listing** — the same role posted again under a new ATS id, at least
-  `freshness.repost_min_gap_days` (default 14) after the first listing. The
-  gap is what separates a re-listing from a healthy job that simply reached us
-  from Greenhouse and Adzuna at the same time: those share a `dedupe_key` and
-  differ in `Job.key`, exactly like a repost, and only time tells them apart.
+The obvious signal is age, and **age cannot work in this pipeline.** Every card
+comes from `scored_jobs ⊆ fresh ⊆ apply_filters(...).kept`, so every posting
+you are shown is younger than `freshness.max_age_hours` by construction. A
+`stale_after_days: 30` setting shipped once, nineteen lines below
+`max_age_hours: 72`: a posting old enough to trip it had been deleted by the
+freshness filter 27 days earlier. It validated, it had 44 tests, and it could
+not fire on anything a run could produce — the tests all called the flagging
+function directly with a hand-built date. It has been removed rather than
+retuned, because the only value that would make it reachable is one that flags
+everything.
 
-Both are lines on the card and nothing else. They do not filter, hide, reorder
-or downweight anything, and the digest's funnel is identical with and without
-them — which is asserted, because the temptation to "just hide the obvious
-ghosts" is exactly how this tool would start deleting real opportunities. A
-wrong flag costs a glance. Neither signal is proof: a genuine role can sit
-open for two months, and a genuine re-listing happens when the first search
-failed. Read them as "do not read silence here as rejection", not as "skip".
+What survives is **re-listing**: the same role posted again under a new ATS id,
+at least `freshness.repost_min_gap_days` (default 14) before the current
+listing. This one is reachable precisely because a re-listed ghost job gets a
+*new* date each time and sails through the freshness window while the tracker
+still remembers the earlier sighting. It also measures the better quantity —
+how long the role has been circulating, rather than how long this particular
+listing has been up.
+
+It is still noisy, so two restrictions apply (see `db.Tracker.repost_gap_days`):
+only sightings on the **same board** count, which removes ATS migrations,
+aggregator re-dating and plain cross-source duplicates; and an **undated**
+current listing is never flagged, because there the only available date
+substitutions inflate the gap rather than shrink it. `repost_min_gap_days: 0`
+turns the flag off — 0 disables in this config, it never maximises.
+
+What is left is irreducible: a company that failed to fill a role in six months
+and honestly re-advertises it is indistinguishable from a ghost job by any data
+we have. The card says so — it reports the measurement and names the innocent
+explanation rather than asserting "Re-listed" as a fact about a named employer.
+
+The flag is a line on the card and nothing else. It does not filter, hide,
+reorder or downweight anything, and the number of cards on the page still
+matches the funnel's `matched` count — which is asserted, because the
+temptation to "just hide the obvious ghosts" is exactly how this tool would
+start deleting real opportunities. A wrong flag costs a glance. Read it as "do
+not read silence here as rejection", not as "skip".
 
 ## 3. Auto-apply: read this twice
 

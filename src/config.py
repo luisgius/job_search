@@ -36,23 +36,28 @@ import yaml
 #: whose timestamp is its own ingest time).
 DEFAULT_MAX_AGE_HOURS = 72
 
-#: A posting older than this many days is **flagged** on its card.
+#: How long a role must already have been on the market before this listing
+#: for the card to say so.
 #:
-#: Never filtered. Research puts ghost jobs at 18-27% of listings and
-#: Greenhouse's own study found at least 1 in 5 US postings is never filled;
-#: age is the cheapest signal we can compute for free. A wrong flag costs a
-#: glance, so the flag is safe in a way a rejection would not be.
-DEFAULT_STALE_AFTER_DAYS = 30
-
-#: How far apart two sightings of the same role must be before the later one
-#: is called a re-listing rather than a duplicate.
+#: This is the *only* ghost-job signal, and it is deliberately not posting age.
+#: Age cannot be one: every posting the digest shows came through
+#: `filters.is_fresh`, so it is younger than `max_age_hours` by construction —
+#: at 72 hours, a "flag postings older than N days" knob can only fire for
+#: N < 3, which flags everything. It was shipped anyway once (see git history),
+#: and it was dead code the day it landed.
 #:
-#: The same live posting reaching us from Greenhouse and from Adzuna has one
-#: `dedupe_key` and two `Job.key`s — structurally identical to a re-listing.
-#: What separates them is time: a duplicate arrives alongside its twin, a
-#: repost arrives after the first listing has been and gone. Two weeks is
-#: comfortably longer than any cross-source ingest lag and comfortably shorter
-#: than a hiring cycle.
+#: The gap survives that argument because a re-listed role gets a *new* date
+#: each time and sails through the freshness filter, so the tracker's memory —
+#: not the posting's date — is what measures how long the role has been
+#: circulating. That is also the quantity worth reading: "this role has been
+#: advertised for eight months" is a ghost-job signal, "this posting is three
+#: days old" is not.
+#:
+#: Two weeks is comfortably longer than any cross-source ingest lag and
+#: comfortably shorter than a hiring cycle. **0 turns the flag off**, matching
+#: `scoring.max_jobs: 0` ("your cost ceiling, so 0 means zero") and
+#: `db.should_surface(within_days<=0)` — in this repo 0 disables a mechanism,
+#: it never maximises one.
 DEFAULT_REPOST_MIN_GAP_DAYS = 14
 
 DEFAULTS: dict[str, Any] = {
@@ -98,10 +103,9 @@ DEFAULTS: dict[str, Any] = {
         # Postings without a trustworthy date cannot be proven fresh. Dropping
         # them is the honest default; flip to False to keep them.
         "skip_undated": True,
-        # The two below are FLAGS ON THE CARD, never filters. Nothing reads
-        # them to drop, hide or reject a posting — they annotate a card the
-        # digest was going to render anyway. See `digest._ghost_flags`.
-        "stale_after_days": DEFAULT_STALE_AFTER_DAYS,
+        # A FLAG ON THE CARD, never a filter. Nothing reads it to drop, hide
+        # or reject a posting — it annotates a card the digest was going to
+        # render anyway. See `digest._ghost_flags`.
         "repost_min_gap_days": DEFAULT_REPOST_MIN_GAP_DAYS,
     },
     "filters": {
@@ -472,19 +476,17 @@ class Config:
                 or max_age <= 0:
             problems.append(f"freshness.max_age_hours must be > 0, got {max_age!r}")
 
-        # The two ghost-job thresholds only ever colour a card, so a bad value
+        # The ghost-job threshold only ever colours a card, so a bad value
         # costs a wrong flag rather than a lost posting. Still checked: a
         # setting that is silently ignored is worse than one that is rejected,
-        # because the user believes it took effect. Zero is legal — it means
-        # "flag everything you can", which is a coherent thing to ask for.
-        for dotted, default in (
-            ("freshness.stale_after_days", DEFAULT_STALE_AFTER_DAYS),
-            ("freshness.repost_min_gap_days", DEFAULT_REPOST_MIN_GAP_DAYS),
-        ):
-            value = self.get(dotted, default)
-            if isinstance(value, bool) or not isinstance(value, (int, float)) \
-                    or value < 0:
-                problems.append(f"{dotted} must be >= 0, got {value!r}")
+        # because the user believes it took effect. Zero is legal and means
+        # "turn the flag off" — the same thing 0 means for `scoring.max_jobs`
+        # and for `db.should_surface`'s window.
+        gap = self.get("freshness.repost_min_gap_days", DEFAULT_REPOST_MIN_GAP_DAYS)
+        if isinstance(gap, bool) or not isinstance(gap, (int, float)) or gap < 0:
+            problems.append(
+                f"freshness.repost_min_gap_days must be >= 0 (0 = off), got {gap!r}"
+            )
 
         if self.source_enabled("adzuna") and not (
             self.get("keys.adzuna_app_id") and self.get("keys.adzuna_app_key")

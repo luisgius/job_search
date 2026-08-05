@@ -301,6 +301,19 @@ section {
   color: var(--bad);
   font-size: 13px;
 }
+/* Same shape as .alert, amber instead of red, plus a rule down the side so
+   the two stay apart for a red-green colour-blind reader as well. `.alert`
+   means "something in this run failed and needs you"; `.advisory` means
+   "this posting may not be what it looks like" — a hedge, not a failure. */
+.advisory {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--warn);
+  border-radius: 0 8px 8px 0;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: 13px;
+}
 .note {
   margin: 10px 0 0;
   color: var(--muted);
@@ -556,10 +569,18 @@ footer code {
 <body>
 
 {#
-  Advisory ghost-job notes: posting age past freshness.stale_after_days, and a
-  re-listing of a role already seen under another job id. Rendered with the
-  same `p.alert` line the scorer's own failure uses, deliberately — a second
-  warning style would just teach the reader that some warnings are optional.
+  The ghost-job advisory: this role was already on the market under another
+  job id, more than freshness.repost_min_gap_days before this listing.
+
+  Rendered AMBER (`p.advisory`), never the red `p.alert`. `.alert` is what a
+  real failure uses — "Scorer failed: judge it yourself", "the form needed an
+  answer this bot will not give" — and those are things that went wrong in
+  *this* run and need the reader to act. "This role has been circulating a
+  while" is a hedge about somebody else's hiring process, on a card that is
+  otherwise completely fine. Painting the two the same colour costs both:
+  the advisory reads as an error, and by the fifth one the errors read as
+  advisories. The amber pair already existed in this file (--warn/--warn-bg,
+  used by .card.warn, .score-70 and .mode-dry) — nothing was invented here.
 
   These NEVER remove a card. Every sentence is computed in digest._ghost_flags;
   this loop prints what it was given and decides nothing. Defined before
@@ -570,7 +591,7 @@ footer code {
    partial context, and iterating a missing key would take the whole page
    down over an advisory line. #}
 {% for flag in item.flags or [] %}
-<p class="alert">{{ flag }}</p>
+<p class="advisory">{{ flag }}</p>
 {% endfor %}
 {% endmacro %}
 
@@ -947,7 +968,7 @@ footer code {
             <tr><td>score threshold</td><td class="num">{{ config_summary.threshold }}</td></tr>
             <tr><td>auto-apply floor</td><td class="num">{{ config_summary.apply_min_score }}</td></tr>
             <tr><td>max age (hours)</td><td class="num">{{ config_summary.max_age_hours }}</td></tr>
-            <tr><td>flag as stale after (days)</td><td class="num">{{ config_summary.stale_after_days }}</td></tr>
+            <tr><td>flag a re-listing after (days)</td><td class="num">{{ config_summary.repost_min_gap_days }}</td></tr>
             <tr><td>scoring model</td><td>{{ config_summary.scoring_model or '—' }}</td></tr>
             <tr><td>tailoring model</td><td>{{ config_summary.tailoring_model if config_summary.tailoring_enabled else 'off' }}</td></tr>
             <tr><td>sources enabled</td><td>{{ config_summary.sources_enabled | join(', ') or 'none' }}</td></tr>

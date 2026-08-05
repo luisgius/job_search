@@ -116,6 +116,11 @@ def _iso(value: datetime | None) -> str | None:
     return dt.isoformat() if dt else None
 
 
+def _source_key(value: Any) -> str:
+    """A `source` name in comparable form — trimmed and case-folded."""
+    return str(value or "").strip().lower()
+
+
 def _parse_iso(value: str | None) -> datetime | None:
     if not value:
         return None
@@ -232,43 +237,84 @@ class Tracker:
         dedupe_key: str,
         *,
         key: str,
+        source: str | None = None,
         posted_at: datetime | None = None,
         now: datetime | None = None,
     ) -> float | None:
-        """How long this role had already been listed before *this* listing.
+        """How long this role had already been listed **on this same board**
+        before *this* listing.
 
         A recruiter who closes a requisition and opens it again gets a new
         `ats_job_id`, therefore a new `Job.key` — but `dedupe_key` (company +
         title + city) does not move. So a row carrying this `dedupe_key` under
-        a **different** `key` is the same role, listed before. Re-listing is
-        one of the two cheap ghost-job signals; posting age is the other.
+        a **different** `key` is the same role, listed before. This is the only
+        ghost-job signal the pipeline has: posting age cannot be one, because
+        every posting that reaches a card came through `filters.is_fresh` and
+        is younger than `freshness.max_age_hours` by construction.
 
         Same shape as `has_applied_similar`: one indexed lookup on
         `dedupe_key`, no network, no cost. It reads only the `jobs` table and
         **nothing acts on the answer except a flag on a digest card.**
 
-        Returns the days between the earliest earlier sighting and this one, or
-        `None` when this role has never been seen under another key. The value
-        is signed: negative means the only other rows are *newer* than this
-        listing, which is evidence of nothing. **The caller applies the
-        threshold** — the gap is a measurement, whether it is wide enough to
-        call a repost is policy, and policy lives in the config
-        (`freshness.repost_min_gap_days`).
+        Returns the days between the earliest qualifying earlier sighting and
+        this one, or `None` when there is none. The value is signed: negative
+        means the only other rows are *newer* than this listing, which is
+        evidence of nothing. **The caller applies the threshold** — the gap is
+        a measurement, whether it is wide enough to call a repost is policy,
+        and policy lives in the config (`freshness.repost_min_gap_days`).
+
+        **Only same-source sightings count**, and that is what keeps this
+        usable. A different `source` on the same `dedupe_key` has at least four
+        readings and only one of them is a repost:
+
+        * an **ATS migration** — Greenhouse to Ashby — re-lists a company's
+          entire board under new ids on one day. Counting those accused every
+          open role at that employer at once, which is not a heuristic, it is
+          a slander generator;
+        * an **aggregator re-dating a live posting**: Adzuna's `created` is its
+          own ingest time, so the same job can arrive months "after" itself;
+        * a plain **cross-source duplicate**, one live job reaching us from two
+          places. The gap alone was supposed to separate this one, and it does
+          when both sources agree on the date — but that is exactly what an
+          aggregator does not do;
+        * and, occasionally, a real repost we now miss. That is the trade, and
+          it is the right way round: a missed flag costs a glance, a wrong one
+          accuses a named employer.
+
+        `source=` names this listing's board. Pass it — the caller is holding
+        the `Job`. Omitting it falls back to the stored row for `key`, which is
+        right for a job the tracker already knows and silently wrong for one it
+        does not.
+
+        `now=` is accepted and, since the undated case above returns early,
+        no longer read. It stays on the signature deliberately: every
+        time-dependent function in this codebase takes an injectable clock
+        (see `docs/TESTING.md`), and one method quietly opting out of that
+        convention is how the next change reaches for `utcnow()` instead.
 
         Which timestamps, and why. This is the part worth reading:
 
-        * Each row contributes `posted_at` when it has one and `first_seen_at`
-          when it does not. `posted_at` is the employer's own claim about when
-          the listing went up, which is exactly the quantity being compared.
-          `first_seen_at` is *our* first sight of it, which can never be
-          earlier than the posting itself — so substituting it can only shrink
-          the gap, never inflate it. Shrinking is the safe direction for a flag
-          that would otherwise fire on a perfectly healthy posting.
-        * Both are stable per row. `record_job` freezes `posted_at` with
-          COALESCE and never rewrites `first_seen_at`, so both mean "when this
-          listing first appeared" and neither drifts as the same row is
-          re-fetched every morning. That stability is what makes two rows
-          comparable at all.
+        * A **prior** row contributes `posted_at` when it has one and
+          `first_seen_at` when it does not. `posted_at` is the employer's own
+          claim about when the listing went up, which is exactly the quantity
+          being compared. `first_seen_at` is *our* first sight of it, which can
+          never be earlier than the posting itself — so substituting it can
+          only shrink the gap, never inflate it. Shrinking is the safe
+          direction for a flag that would otherwise fire on a healthy posting.
+        * The **current** listing gets no such substitution, because there the
+          same trick runs the other way: replacing this listing's missing date
+          with `first_seen_at` — or worse, with `now()` — moves the reference
+          *later* and inflates the gap. An undated posting that has simply been
+          open for 200 days then reads identically to a role genuinely
+          re-listed today, opposite ground truths, same number. So an undated
+          current listing returns `None`: no date, no measurement. Reachable
+          whenever `freshness.skip_undated` is false, which is a documented
+          setting.
+        * Both stored values are stable per row. `record_job` freezes
+          `posted_at` with COALESCE and never rewrites `first_seen_at`, so both
+          mean "when this listing first appeared" and neither drifts as the
+          same row is re-fetched every morning. That stability is what makes
+          two rows comparable at all.
         * `last_seen_at` is deliberately **not** used, though "was the old
           listing still live?" sounds like the sharper question. It moves for
           reasons that have nothing to do with the employer: a weekend with no
@@ -276,43 +322,56 @@ class Tracker:
           filter all freeze it. Our own gaps in observation would then read as
           the employer closing the requisition.
 
-        The gap is also the whole defence against the false positive that
-        matters: a **simultaneous cross-source duplicate is not a repost.** The
-        same live job arriving from Greenhouse and from Adzuna has one
-        `dedupe_key` and two keys, structurally identical to a re-listing. What
-        tells them apart is time — a duplicate arrives beside its twin, a
-        repost arrives after the first listing has been and gone — so the
-        duplicate's gap comes out at roughly zero and no sane threshold fires.
+        What is left over is irreducible: a company that failed to fill a role
+        in six months and honestly re-advertises it looks, from outside,
+        exactly like a ghost job. The card's wording carries that hedge rather
+        than pretending the data settles it.
         """
         clean = str(dedupe_key or "").strip()
         own = str(key or "")
         if not clean:
             return None
 
+        # Reference for *this* listing: what the caller knows, else what the
+        # tracker froze on the row for this key. No third fallback — see the
+        # docstring; the ones on offer inflate.
+        reference = ensure_utc(posted_at)
+        if reference is None:
+            row = self.conn.execute(
+                "SELECT posted_at FROM jobs WHERE key = ?", (own,)
+            ).fetchone()
+            reference = _parse_iso(row["posted_at"]) if row else None
+        if reference is None:
+            return None
+
         rows = self.conn.execute(
-            "SELECT key, posted_at, first_seen_at FROM jobs WHERE dedupe_key = ?",
+            "SELECT key, source, posted_at, first_seen_at FROM jobs WHERE dedupe_key = ?",
             (clean,),
         ).fetchall()
 
         def appeared(row: sqlite3.Row) -> datetime | None:
             return _parse_iso(row["posted_at"]) or _parse_iso(row["first_seen_at"])
 
-        others = [appeared(row) for row in rows if row["key"] != own]
-        earlier = [moment for moment in others if moment is not None]
+        # Which board this listing is on. The caller normally knows (it is
+        # holding the `Job`); falling back to the stored row covers a caller
+        # that does not, and `record_job` never rewrites `source` on conflict,
+        # so the stored value names the board this key was first seen on and
+        # does not drift underneath us.
+        own_source = _source_key(source)
+        if not own_source:
+            mine = next((r for r in rows if r["key"] == own), None)
+            own_source = _source_key(mine["source"]) if mine is not None else ""
+
+        # `min()` in Python rather than `MIN()` in SQL: ISO strings with and
+        # without microseconds do not sort chronologically as text.
+        earlier = [
+            appeared(row)
+            for row in rows
+            if row["key"] != own and _source_key(row["source"]) == own_source
+        ]
+        earlier = [moment for moment in earlier if moment is not None]
         if not earlier:
             return None
-
-        # Reference for *this* listing, most authoritative first: what the
-        # caller knows, then what the tracker recorded when it first met this
-        # key, then the clock. Sorting is done in Python rather than SQL
-        # because ISO strings with and without microseconds do not sort
-        # chronologically as text.
-        reference = ensure_utc(posted_at)
-        if reference is None:
-            mine = [appeared(row) for row in rows if row["key"] == own]
-            reference = next((m for m in mine if m is not None), None)
-        if reference is None:
-            reference = ensure_utc(now) or utcnow()
 
         return (reference - min(earlier)).total_seconds() / 86400.0
 

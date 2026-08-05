@@ -76,24 +76,30 @@ freshness:
   # is the switch.
   skip_undated: true
 
-  # --- ghost-job flags: these annotate a card, they never drop a job ---------
+  # --- the ghost-job flag: it annotates a card, it never drops a job --------
   #
   # Somewhere between 18% and 27% of online postings are never filled, and
   # Greenhouse's own study found at least 1 in 5 US postings falls in that
-  # bucket. The two cheapest signals both come free from data the tracker
-  # already stores.
-
-  # A posting older than this many days is flagged on its card. It still
-  # renders in full, still counts in the funnel, still links to the form —
-  # a wrong flag costs you a glance, a wrong deletion costs you a job you
-  # never hear about.
-  stale_after_days: 30
-
-  # A role re-listed under a new job id is the second signal. The catch is
-  # that a healthy job reaching us from Greenhouse AND Adzuna at the same
-  # time looks identical — one role, two ids — so a sighting only counts as
-  # a repost when it is this many days after the earlier one. Lower it and
-  # you start calling ordinary cross-source duplicates ghost jobs.
+  # bucket. There is exactly one signal here, and it is NOT posting age.
+  #
+  # Age cannot be a signal in this pipeline. Every posting you see came
+  # through the max_age_hours window above, so it is younger than 72 hours by
+  # construction — "flag postings older than 30 days" can never fire on
+  # anything you are shown. (It shipped once anyway. It was dead code.)
+  #
+  # What survives is how long the *role* has been circulating, which the
+  # tracker remembers even though each re-listing carries a brand new date:
+  # same company, same title, same city, a different job id, seen before. A
+  # role advertised for eight months is the thing worth flagging.
+  #
+  # A sighting only counts once it is this many days before the current
+  # listing, because a healthy job reaching us twice from the SAME board in
+  # one week is a duplicate, not a re-listing. (Cross-board sightings are
+  # ignored outright — see docs/ARCHITECTURE.md — because an ATS migration or
+  # an aggregator re-dating a live posting looks exactly like a re-listing.)
+  #
+  # 0 turns the flag off. It does not mean "flag everything": in this file 0
+  # always disables, the same way scoring.max_jobs: 0 scores nothing.
   repost_min_gap_days: 14
 
 filters:
@@ -201,6 +207,7 @@ filters:
   description_exclude:
     - security clearance
     - must be a us citizen
+    - ts/sci
   # Read only from what the board states as structured data — Lever's
   # categories.commitment, Adzuna's contract_type — never from the title.
   # This catches the roles whose title is neutral but whose type is not.
@@ -269,7 +276,10 @@ notify:
   # A run that fetched nothing because every board 404'd produces the same
   # empty digest as a genuinely quiet Tuesday. This is what tells them apart.
   enabled: true
-  on: [no_digest, missed_run, no_jobs, source_zero, all_sources_failed]
+  # MUST stay quoted, for the same reason `"NO"` is quoted in filters.countries
+  # above: YAML reads a bare `on` as the boolean true, so this whole list used
+  # to land under a key named `True` and every edit to it was silently ignored.
+  "on": [no_digest, missed_run, no_jobs, source_zero, all_sources_failed]
   channels:
     console: true          # stderr — ends up in run.log, and in cron's mail
     file: true             # output/ALERT.txt, deleted again when a run is healthy

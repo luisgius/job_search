@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 
 from src.digest import (
-    DEFAULT_STALE_AFTER_DAYS,
+    DEFAULT_REPOST_MIN_GAP_DAYS,
     RELATIVE_DAYS_LIMIT,
     build_context,
     posting_age_days,
@@ -127,14 +127,53 @@ def test_the_card_states_the_age_of_a_recent_posting(tmp_path: Path):
 def test_the_card_states_the_age_of_a_very_old_posting_too(tmp_path: Path):
     """`relative_time` switches to a calendar date past
     `RELATIVE_DAYS_LIMIT`, which is easier to place but stops answering the
-    question. On a posting old enough to be flagged, the age in days *is* the
-    news, so the card prints both."""
+    question. On a posting that old the age in days *is* the news, so the card
+    prints both."""
     old = make_scored(score=90, hours_old=24 * (RELATIVE_DAYS_LIMIT + 40))
     item = build_context([old], stats(), digest_config(tmp_path),
                          now=NOW)["needs_click"][0]
     assert item["posted_age_days"] == RELATIVE_DAYS_LIMIT + 40
     assert "100 days ago" in item["posted_label"]
     assert "2026-04-26" in item["posted_label"]     # and still the date
+
+
+def test_the_day_count_appears_at_exactly_the_relative_time_limit(tmp_path: Path):
+    """The boundary, pinned in both directions, because nothing pinned it.
+
+    `relative_time` stops saying "Nd ago" at `days < RELATIVE_DAYS_LIMIT`, so
+    at exactly 60 days it has *already* switched to a calendar date. The card's
+    own branch must switch at the same instant — `>=`, not `>`. With `>` the
+    card at exactly 60 days prints "posted 2026-06-05" and nothing else, which
+    is the bug the day count was added to fix, reproduced at the one input
+    nobody would test. Mutating `>=` to `>` left the whole suite green.
+    """
+    at = make_scored(score=90, hours_old=24 * RELATIVE_DAYS_LIMIT, ats_job_id="at")
+    before = make_scored(score=90, hours_old=24 * RELATIVE_DAYS_LIMIT - 1,
+                         ats_job_id="before")
+    ctx = build_context([at, before], stats(), digest_config(tmp_path), now=NOW)
+    labels = {item["key"]: item["posted_label"] for item in ctx["needs_click"]}
+
+    assert labels[at.job.key] == "posted 2026-06-05 — 60 days ago"
+    # One hour younger: still a plain day count, so no redundant "— 59 days
+    # ago" tacked onto "59d ago".
+    assert labels[before.job.key] == "posted 59d ago"
+
+
+@pytest.mark.parametrize(
+    "hours,expected",
+    [(23, 1), (24 * 30 + 12, 31), (24 * 61 + 20, 62)],
+    ids=["23h-is-not-zero-days", "30.5d-rounds-up", "61.8d-rounds-up"],
+)
+def test_the_age_in_days_is_rounded_and_not_truncated(tmp_path: Path, hours,
+                                                      expected):
+    """`int()` truncates, and the card prints the result next to an untruncated
+    threshold. A 23-hour-old posting reported an age of `0` days, and 30.5 days
+    printed as "30" — a number that contradicts the sentence it sits in.
+    """
+    job = make_scored(score=90, hours_old=hours)
+    item = build_context([job], stats(), digest_config(tmp_path),
+                         now=NOW)["needs_click"][0]
+    assert item["posted_age_days"] == expected
 
 
 def test_an_undated_card_says_so_instead_of_guessing(tmp_path: Path, memory_tracker):
@@ -162,66 +201,50 @@ def test_an_undated_card_says_so_instead_of_guessing(tmp_path: Path, memory_trac
 
 
 # ==========================================================================
-# the stale flag — advisory, never a filter
+# there is no age-based flag, and there must not be one
 # ==========================================================================
 
 
-def test_an_old_posting_is_flagged_stale(tmp_path: Path):
-    """One posting in five is never filled, and the old ones are where they
-    gather. The flag is the cheapest thing this pipeline can tell you."""
-    old = make_scored(score=90, hours_old=24 * 45)
-    item = build_context([old], stats(), digest_config(tmp_path),
+def test_posting_age_is_never_a_ghost_job_flag(tmp_path: Path):
+    """The one that would have caught the dead feature.
+
+    A "flag anything older than 30 days" rule shipped once, next to a
+    `max_age_hours` of 72. Every card comes from `scored_jobs ⊆ fresh ⊆
+    apply_filters(...).kept`, so a posting old enough to trip 30 days was
+    deleted by the freshness filter 27 days earlier: the flag could not fire
+    on anything the pipeline was able to produce. It looked alive only because
+    every one of its tests called `build_context` with a hand-built old
+    `posted_at` — a state no run reaches.
+
+    So: age is on the card as *information*, and it earns no flag. The signal
+    that survives is the repost gap, because a re-listing carries a brand new
+    date and walks through the freshness window while the tracker still
+    remembers the first listing.
+    """
+    ancient = make_scored(score=90, hours_old=24 * 400, ats_job_id="ancient")
+    item = build_context([ancient], stats(), digest_config(tmp_path),
                          now=NOW)["needs_click"][0]
-    assert item["stale"] is True
-    assert any("45 days" in flag for flag in item["flags"])
+    assert item["posted_age_days"] == 400     # measured and printed ...
+    assert item["flags"] == []                # ... and accusing nobody
 
 
-def test_a_recent_posting_is_not_flagged_stale(tmp_path: Path):
-    """The neighbouring case. A flag that fires on a two-day-old posting is a
-    flag nobody reads by the end of the week."""
-    fresh = make_scored(score=90, hours_old=48)
-    item = build_context([fresh], stats(), digest_config(tmp_path),
-                         now=NOW)["needs_click"][0]
-    assert item["stale"] is False
-    assert item["flags"] == []
+def test_the_config_no_longer_carries_a_dead_stale_knob():
+    """`stale_after_days` is gone from every site, not merely ignored.
 
+    A key that loads, validates and does nothing is worse than no key: the
+    user believes it took effect. If age-based flagging ever comes back it
+    needs a new argument, not a resurrected constant.
+    """
+    from src import config as config_module
+    from src import digest as digest_module
 
-def test_a_posting_exactly_at_the_stale_threshold_is_not_flagged(tmp_path: Path):
-    """Boundary, stated the same way `is_fresh` states its own: at the limit
-    is inside it. An hour past is not."""
-    at = make_scored(score=90, hours_old=24 * DEFAULT_STALE_AFTER_DAYS,
-                     ats_job_id="at")
-    past = make_scored(score=90, hours_old=24 * DEFAULT_STALE_AFTER_DAYS + 1,
-                       ats_job_id="past")
-    ctx = build_context([at, past], stats(), digest_config(tmp_path), now=NOW)
-    flags = {item["key"]: item["stale"] for item in ctx["needs_click"]}
-    assert flags[at.job.key] is False
-    assert flags[past.job.key] is True
-
-
-def test_an_undated_posting_is_never_flagged_stale(tmp_path: Path):
-    """The case that would otherwise be got wrong by treating a missing date
-    as an infinitely old one. There is nothing to judge here, and guessing
-    would put a ghost-job warning on every LinkedIn alert item there is."""
-    undated = make_scored(score=90, hours_old=None)
-    item = build_context([undated], stats(), digest_config(tmp_path),
-                         now=NOW)["needs_click"][0]
-    assert item["posted_age_days"] is None
-    assert item["stale"] is False
-    assert item["flags"] == []
-
-
-def test_the_stale_threshold_is_configurable(tmp_path: Path):
-    old = make_scored(score=90, hours_old=24 * 45)
-    cfg = digest_config(tmp_path, freshness={"stale_after_days": 60})
-    item = build_context([old], stats(), cfg, now=NOW)["needs_click"][0]
-    assert item["stale"] is False
-
-
-def test_the_stale_flag_reaches_the_page(tmp_path: Path):
-    old = make_scored(score=90, hours_old=24 * 45)
-    html = render_html(build_context([old], stats(), digest_config(tmp_path), now=NOW))
-    assert "On the market 45 days" in html
+    assert "stale_after_days" not in config_module.DEFAULTS["freshness"]
+    assert not hasattr(config_module, "DEFAULT_STALE_AFTER_DAYS")
+    assert not hasattr(digest_module, "DEFAULT_STALE_AFTER_DAYS")
+    shipped = (Path(__file__).resolve().parent.parent / "config.yaml").read_text(
+        encoding="utf-8"
+    )
+    assert "stale_after_days" not in shipped
 
 
 # ==========================================================================
@@ -259,7 +282,26 @@ def test_a_relisting_after_a_gap_is_flagged(tmp_path: Path, memory_tracker):
     item = build_context([today], stats(), digest_config(tmp_path), now=NOW,
                          tracker=memory_tracker)["needs_click"][0]
     assert item["repost_gap_days"] == 90
-    assert any("Re-listed" in flag for flag in item["flags"])
+    assert any("On the market 90 days or more" in flag for flag in item["flags"])
+
+
+def test_the_flag_does_not_state_a_re_listing_as_fact(tmp_path: Path,
+                                                      memory_tracker):
+    """Wording, and it is not cosmetic.
+
+    Measured against a real `Tracker` at the shipped 14-day threshold, this
+    signal cannot tell a ghost job from a company that failed to fill a role
+    in six months and honestly re-advertised it. That one is irreducible — an
+    honest re-advertisement and a ghost job look identical from outside. What
+    is *not* forced is asserting the mechanism: "Re-listed:" told the reader,
+    as fact, why a named employer had posted twice. The card now reports the
+    measurement and names the alternatives, including the innocent one.
+    """
+    today = relisted(memory_tracker, gap_days=189)
+    flag = build_context([today], stats(), digest_config(tmp_path), now=NOW,
+                         tracker=memory_tracker)["needs_click"][0]["flags"][0]
+    assert not flag.startswith("Re-listed")
+    assert "can also just be a second headcount" in flag
 
 
 def test_a_simultaneous_cross_source_duplicate_is_not_flagged_as_a_repost(
@@ -282,21 +324,105 @@ def test_a_simultaneous_cross_source_duplicate_is_not_flagged_as_a_repost(
 
     item = build_context([today], stats(), digest_config(tmp_path), now=NOW,
                          tracker=memory_tracker)["needs_click"][0]
-    assert item["repost_gap_days"] == 0
+    assert item["repost_gap_days"] is None
     assert item["flags"] == []
+
+
+def test_an_aggregator_that_re_dates_a_live_posting_is_not_a_repost(
+        tmp_path: Path, memory_tracker):
+    """The cross-source case the *gap* was supposed to handle, and does not.
+
+    Adzuna's `created` is its own ingest time, not the employer's. One live
+    Greenhouse posting syndicated to Adzuna therefore arrives with a date
+    months away from its twin's, and the gap — the whole defence against
+    cross-source duplicates — comes out at 150 days instead of zero. Two
+    sightings of one live job, and the card accused the employer of running a
+    ghost ad. Sightings from another board no longer count at all.
+    """
+    live_on_greenhouse = make_job(hours_old=2, ats_job_id="req-1")
+    syndicated = make_job(source="adzuna", ats=None, ats_job_id=None,
+                          url="https://www.adzuna.de/details/9",
+                          posted_at=NOW - timedelta(days=150))
+    memory_tracker.record_job(syndicated, now=NOW - timedelta(days=150))
+    memory_tracker.record_job(live_on_greenhouse, now=NOW)
+    assert live_on_greenhouse.dedupe_key == syndicated.dedupe_key
+
+    item = build_context([make_scored(live_on_greenhouse)], stats(),
+                         digest_config(tmp_path), now=NOW,
+                         tracker=memory_tracker)["needs_click"][0]
+    assert item["repost_gap_days"] is None
+    assert item["flags"] == []
+
+
+def test_an_ats_migration_does_not_accuse_a_whole_board(tmp_path: Path,
+                                                        memory_tracker):
+    """The worst false positive there is, because it fires on every role at
+    one employer on the same morning.
+
+    A company moving Greenhouse -> Ashby re-lists its entire board under new
+    ids on one day. Every req then has an older sighting under the same
+    `dedupe_key` and a different `Job.key`, with a gap of however long the
+    company had been on the old ATS — 118 days here. Four reqs, four
+    accusations, one relocation. A heuristic that indicts a whole employer at
+    once is not a heuristic.
+    """
+    titles = ["Backend Engineer", "Data Engineer", "SRE", "Product Designer"]
+    for i, title in enumerate(titles):
+        old = make_job(source="greenhouse", ats="greenhouse", title=title,
+                       ats_job_id=f"gh-{i}", posted_at=NOW - timedelta(days=118))
+        memory_tracker.record_job(old, now=NOW - timedelta(days=118))
+
+    moved = []
+    for i, title in enumerate(titles):
+        job = make_job(source="ashby", ats="ashby", title=title,
+                       ats_job_id=f"ashby-{i}", hours_old=2)
+        memory_tracker.record_job(job, now=NOW)
+        moved.append(make_scored(job, score=90))
+
+    ctx = build_context(moved, stats(), digest_config(tmp_path), now=NOW,
+                        tracker=memory_tracker)
+    assert len(ctx["needs_click"]) == 4                       # all four shown
+    assert [i["flags"] for i in ctx["needs_click"]] == [[]] * 4   # none accused
 
 
 def test_a_repost_whose_earlier_listing_was_undated_is_still_flagged(
         tmp_path: Path, memory_tracker):
-    """The gap survives a missing date on either side: two sightings ninety
-    days apart are ninety days apart whatever the boards claimed. The fallback
-    is `first_seen_at`, which is *our* observation and can only ever shrink
-    the gap — never invent one."""
+    """The gap survives a missing date on the *earlier* side: two sightings
+    ninety days apart are ninety days apart whatever the boards claimed. The
+    fallback there is `first_seen_at`, which is our own observation and can
+    only ever shrink the gap — never invent one."""
     today = relisted(memory_tracker, gap_days=90, posted=False)
     item = build_context([today], stats(), digest_config(tmp_path), now=NOW,
                          tracker=memory_tracker)["needs_click"][0]
     assert item["repost_gap_days"] == 90
-    assert any("Re-listed" in flag for flag in item["flags"])
+    assert any("On the market 90 days or more" in flag for flag in item["flags"])
+
+
+def test_an_undated_current_listing_is_never_flagged(tmp_path: Path,
+                                                     memory_tracker):
+    """`first_seen_at` is only safe on one side, and this is the other one.
+
+    Substituting it for a *prior* row can only shrink the gap. Substituting it
+    for the listing being judged moves the reference *later* and inflates:
+    one role open and undated for 200 days, and one genuinely re-listed today
+    after a 200-day-old first listing, produced the identical `gap=200` —
+    opposite ground truths, same output, same accusation. Reachable whenever
+    `freshness.skip_undated` is false, which is documented and supported.
+
+    Resolved toward not flagging, because this flag accuses somebody.
+    """
+    earlier = make_job(ats_job_id="old", posted_at=NOW - timedelta(days=200))
+    memory_tracker.record_job(earlier, now=NOW - timedelta(days=200))
+    undated_now = make_scored(score=90, ats_job_id="new", hours_old=None)
+    memory_tracker.record_job(undated_now.job, now=NOW)
+    assert undated_now.job.dedupe_key == earlier.dedupe_key
+
+    ctx = build_context([undated_now], stats(), digest_config(tmp_path),
+                        now=NOW, tracker=memory_tracker)
+    item = ctx["needs_click"][0]
+    assert item["repost_gap_days"] is None
+    assert item["flags"] == []
+    assert undated_now.job.company in render_html(ctx)   # and still on the page
 
 
 def test_the_repost_gap_threshold_is_configurable(tmp_path: Path, memory_tracker):
@@ -306,6 +432,26 @@ def test_the_repost_gap_threshold_is_configurable(tmp_path: Path, memory_tracker
                          tracker=memory_tracker)["needs_click"][0]
     assert item["repost_gap_days"] == 20        # measured ...
     assert item["flags"] == []                  # ... but under the threshold
+
+
+def test_a_gap_threshold_of_zero_turns_the_flag_off(tmp_path: Path,
+                                                    memory_tracker):
+    """0 disables, it does not maximise — the two precedents in this repo both
+    say so. `scoring.max_jobs: 0` scores nothing ("config.yaml calls this your
+    cost ceiling, so 0 has to mean zero") and `should_surface` reads
+    `within_days <= 0` as "no window".
+
+    Read the other way, `repost_min_gap_days: 0` flagged a same-day duplicate
+    — precisely the false positive this threshold exists to prevent, and the
+    thing config.yaml warns about two lines above the setting. The obvious way
+    to turn a noisy flag off would have turned it up to maximum.
+    """
+    today = relisted(memory_tracker, gap_days=90)
+    cfg = digest_config(tmp_path, freshness={"repost_min_gap_days": 0})
+    item = build_context([today], stats(), cfg, now=NOW,
+                         tracker=memory_tracker)["needs_click"][0]
+    assert item["repost_gap_days"] == 90        # still measured ...
+    assert item["flags"] == []                  # ... and deliberately silent
 
 
 def test_without_a_tracker_there_is_simply_no_repost_flag(tmp_path: Path):
@@ -318,21 +464,56 @@ def test_without_a_tracker_there_is_simply_no_repost_flag(tmp_path: Path):
     assert item["flags"] == []
 
 
-def test_a_tracker_that_raises_costs_one_flag_not_the_page(tmp_path: Path):
-    """By the time the digest runs, the run's money is already spent. A
-    tracker problem must not take the card — or the page — down with it."""
+class RaisingTracker:
+    def repost_gap_days(self, *args, **kwargs):
+        raise RuntimeError("database is locked")
 
-    class BrokenTracker:
-        def repost_gap_days(self, *args, **kwargs):
-            raise RuntimeError("database is locked")
 
+class NotATracker:
+    """Has nothing at all — `repost_gap_days` is an AttributeError."""
+
+
+class StringTracker:
+    def repost_gap_days(self, *args, **kwargs):
+        return "40"
+
+
+class UncomparableTracker:
+    """A `Mock()`/`MagicMock()` in one line: answers anything, compares to
+    nothing."""
+
+    def repost_gap_days(self, *args, **kwargs):
+        return object()
+
+
+@pytest.mark.parametrize(
+    "tracker",
+    [RaisingTracker(), NotATracker(), StringTracker(), UncomparableTracker()],
+    ids=["raises", "no-such-method", "returns-a-string", "returns-an-object"],
+)
+def test_a_broken_tracker_costs_one_flag_not_the_page(tmp_path: Path, tracker):
+    """The governing constraint, tested through the seam that threatens it.
+
+    The `try` used to wrap only the *call*. The comparison and the `int()`
+    were outside it, so a tracker answering with anything not comparable to a
+    float — a string, a `Mock()`, anything a hand-rolled stub might hand back
+    — raised `TypeError` out of `_ghost_flags`, out of `_item`, and into
+    `build_context`'s "skipping unrenderable digest item". The card was
+    deleted from the page. Measured: `None` gave 1 card, a stub returning
+    `"40"` gave **0**, and so did a bare `Mock()`.
+
+    This test used to cover only the raising case while its name claimed the
+    general guarantee. A wrong *type* is the commoner mistake and was the
+    unhandled one.
+    """
     old = make_scored(score=90, company="Northwind", hours_old=24 * 45)
     ctx = build_context([old], stats(), digest_config(tmp_path), now=NOW,
-                        tracker=BrokenTracker())
+                        tracker=tracker)
+    assert len(ctx["needs_click"]) == 1        # the card survived ...
     item = ctx["needs_click"][0]
-    assert item["repost_gap_days"] is None
-    assert item["stale"] is True               # the other flag still works
-    assert "Northwind" in render_html(ctx)     # and the card is still there
+    assert item["repost_gap_days"] is None     # ... at the cost of one flag
+    assert item["flags"] == []
+    assert "Northwind" in render_html(ctx)     # and it really renders
 
 
 def test_a_hand_built_item_with_no_flags_key_still_renders(tmp_path: Path):
@@ -351,7 +532,42 @@ def test_the_repost_flag_reaches_the_page(tmp_path: Path, memory_tracker):
     today = relisted(memory_tracker, gap_days=90)
     html = render_html(build_context([today], stats(), digest_config(tmp_path),
                                      now=NOW, tracker=memory_tracker))
-    assert "Re-listed" in html
+    assert "On the market 90 days or more" in html
+
+
+def test_an_advisory_and_an_error_do_not_look_the_same(tmp_path: Path,
+                                                       memory_tracker):
+    """"This posting might be old" was pixel-identical to "your scorer is
+    down": both rendered `p.alert`, red, on cards in every section.
+
+    That degrades both claims this suite makes about the page. `test_health`
+    defends "a quiet day is distinguishable from a broken pipeline" and this
+    file defends "legibility of failure" — and neither survives a page where
+    an advisory about somebody else's hiring process and an actual failure of
+    *this* run are the same object.
+
+    Both mechanisms already existed in the template: `.note` (muted) and the
+    `--warn`/`--warn-bg` amber pair used by `.card.warn`, `.score-70` and
+    `.mode-dry`. Nothing needed inventing.
+    """
+    advisory_job = relisted(memory_tracker, gap_days=90)
+    broken = make_scored(score=0, company="Umbrella", ats_job_id="broken",
+                         error="503 from the API", hours_old=2)
+
+    html = render_html(build_context([advisory_job, broken], stats(),
+                                     digest_config(tmp_path), now=NOW,
+                                     tracker=memory_tracker))
+
+    advisory = re.search(r'<p class="advisory">([^<]*)</p>', html)
+    alert = re.search(r'<p class="alert">([^<]*)</p>', html)
+    assert advisory and "On the market 90 days" in advisory.group(1)
+    assert alert and "Scorer failed" in alert.group(1)
+    # Different class, and the classes really do resolve to different colours.
+    assert ".advisory {" in html and ".alert {" in html
+    advisory_css = html.split(".advisory {")[1].split("}")[0]
+    alert_css = html.split(".alert {")[1].split("}")[0]
+    assert "--warn" in advisory_css and "--bad" not in advisory_css
+    assert "--bad" in alert_css and "--warn" not in alert_css
 
 
 # ==========================================================================
@@ -359,15 +575,19 @@ def test_the_repost_flag_reaches_the_page(tmp_path: Path, memory_tracker):
 # ==========================================================================
 
 
+def funnel_of(ctx) -> dict[str, int]:
+    return {step["label"]: step["value"] for step in ctx["funnel"]}
+
+
 def test_flagging_never_removes_a_job_from_the_digest(tmp_path: Path, memory_tracker):
     """The invariant the whole feature is subordinate to.
 
-    A stale, re-listed, undated posting is exactly the profile these flags are
-    looking for — and it must still be on the page, in its section, counted in
-    the totals, with its link intact. A wrong flag costs a glance; a wrong
-    deletion costs an opportunity the user never learns existed.
+    A re-listed posting is exactly the profile the flag is looking for — and it
+    must still be on the page, in its section, counted in the totals, with its
+    link intact. A wrong flag costs a glance; a wrong deletion costs an
+    opportunity the user never learns existed.
     """
-    today = relisted(memory_tracker, gap_days=200, age_days=200)
+    today = relisted(memory_tracker, gap_days=200)
 
     cfg = digest_config(tmp_path)
     without = build_context([today], stats(), cfg, now=NOW)
@@ -375,27 +595,47 @@ def test_flagging_never_removes_a_job_from_the_digest(tmp_path: Path, memory_tra
                                  tracker=memory_tracker)
 
     item = with_tracker["needs_click"][0]
-    assert item["stale"] is True
-    assert len(item["flags"]) == 2                       # both flags fired ...
+    assert len(item["flags"]) == 1                       # the flag fired ...
     assert with_tracker["totals"] == without["totals"]   # ... and nothing moved
-    assert with_tracker["funnel"] == without["funnel"]
     assert len(with_tracker["needs_click"]) == 1
     assert item["url"] == today.job.url
     assert item["score"] == 90
+    assert today.job.company in render_html(with_tracker)
 
 
-def test_the_funnel_is_untouched_by_the_flags(tmp_path: Path, memory_tracker):
-    """Stated separately because the funnel is the number a user reads to tell
-    a quiet day from a broken pipeline. If flagging ever started dropping
-    jobs, this is where it would show — and it must not."""
+def test_the_funnel_and_the_page_agree_about_how_many_jobs_matched(
+        tmp_path: Path, memory_tracker):
+    """The funnel is the number a user reads to tell a quiet day from a broken
+    pipeline, so this is where a flag that started deleting jobs would show.
+
+    It has to be stated as a *cross-check*, and the previous version was not.
+    It asserted `funnel["fetched"] == 312` against a hardcoded `RunStats` —
+    a constant compared to itself. `build_context` copies `stats` through
+    untouched, so no change to the digest stage could ever move that number,
+    and mutating `build_context` to drop every flagged job left the funnel
+    assertion passing. The evidence for the guarantee was worth nothing.
+
+    What actually catches it: the funnel says N matched, the page must carry N
+    cards. Those two numbers come from opposite ends of the run — `stats` from
+    the pipeline, `totals` from the buckets built here — and a dropped card
+    breaks the equality.
+    """
     scored = [relisted(memory_tracker, gap_days=90)]
     scored.append(make_scored(score=70, ats_job_id="fresh", hours_old=2))
     scored.append(make_scored(score=60, ats_job_id="undated", hours_old=None,
                               status=ApplyStatus.SCORED_BELOW))
 
-    ctx = build_context(scored, stats(), digest_config(tmp_path), now=NOW,
+    # `matches` counts the DIGEST-status jobs the run handed over — the two
+    # above the threshold. Built to describe *these* jobs, so the comparison
+    # below has two independent sides.
+    run = RunStats(fetched=312, after_dedupe=287, after_filters=41, scored=3,
+                   matches=2)
+
+    ctx = build_context(scored, run, digest_config(tmp_path), now=NOW,
                         tracker=memory_tracker)
-    assert {step["label"]: step["value"] for step in ctx["funnel"]}["fetched"] == 312
+    assert any(item["flags"] for item in ctx["needs_click"])   # a flag did fire
+    assert funnel_of(ctx)["matched"] == ctx["totals"]["needs_click"]
+    assert funnel_of(ctx)["scored"] == ctx["totals"]["all"]
     assert ctx["totals"]["all"] == 3
     assert ctx["totals"]["needs_click"] == 2
     assert ctx["totals"]["below"] == 1

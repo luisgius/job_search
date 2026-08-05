@@ -364,6 +364,38 @@ def _gate_on_tracker(
     return surviving
 
 
+def _newest_first(jobs: list[Job]) -> list[Job]:
+    """Order postings by recency, so a cap spends itself on the freshest.
+
+    **Undated postings go last, in fetch order.** That position is a decision,
+    so here is the reasoning rather than an accident:
+
+      * `freshness.skip_undated` ships **true**, so an undated posting only
+        reaches this list when the user has explicitly turned it off and, in
+        that setting's own words, "accept[ed] some staleness". Ranking it
+        above a posting we can *prove* is two hours old would contradict the
+        stance the rest of the pipeline takes on undated postings, which is
+        that they cannot be proven fresh (`filters.is_fresh`).
+      * The alternative starves the other side. ATS board endpoints return
+        every open requisition, not the recent ones, so `skip_undated: false`
+        can admit hundreds of undated postings in one run
+        (`docs/EVALUATION.md` says exactly this). Putting them first would let
+        them evict every dated posting from a 40-job ceiling.
+      * The cost is real and worth stating: a board that never dates anything
+        (LinkedIn alert items) is scored last and, on a busy morning, not at
+        all that day. It is still strictly better off than under the shipped
+        default, which drops it before this point entirely.
+
+    Stable, so equal timestamps and the undated tail keep fetch order and two
+    runs over the same input agree.
+    """
+    return sorted(
+        jobs,
+        key=lambda job: (job.posted_at is None, -(job.posted_at.timestamp()
+                                                  if job.posted_at else 0.0)),
+    )
+
+
 def _read_cv(config: Any) -> str:
     """Load the base CV, or raise `ConfigError`.
 
@@ -560,6 +592,19 @@ def run_pipeline(
     cv_markdown = "" if skip_llm else _read_cv(config)
 
     # -- 6. scoring -------------------------------------------------------
+    # Newest first, *before* anything truncates. Two things downstream cut
+    # this list — `--limit` immediately below and `scoring.max_jobs` inside
+    # `score_jobs` — and both slice from the front. Until this sort they
+    # sliced in fetch order, which is board order: `_fetch_all` extends in
+    # source order and both `apply_filters` and `_gate_on_tracker` append in
+    # input order. So with 40 postings 48h old ahead of 5 posted two hours
+    # ago, the 40-job cost ceiling was spent entirely on the older ones and
+    # the freshest five were not scored at all. The harm is a one-run delay
+    # rather than a permanent loss — a job truncated before scoring never
+    # gets an `applications` row, so `should_surface` shows it tomorrow — but
+    # it is systematic in the worst direction: on any given morning you were
+    # least likely to see the postings you most wanted.
+    fresh = _newest_first(fresh)
     if limit is not None and 0 <= limit < len(fresh):
         logger.info("--limit %d: scoring %d of %d jobs", limit, limit, len(fresh))
         fresh = fresh[:limit]

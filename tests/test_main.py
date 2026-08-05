@@ -26,7 +26,12 @@ from pathlib import Path
 import pytest
 
 from src import main as main_module
-from src.config import ConfigError
+from src.config import (
+    DEFAULT_MAX_AGE_HOURS,
+    DEFAULT_REPOST_MIN_GAP_DAYS,
+    DEFAULTS,
+    ConfigError,
+)
 from src.db import Tracker
 from src.main import (
     apply_cli_overrides,
@@ -182,13 +187,22 @@ def test_the_funnel_adds_up(tmp_path: Path, stub_sources, memory_tracker):
 
 def test_a_relisted_job_is_flagged_on_the_page_and_not_dropped_from_it(
         tmp_path: Path, stub_sources, memory_tracker):
-    """The wiring behind the ghost-job flags: `run_pipeline` hands the tracker
+    """The wiring behind the ghost-job flag: `run_pipeline` hands the tracker
     to the digest, which is the only way the page can know a role was already
-    listed under a different job id.
+    listed under a different job id. And it fires **through the real pipeline
+    at the shipped threshold** — which is the bar the deleted age flag could
+    never clear, since anything old enough to trip it had been dropped by the
+    freshness filter weeks earlier.
 
     Both halves are asserted, and the second is the important one. A flag that
-    also removed the job would be worse than no flag at all, so the funnel has
-    to read exactly as it would have without it.
+    also removed the job would be worse than no flag at all.
+
+    That second half has to be a *cross-check*, not a repetition. Asserting
+    `after_filters == 2` and `matches == 2` proves nothing about the digest:
+    both counters are set at pipeline steps 3 and 6, before `write_digest` is
+    ever called, so no change to the digest stage can move them. Mutating
+    `build_context` to delete every flagged job left both passing. What bites
+    is the funnel number against the cards actually on the page.
     """
     earlier = make_job(company="Company0", title="Backend Engineer",
                        location="Berlin, Germany", ats_job_id="old-req",
@@ -196,13 +210,19 @@ def test_a_relisted_job_is_flagged_on_the_page_and_not_dropped_from_it(
     memory_tracker.record_job(earlier, now=NOW - timedelta(days=120))
 
     stub_sources.results["ats_boards"] = fresh_jobs(2)
-    _, stats = run_pipeline(pipeline_config(tmp_path), tracker=memory_tracker,
-                            now=NOW, llm_client=llm_client(LLM_SCRIPT))
+    cfg = pipeline_config(tmp_path)
+    assert cfg.get("freshness.repost_min_gap_days") == DEFAULT_REPOST_MIN_GAP_DAYS
+    scored, stats = run_pipeline(cfg, tracker=memory_tracker,
+                                 now=NOW, llm_client=llm_client(LLM_SCRIPT))
 
-    assert stats.after_filters == 2       # the repost survived every filter ...
-    assert stats.matches == 2             # ... and reached the digest
     html = Path(stats.digest_path).read_text(encoding="utf-8")
-    assert "Re-listed" in html
+    assert "On the market 120 days or more" in html      # the flag fired ...
+    # ... and the page carries one card per job the run produced. The funnel is
+    # counted at step 6, the cards are built at step 11; dropping a flagged job
+    # breaks the equality between them. Every job here is above the threshold,
+    # so `matches` is the whole set and the count is unambiguous.
+    assert stats.matches == len(scored) == 2
+    assert html.count('<article class="card') == stats.matches
     assert "Company0" in html and "Company1" in html
 
 
@@ -211,6 +231,116 @@ def test_source_counts_are_recorded(tmp_path: Path, stub_sources, memory_tracker
     _, stats = run_pipeline(pipeline_config(tmp_path), tracker=memory_tracker,
                             now=NOW, llm_client=llm_client(LLM_SCRIPT))
     assert sum(stats.source_counts.values()) == 3
+
+
+# ==========================================================================
+# the cost ceiling spends itself on the freshest postings
+# ==========================================================================
+
+
+def shipped_defaults_config(tmp_path: Path, freshness=None, **overrides):
+    """A pipeline config that really does use the shipped freshness window and
+    the shipped cost ceiling, not the tighter ones the other tests pick."""
+    window = {"max_age_hours": DEFAULT_MAX_AGE_HOURS}
+    window.update(freshness or {})
+    cfg = pipeline_config(tmp_path, freshness=window, **overrides)
+    assert cfg.get("freshness.max_age_hours") == DEFAULT_MAX_AGE_HOURS == 72
+    assert cfg.get("scoring.max_jobs") == DEFAULTS["scoring"]["max_jobs"] == 40
+    return cfg
+
+
+def test_the_freshest_postings_are_never_the_ones_the_cap_drops(
+        tmp_path: Path, stub_sources, memory_tracker):
+    """The regression the 24h -> 72h widening introduced, end to end.
+
+    `scoring.max_jobs` slices `batch[:max_jobs]`, and until the pipeline
+    sorted, that slice was in **fetch order**: `_fetch_all` extends in source
+    order and `apply_filters` and `_gate_on_tracker` both append in input
+    order. So board order decided who got scored. Forty postings 48 hours old
+    ahead of five posted two hours ago, at the shipped ceiling of 40:
+
+        parent (24h window)   after_filters 5    cards 5   2h-old shown 5 of 5
+        72h window, unsorted  after_filters 45   cards 40  2h-old shown 0 of 5
+
+    Every one of the five freshest postings in the run was cut. The harm is a
+    one-run delay rather than a permanent loss — nothing truncated before
+    scoring gets an `applications` row, so `should_surface` brings it back
+    tomorrow — but it is systematic in the worst direction: on any given
+    morning you were least likely to see the postings you most wanted.
+
+    Widening the window was right; spending the ceiling in board order was the
+    bug. Recency now decides.
+    """
+    old = [make_job(company=f"Old{i}", title="Backend Engineer",
+                    location="Berlin, Germany", hours_old=48, ats_job_id=f"o{i}")
+           for i in range(40)]
+    newest = [make_job(company=f"New{i}", title="Backend Engineer",
+                       location="Berlin, Germany", hours_old=2, ats_job_id=f"n{i}")
+              for i in range(5)]
+    stub_sources.results["ats_boards"] = old + newest      # board order: old first
+
+    scored, stats = run_pipeline(shipped_defaults_config(tmp_path),
+                                 tracker=memory_tracker, now=NOW,
+                                 llm_client=llm_client(LLM_SCRIPT))
+
+    assert stats.after_filters == 45      # all 45 are inside the 72h window
+    assert len(scored) == 40              # and 40 is the ceiling, as before
+    shown = {item.job.company for item in scored}
+    assert {f"New{i}" for i in range(5)} <= shown, (
+        "the five freshest postings in the run were cut by the cost ceiling"
+    )
+
+
+def test_the_limit_flag_also_keeps_the_freshest(tmp_path: Path, stub_sources,
+                                                memory_tracker):
+    """`--limit` truncates in the same place and had the same bug. It is the
+    flag a user reaches for to try the tool cheaply, so handing them the five
+    oldest postings on the board is a bad first impression on top of a bug."""
+    old = [make_job(company=f"Old{i}", title="Backend Engineer",
+                    location="Berlin, Germany", hours_old=60, ats_job_id=f"o{i}")
+           for i in range(6)]
+    newest = make_job(company="Newest", title="Backend Engineer",
+                      location="Berlin, Germany", hours_old=1, ats_job_id="n")
+    stub_sources.results["ats_boards"] = old + [newest]
+
+    scored, _ = run_pipeline(shipped_defaults_config(tmp_path), limit=2,
+                             tracker=memory_tracker, now=NOW,
+                             llm_client=llm_client(LLM_SCRIPT))
+    assert "Newest" in {item.job.company for item in scored}
+
+
+def test_an_undated_posting_queues_behind_every_dated_one(
+        tmp_path: Path, stub_sources, memory_tracker):
+    """Undated postings need a defined position in that order, and this is it:
+    **last, in fetch order**.
+
+    `skip_undated` ships true, so an undated posting only gets this far when
+    the user has turned it off and, in that setting's own words, accepted some
+    staleness. Ranking it above a posting we can prove is two hours old would
+    contradict `filters.is_fresh`, which holds that an undated posting cannot
+    be proven fresh at all. And the alternative starves the other side: ATS
+    endpoints return every open requisition rather than the recent ones, so
+    `skip_undated: false` can admit hundreds of undated postings in one run
+    and putting them first would evict every dated posting from the ceiling.
+
+    The cost, stated rather than hidden: a board that never dates anything is
+    scored last, and on a busy morning not at all that day. It is still better
+    off than under the shipped default, which drops it outright.
+    """
+    undated = [make_job(company=f"Undated{i}", title="Backend Engineer",
+                        location="Berlin, Germany", hours_old=None,
+                        ats_job_id=f"u{i}")
+               for i in range(3)]
+    dated = make_job(company="Dated", title="Backend Engineer",
+                     location="Berlin, Germany", hours_old=48, ats_job_id="d")
+    stub_sources.results["ats_boards"] = undated + [dated]   # undated arrive first
+
+    cfg = shipped_defaults_config(tmp_path, freshness={"skip_undated": False})
+    scored, stats = run_pipeline(cfg, limit=1, tracker=memory_tracker, now=NOW,
+                                 llm_client=llm_client(LLM_SCRIPT))
+
+    assert stats.after_filters == 4         # skip_undated is off, so all four
+    assert [item.job.company for item in scored] == ["Dated"]
 
 
 # ==========================================================================
