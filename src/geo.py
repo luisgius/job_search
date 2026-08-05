@@ -545,8 +545,55 @@ def _part_looks_us(raw_part: str, *, index: int) -> bool:
     return False
 
 
+#: Countries outside Europe whose cities collide with European ones. The US
+#: has its own machinery because its collisions are by far the most numerous;
+#: this covers the rest, and it matters most for a Spanish-language search:
+#: Valencia, Barcelona and Mérida are Venezuelan cities too, Córdoba and Santa
+#: Fe are Argentinian, León and Mérida Mexican, London is in Ontario.
+#:
+#: Named countries only — never bare city names. "Valencia" alone has to stay
+#: Spanish, because that is what a Spanish posting actually says.
+NON_EUROPEAN_COUNTRIES: frozenset[str] = frozenset(
+    normalize_text(name)
+    for name in (
+        "Argentina", "Australia", "Bolivia", "Brazil", "Brasil", "Canada",
+        "Chile", "China", "Colombia", "Costa Rica", "Cuba", "Ecuador", "Egypt",
+        "El Salvador", "Guatemala", "Honduras", "India", "Indonesia", "Israel",
+        "Japan", "Kenya", "Malaysia", "Mexico", "México", "Morocco",
+        "New Zealand", "Nicaragua", "Nigeria", "Pakistan", "Panama",
+        "Paraguay", "Peru", "Perú", "Philippines", "Filipinas", "Singapore",
+        "South Africa", "South Korea", "Thailand", "Uruguay", "Venezuela",
+        "Vietnam", "UAE", "United Arab Emirates", "Saudi Arabia", "Qatar",
+        "Ontario", "Quebec", "Québec", "British Columbia", "Alberta",
+        "New South Wales", "Victoria Australia", "Queensland",
+        "LATAM", "APAC", "Latin America", "America Latina", "Latinoamerica",
+    )
+)
+
+#: Longest alias above, in tokens.
+_FOREIGN_MAX_NGRAM = max(len(k.split()) for k in NON_EUROPEAN_COUNTRIES)
+
+
+def names_a_non_european_country(location: str | None) -> bool:
+    """Does this location name a country outside Europe?
+
+    Used exactly like the US check: the phrase is discarded before any city
+    lookup, so "Valencia, Venezuela" cannot be filed as Spain.
+    """
+    return any(
+        _ngram_hit(normalize_text(phrase).split(), NON_EUROPEAN_COUNTRIES,
+                   _FOREIGN_MAX_NGRAM)
+        for phrase in _phrases(str(location or ""))
+    )
+
+
 def _phrase_looks_us(phrase: str) -> bool:
     if _US_ABBREV_RE.search(phrase):
+        return True
+    # A named non-European country vetoes the phrase for the same reason a US
+    # state code does: the city that follows is not the European one.
+    if _ngram_hit(normalize_text(phrase).split(), NON_EUROPEAN_COUNTRIES,
+                  _FOREIGN_MAX_NGRAM):
         return True
     parts = phrase.split(",")
     if any(_part_looks_us(part, index=i) for i, part in enumerate(parts)):

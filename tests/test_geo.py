@@ -377,3 +377,44 @@ def test_us_state_codes_table_is_complete():
     assert len(US_STATE_CODES) >= 50
     for code in ("CA", "NY", "TX", "MA", "WA", "IL", "FL", "GA", "OH", "CT"):
         assert code in US_STATE_CODES
+
+
+# ==========================================================================
+# non-European collisions — the Spanish-language case
+# ==========================================================================
+
+
+@pytest.mark.parametrize(
+    "location",
+    ["Valencia, Spain", "Valencia", "València", "Valencia, España",
+     "Valencia, ES", "Valencia, Comunidad Valenciana, Spain",
+     "Paterna, Valencia", "Remote - Valencia", "Hybrid - Valencia, Spain",
+     "Alicante, Spain", "Castellón, Spain", "Elche, Spain"],
+)
+def test_valencia_and_its_region_resolve_to_spain(location):
+    assert country_of(location) == "ES"
+
+
+@pytest.mark.parametrize(
+    "location",
+    ["Valencia, Venezuela", "Barcelona, Venezuela", "Mérida, Venezuela",
+     "Córdoba, Argentina", "Santa Fe, Argentina", "León, Mexico",
+     "Mérida, Mexico", "Valencia, Philippines", "London, Ontario",
+     "London, Canada", "Newcastle, Australia", "Valparaíso, Chile",
+     "Cartagena, Colombia", "Santiago, Chile"],
+)
+def test_a_named_non_european_country_vetoes_the_city(location):
+    """The same class of bug as Delaware, and it bites hardest in Spanish:
+    Valencia, Barcelona and Mérida are Venezuelan cities too, Córdoba and
+    Santa Fe are Argentinian, León and Mérida Mexican, London is in Ontario.
+    Without the veto every one of them was filed as a European job, scored,
+    tailored and shown as something to apply for."""
+    assert country_of(location) not in EU_COUNTRIES
+
+
+def test_a_bare_city_name_is_still_european():
+    """The veto is on *named countries* only. A Spanish posting says
+    "Valencia", not "Valencia, Spain", and it must keep working."""
+    assert country_of("Valencia") == "ES"
+    assert country_of("Barcelona") == "ES"
+    assert country_of("London") == "GB"

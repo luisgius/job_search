@@ -22,14 +22,21 @@ lever:
 adzuna:
   # Lowercase ISO country codes supported by Adzuna: gb de nl fr es it at be
   # ch pl pt se no dk (among others).
-  countries: [de, nl, es]
+  #
+  # This is the supported way to search one city. Indeed is deliberately not a
+  # source: it closed its public API to new users, so the only route left is
+  # scraping against its terms, and it is heavily defended against exactly
+  # that. Adzuna aggregates a large share of the same Spanish listings and has
+  # an API you are allowed to use.
+  countries: [es]
   queries:
-    - "python engineer"
-    - "backend engineer"
+    - "python"
+    - "backend"
     - "data engineer"
+  where: "Valencia"        # the city; needs distance_km to widen the radius
+  distance_km: 25          # includes Paterna, Burjassot, Torrent, Sagunto...
   max_days_old: 1          # Adzuna's own freshness filter
   results_per_page: 50
-  distance_km: 0
 
 linkedin_email:
   # Create daily job alerts in LinkedIn, then let the pipeline read them.
