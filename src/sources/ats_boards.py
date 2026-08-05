@@ -38,8 +38,9 @@ from a single IP. A tool that looks like a scanner gets its user blocked from
 the boards they actually need, so the sweep is bounded twice
 (`DISCOVER_MAX_SLUGS_PER_COMPANY`, `DISCOVER_MAX_REQUESTS`), says out loud what
 each bound dropped, stops as soon as a board answers with real postings, and
-reuses `util.http_get`'s retry policy rather than adding a second one — a 404 is
-an answer and is never retried. It reports a *confidence*, never a verdict, and
+holds every probe to a single attempt (`retries=1` through `util.http_get`) — a
+404 is an answer, and a host that failed or refused once is not asked a second
+time by a tool it never invited. It reports a *confidence*, never a verdict, and
 it never writes to `watchlist.yaml`: a confident-looking wrong slug is worse
 than no slug, because it produces an empty board every morning that is
 indistinguishable from a quiet market.
@@ -60,6 +61,7 @@ import argparse
 import html as html_module
 import json as json_lib
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -67,6 +69,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from ..config import Config, ConfigError
 from ..models import Job, collapse_initialisms, normalize_company, normalize_text
 from ..util import (
+    DEFAULT_RETRIES,
     HttpError,
     get_logger,
     html_to_text,
@@ -309,6 +312,54 @@ def _as_list(payload: Any, *keys: str) -> list[Any]:
     return []
 
 
+def _require_board_payload(
+    board: str, slug: str, payload: Any, *keys: str, bare_list: bool = False
+) -> None:
+    """Raise unless `payload` carries `board`'s own envelope shape.
+
+    The JSON twin of Personio's root-tag check, for the same reason: a 200
+    whose body is valid JSON but not the board — `{"error": "not found"}`, a
+    login wall's message object, a gateway's error envelope — used to fall
+    through `_as_list` as zero postings and read, every morning, as a company
+    that simply is not hiring. "This board exists and has nothing open" is a
+    *finding*, and it must not be manufacturable by any 200 that happens to
+    parse; the envelope (Greenhouse's `jobs` list, Lever's bare array,
+    SmartRecruiters' `content`/`totalFound`, …) is the positive evidence that
+    the vendor's board API is what answered.
+
+    Strict on purpose — the key must be present *and* hold a list. A payload
+    like ``{"jobs": "unavailable"}`` is somebody's error message, not a board.
+    If a vendor ever serves a real empty tenant without the empty list, the
+    live contract tests are where that surfaces, and the failure here is loud
+    (`--check` says FAIL, the daily run logs an error) rather than a silent
+    zero — which is the correct direction to be wrong in.
+
+    The message deliberately says "answered 200" rather than "HTTP 200":
+    `_classify_probe_error` reads `HTTP \\d+` as "the far end sent this status
+    on an *error*", and this exception must classify as "answered, but not
+    with a board", never as an absence or a transport failure.
+    """
+    if bare_list and isinstance(payload, list):
+        return
+    if isinstance(payload, Mapping) and any(
+        isinstance(payload.get(key), list) for key in keys
+    ):
+        return
+    shape = (
+        f"an object with keys {sorted(map(str, payload.keys()))!r}"
+        if isinstance(payload, Mapping)
+        else f"a {type(payload).__name__}"
+    )
+    expected = " or ".join(
+        (["a bare list"] if bare_list else []) + [f"a {key!r} list" for key in keys]
+    )
+    raise ValueError(
+        f"{board}/{slug}: answered 200, but the body is not a {board} board "
+        f"payload — expected {expected}, got {shape}. An error envelope, a "
+        "login wall or the wrong endpoint, not a board"
+    )
+
+
 def _text(value: Any) -> str:
     """A trimmed string, but only for values that really are strings.
 
@@ -473,12 +524,15 @@ def _parse_greenhouse_posting(
 
 
 def fetch_greenhouse(
-    slug: str, *, session: Any = None, content: bool = True
+    slug: str, *, session: Any = None, content: bool = True,
+    retries: int = DEFAULT_RETRIES,
 ) -> list[Job]:
     """Fetch every open posting on a Greenhouse board.
 
     `content=False` skips the (large) description payload — used by `--check`,
     which only needs to know the board answers and how many roles it has.
+    `retries` is passed through to `util.http_get`; discovery probes set it to
+    1 so a speculative guess never re-asks a host that already failed once.
 
     Raises on transport/HTTP failure; `fetch` and `check_slug` are the layers
     that turn that into a logged, non-fatal error.
@@ -491,7 +545,9 @@ def fetch_greenhouse(
         GREENHOUSE_BOARD_URL.format(slug=clean),
         params={"content": "true"} if content else None,
         session=session,
+        retries=retries,
     )
+    _require_board_payload("greenhouse", clean, payload, "jobs")
     company = company_from_slug(clean)
 
     jobs: list[Job] = []
@@ -652,7 +708,9 @@ def _parse_lever_posting(posting: Mapping[str, Any], slug: str, company: str) ->
     )
 
 
-def fetch_lever(slug: str, *, session: Any = None) -> list[Job]:
+def fetch_lever(
+    slug: str, *, session: Any = None, retries: int = DEFAULT_RETRIES
+) -> list[Job]:
     """Fetch every published posting on a Lever board.
 
     Raises on transport/HTTP failure; callers (`fetch`, `check_slug`) contain it.
@@ -665,6 +723,12 @@ def fetch_lever(slug: str, *, session: Any = None) -> list[Job]:
         LEVER_POSTINGS_URL.format(slug=clean),
         params={"mode": "json"},
         session=session,
+        retries=retries,
+    )
+    # `?mode=json` answers with a bare array; the wrapped spellings are older
+    # API shapes that are still accepted.
+    _require_board_payload(
+        "lever", clean, payload, "data", "postings", "results", bare_list=True
     )
     company = company_from_slug(clean)
 
@@ -910,11 +974,22 @@ def _parse_workable_posting(
     )
 
 
-def fetch_workable(slug: str, *, session: Any = None, details: bool = True) -> list[Job]:
+def fetch_workable(
+    slug: str, *, session: Any = None, details: bool = True,
+    retries: int = DEFAULT_RETRIES, envelope: dict[str, Any] | None = None,
+) -> list[Job]:
     """Fetch every published posting on a Workable account.
 
     `details=False` drops the (large) description/requirements/benefits blocks
     — used by `--check`, which only needs to know the account answers.
+
+    `envelope`, when a dict is passed, receives the account-level facts that a
+    zero-job payload still carries — currently `company_name`, the tenant's
+    own display name. Discovery needs it precisely for empty boards: "this
+    board exists and calls itself 'Glovo Spain SL'" is evidence about *whose*
+    board it is that the returned job list cannot carry when it has no jobs in
+    it. Only the payload's own name is copied — never the slug-derived guess —
+    so a reader can trust that anything in here was published by the board.
 
     Raises on transport/HTTP failure; `fetch` and `check_slug` contain that.
     """
@@ -926,12 +1001,16 @@ def fetch_workable(slug: str, *, session: Any = None, details: bool = True) -> l
         WORKABLE_ACCOUNT_URL.format(slug=clean),
         params={"details": "true"} if details else None,
         session=session,
+        retries=retries,
     )
+    _require_board_payload("workable", clean, payload, "jobs", "results")
     # Workable is the one vendor here that publishes a real display name, so
     # the slug heuristic is only the fallback.
     company = ""
     if isinstance(payload, Mapping):
         company = _first_text(payload, "name", "company_name")
+    if envelope is not None and company:
+        envelope["company_name"] = company
     company = company or company_from_slug(clean)
 
     jobs: list[Job] = []
@@ -1094,7 +1173,9 @@ def _parse_ashby_posting(
     )
 
 
-def fetch_ashby(slug: str, *, session: Any = None) -> list[Job]:
+def fetch_ashby(
+    slug: str, *, session: Any = None, retries: int = DEFAULT_RETRIES
+) -> list[Job]:
     """Fetch every listed posting on an Ashby job board.
 
     Raises on transport/HTTP failure; callers (`fetch`, `check_slug`) contain it.
@@ -1107,7 +1188,9 @@ def fetch_ashby(slug: str, *, session: Any = None) -> list[Job]:
         ASHBY_JOB_BOARD_URL.format(slug=clean),
         params={"includeCompensation": "true"},
         session=session,
+        retries=retries,
     )
+    _require_board_payload("ashby", clean, payload, "jobs", "results")
     company = company_from_slug(clean)
 
     jobs: list[Job] = []
@@ -1276,6 +1359,13 @@ def _parse_smartrecruiters_posting(
             "slug": identifier,
             "id": ats_job_id,
             "uuid": posting.get("uuid"),
+            # True only when the payload itself named the employer. Discovery's
+            # collision check reads `Job.company` off a probe hit, and it must
+            # be able to tell "the board said Acme" from "we guessed Acme off
+            # the slug" — comparing our own guess to the name it was derived
+            # from is an assertion that cannot fail, or worse, one that fails
+            # for spelling reasons and mints a mismatch out of nothing.
+            "company_published": bool(display),
             "ref_number": posting.get("refNumber"),
             "department": department_label,
             # One of `filters.EMPLOYMENT_TYPE_KEYS`, so an "Internship" whose
@@ -1295,6 +1385,7 @@ def fetch_smartrecruiters(
     details: bool = True,
     max_descriptions: int = SMARTRECRUITERS_MAX_DESCRIPTIONS,
     max_pages: int = SMARTRECRUITERS_MAX_PAGES,
+    retries: int = DEFAULT_RETRIES,
 ) -> list[Job]:
     """Fetch every posting for a SmartRecruiters company, following the offsets.
 
@@ -1335,13 +1426,20 @@ def fetch_smartrecruiters(
             url,
             params={"limit": SMARTRECRUITERS_PAGE_LIMIT, "offset": offset},
             session=session,
+            retries=retries,
         )
         pages += 1
 
-        if isinstance(payload, Mapping):
-            reported = payload.get("totalFound")
-            if isinstance(reported, (int, float)) and not isinstance(reported, bool):
-                total = int(reported)
+        reported = payload.get("totalFound") if isinstance(payload, Mapping) else None
+        if isinstance(reported, (int, float)) and not isinstance(reported, bool):
+            total = int(reported)
+        else:
+            # A numeric `totalFound` is the SmartRecruiters envelope even when
+            # a page carries no `content` list; a body with neither is not
+            # this board answering.
+            _require_board_payload(
+                "smartrecruiters", clean, payload, "content", "postings", "results"
+            )
 
         entries = _as_list(payload, "content", "postings", "results")
         for posting in entries:
@@ -1668,7 +1766,8 @@ def _parse_personio_xml(text: str, host: str, company: str) -> list[Job]:
 
 
 def fetch_personio(
-    slug: str, *, session: Any = None, language: str | None = None
+    slug: str, *, session: Any = None, language: str | None = None,
+    retries: int = DEFAULT_RETRIES,
 ) -> list[Job]:
     """Fetch every published position from a Personio tenant's XML feed.
 
@@ -1716,7 +1815,8 @@ def fetch_personio(
     for index, host in enumerate(hosts):
         try:
             response = http_get(
-                PERSONIO_XML_URL.format(host=host), params=params, session=session
+                PERSONIO_XML_URL.format(host=host), params=params, session=session,
+                retries=retries,
             )
         except Exception as exc:
             last_error = exc
@@ -1752,11 +1852,11 @@ def _fetch_board(board: str, slug: str, *, session: Any = None, **kwargs: Any) -
     if board == "greenhouse":
         return fetch_greenhouse(slug, session=session, **kwargs)
     if board == "lever":
-        return fetch_lever(slug, session=session)
+        return fetch_lever(slug, session=session, **kwargs)
     if board == "workable":
         return fetch_workable(slug, session=session, **kwargs)
     if board == "ashby":
-        return fetch_ashby(slug, session=session)
+        return fetch_ashby(slug, session=session, **kwargs)
     if board == "smartrecruiters":
         return fetch_smartrecruiters(slug, session=session, **kwargs)
     if board == "personio":
@@ -1974,6 +2074,14 @@ class BoardProbe:
 #: an assertion that cannot fail, which is worse than none.
 _BOARDS_WITH_A_PUBLISHED_NAME = frozenset({"workable", "smartrecruiters"})
 
+#: The vendor whose *account envelope* names the tenant even when the job list
+#: is empty. SmartRecruiters names the company per posting, so an empty listing
+#: says nothing; Workable's `{name, jobs}` envelope names it regardless, and a
+#: probe that reads the name only off the first job throws that evidence away
+#: exactly when it matters most — an empty board is the case where nothing
+#: *else* confirms whose board it is.
+_BOARDS_WITH_AN_ENVELOPE_NAME = frozenset({"workable"})
+
 
 def _names_disagree(asked: str, published: str) -> bool:
     """True when a board's own name for the company is not the one we asked for.
@@ -1985,13 +2093,41 @@ def _names_disagree(asked: str, published: str) -> bool:
 
     Deliberately lenient — containment either way counts as agreement — because
     "Acme" and "Acme Insurance Group" are one company and a false mismatch would
-    downgrade a correct answer. Only a name with nothing in common is reported.
+    downgrade a correct answer. Compared with the spaces stripped as well:
+    "FactorialHR" and "Factorial HR" are one company spelled two ways, and the
+    space-sensitive comparison alone would flag exactly the companies whose
+    house style closes the words up — a false mismatch minted from a spelling
+    convention. Only a name with nothing in common either way is reported.
     """
     a = normalize_company(asked)
     b = normalize_company(published)
     if not a or not b:
         return False
-    return a not in b and b not in a
+    if a in b or b in a:
+        return False
+    a_joined = a.replace(" ", "")
+    b_joined = b.replace(" ", "")
+    return a_joined not in b_joined and b_joined not in a_joined
+
+
+def _published_job_name(board: str, job: Any) -> str:
+    """The employer name the *payload* put on `job`, or "" when it named none.
+
+    Only SmartRecruiters names the company per posting, and its parser records
+    whether the name really came from the payload (`raw["company_published"]`)
+    or from the slug heuristic. Only the former is evidence: `Job.company` on
+    every other vendor — and on a nameless SmartRecruiters posting — is
+    `company_from_slug`, our own guess, and comparing a guess to the name it
+    was derived from either always agrees (an assertion that cannot fail) or
+    disagrees over a spelling we introduced ourselves (a fabricated mismatch).
+    Workable's name lives on the account envelope and arrives via `envelope=`.
+    """
+    if board != "smartrecruiters":
+        return ""
+    raw = getattr(job, "raw", None)
+    if not isinstance(raw, Mapping) or not raw.get("company_published"):
+        return ""
+    return str(getattr(job, "company", "") or "").strip()
 
 
 def _probe(
@@ -2003,18 +2139,36 @@ def _probe(
     expect: str = "",
 ) -> BoardProbe:
     """Ask one board about one slug and classify the answer. Never raises."""
+    call_kwargs = dict(kwargs or {})
+    envelope: dict[str, Any] = {}
+    if board in _BOARDS_WITH_AN_ENVELOPE_NAME:
+        call_kwargs["envelope"] = envelope
     try:
-        found = _fetch_board(board, slug, session=session, **dict(kwargs or {}))
+        found = _fetch_board(board, slug, session=session, **call_kwargs)
     except Exception as exc:
         return BoardProbe(
             board=board, slug=slug, status=_classify_probe_error(exc),
             count=None, message=_describe_error(exc),
         )
 
+    # `count` is parsed, open postings — and a board whose raw entries all
+    # fail to parse deliberately still lands `empty`. Ashby publishes unlisted
+    # drafts (`isListed: false`) and Workable closed states, and the parsers
+    # skip both by design, so "entries > 0, parsed == 0" is what a real board
+    # with nothing open to an applicant looks like; calling it `error` would
+    # misfile every such quiet board. The fetchers' envelope checks are what
+    # keep this honest: by the time we count, the response has proven it IS
+    # the vendor's board, which is all that "exists, nothing open" claims.
     count = len(found)
-    published = ""
-    if board in _BOARDS_WITH_A_PUBLISHED_NAME and found:
-        published = str(getattr(found[0], "company", "") or "").strip()
+    # Whatever the payload itself called the employer. The envelope name is
+    # read whether or not any job came back — an empty Workable board still
+    # names its tenant, and that name is the only company evidence an empty
+    # board has. Never the slug-derived guess: `fetch_workable` only fills
+    # `envelope` from the payload, so "" here means "the board named nobody",
+    # not "we invented a name and it agreed with itself".
+    published = str(envelope.get("company_name") or "").strip()
+    if not published and found:
+        published = _published_job_name(board, found[0])
     return BoardProbe(
         board=board,
         slug=slug,
@@ -2082,22 +2236,31 @@ DISCOVER_MAX_SLUGS_PER_COMPANY = 4
 #: starts looking like someone enumerating a vendor's tenants, and the cost of
 #: being wrong about that is losing access to the boards the daily run needs.
 #:
-#: One probe is one HTTP request, with one exception worth naming: a bare
-#: Personio slug that 404s on `.jobs.personio.de` is retried once on
-#: `.jobs.personio.com`, so a Personio miss is two requests against this budget's
-#: one. The bound is therefore approximate in the safe direction only for the
-#: five other boards, and understates Personio by at most one request per probe.
+#: One probe is one HTTP request — really one, because the probe path forces
+#: `retries=1` (see `_DISCOVER_PROBE_KWARGS`). The one exception worth naming:
+#: a bare Personio slug that 404s on `.jobs.personio.de` is retried once on
+#: `.jobs.personio.com`, so a Personio miss is two requests against this
+#: budget's one. The bound understates nothing else.
 DISCOVER_MAX_REQUESTS = 120
 
 #: Discovery only needs to know whether a board answers and roughly how big it
 #: is, so every expensive half of a fetch is off. `max_pages: 1` is on top of
-#: `--check`'s settings and matters most: without it a single probe against a
-#: large SmartRecruiters tenant would quietly spend twenty requests of a budget
-#: that thinks it spent one.
+#: `--check`'s settings and matters: without it a single probe against a large
+#: SmartRecruiters tenant would quietly spend twenty requests of a budget that
+#: thinks it spent one.
+#:
+#: `retries: 1` is what makes the request budget the truth rather than a lower
+#: bound. `util.http_get`'s default of three attempts is the right insurance
+#: for the daily run, where a transient failure costs real jobs; a discovery
+#: probe that misses costs one commented-out suggestion, so the insurance buys
+#: nothing — and it re-asks a host that just answered 429 twice more, under a
+#: cap whose whole point is not looking like a scanner. One probe, one request.
 _DISCOVER_PROBE_KWARGS: dict[str, dict[str, Any]] = {
-    **_CHEAP_CHECK_KWARGS,
-    "smartrecruiters": {"details": False, "max_pages": 1},
+    board: {"retries": 1, **_CHEAP_CHECK_KWARGS.get(board, {})}
+    for board in BOARDS
 }
+_DISCOVER_PROBE_KWARGS["smartrecruiters"]["max_pages"] = 1
+
 
 def probe_board(board: str, slug: str, *, session: Any = None, expect: str = "") -> BoardProbe:
     """Ask one board about one slug exactly the way `--discover` does.
@@ -2120,14 +2283,32 @@ def probe_board(board: str, slug: str, *, session: Any = None, expect: str = "")
 #: outcome: it goes into `watchlist.yaml`, and from then on produces an empty
 #: board every morning that is indistinguishable from a quiet market — the exact
 #: failure `src/health.py` exists to catch, arriving with no error attached.
-CONFIDENCE_HIGH = "high"      #: one board answered with postings, nothing qualifies it
-CONFIDENCE_MEDIUM = "medium"  #: one clear answer, but the sweep was incomplete
+#:
+#: The line between the top two is drawn on the *evidence*, not on how much of
+#: the sweep ran. A hit ends the sweep early by design (the politeness trade),
+#: and the spellings it never asked about are printed as untried rather than
+#: held against the answer — stopping early does not downgrade. What downgrades
+#: is a hole in the evidence that was actually gathered: a board that never
+#: answered or answered with something that is not a board might still be the
+#: company, and an empty twin of the winning slug might be the company too.
+CONFIDENCE_HIGH = "high"      #: every question asked got a real answer
+#:                               (found/empty/absent), exactly one board had
+#:                               postings, and nothing qualifies it
+CONFIDENCE_MEDIUM = "medium"  #: one clear answer, but the evidence has a hole:
+#:                               a probe got no usable answer (unreachable, or
+#:                               not a board), or an empty board also owns the
+#:                               slug — a second company could hide in either
 CONFIDENCE_LOW = "low"        #: answered, and something is wrong with the answer
 CONFIDENCE_NONE = "none"      #: nothing answered anywhere
 
-#: `high` and `medium` are pasteable; `low` and ambiguous results are printed
-#: commented out, so that pasting the block can never install a guess.
-_PASTEABLE = (CONFIDENCE_HIGH, CONFIDENCE_MEDIUM)
+#: Only `high` is pasteable. `medium` means the evidence has a named hole —
+#: one board of six timing out in the deciding round is enough to mint it, and
+#: a transient blip must never be able to produce an *installed* guess: a
+#: wrong slug is worse than no slug, because it returns an empty board every
+#: morning that reads as a quiet market. The reason for every downgrade is
+#: printed next to the commented-out line, so overruling the tool is one
+#: uncomment away — but it is the user's uncomment, not the tool's guess.
+_PASTEABLE = (CONFIDENCE_HIGH,)
 
 #: "&" is punctuation to `normalize_text`, so "H&M" tokenises to ["h", "m"] and
 #: the joined spelling "hm" comes out right. The written-out form is a genuinely
@@ -2204,23 +2385,21 @@ def _name_variants(name: str) -> list[str]:
     return variants
 
 
-def slug_candidates(
-    name: str,
-    *,
-    cased: bool = False,
-    limit: int | None = DISCOVER_MAX_SLUGS_PER_COMPANY,
-) -> list[str]:
-    """Slugs `name` might be published under, most likely first.
+def slug_candidates(name: str, *, cased: bool = False) -> list[str]:
+    """Every slug `name` might be published under, most likely first.
 
     `cased=True` is SmartRecruiters, and only SmartRecruiters: its slug is
     case-sensitive and spelled as the company spells itself, so the folded form
     alone would miss "FactorialHR" entirely. Both spellings are tried, cased
-    first, interleaved form by form so that the cap cuts the *least likely
+    first, interleaved form by form so that a cap cuts the *least likely
     shape* rather than every capitalised candidate at once. For a name the user
     typed in lower case the two coincide and dedupe to one, costing nothing.
 
-    `limit=None` returns the whole ordered list, which is how the caller sees
-    what a cap dropped in order to say so.
+    Deliberately uncapped: derivation is pure string work and costs no
+    requests. The per-company cap has exactly one owner — `discover_company`'s
+    `max_slugs` — which slices this list and keeps the remainder as
+    `dropped_candidates` so the report can say what the cap dropped. A second
+    cap here was dead code that could drift from the real one unnoticed.
     """
     folded, capitals = _company_tokens(name)
     ordered: list[str] = []
@@ -2254,7 +2433,7 @@ def slug_candidates(
             continue
         seen.add(candidate)
         kept.append(candidate)
-    return kept if limit is None else kept[:max(0, int(limit))]
+    return kept
 
 
 class RequestBudget:
@@ -2384,6 +2563,30 @@ class DiscoveryResult:
         }
 
 
+def _generic_token_hit(company: str, probe: BoardProbe) -> bool:
+    """True when the hit's slug is only the *first word* of a multi-word name
+    on a board whose payload named no company to check it against.
+
+    The squatter case. Derivation offers the bare first token as a last-resort
+    spelling ("Octopus Energy" -> "octopus", "Delivery Hero" -> "delivery"),
+    and on the boards that publish no company name a FOUND on such a slug is
+    unverifiable: a generic English word is exactly the slug some unrelated
+    company already owns. The failure asymmetry decides what to do about it —
+    a missed real board prints "not found, check by hand" and costs a manual
+    look, while a squatter hit installs a wrong slug, the named worst failure
+    — so the hit is kept, capped at `medium`, and told to the user with the
+    reason. Where the payload *does* name the company, the name check is the
+    stronger evidence and this heuristic stays out of the way.
+    """
+    if probe.company_name:
+        return False
+    for name in (company, *_name_variants(company)):
+        folded, _capitals = _company_tokens(name)
+        if len(folded) > 1 and probe.slug.lower() == folded[0].lower():
+            return True
+    return False
+
+
 def _grade(result: DiscoveryResult) -> None:
     """Fill in `confidence`, `ambiguous` and `notes` from the probes.
 
@@ -2414,6 +2617,15 @@ def _grade(result: DiscoveryResult) -> None:
                 f"{hit.company_name!r} and you asked for {result.company!r} — "
                 "very likely a different company on the same slug"
             )
+        elif _generic_token_hit(result.company, hit):
+            result.confidence = min(result.confidence, CONFIDENCE_MEDIUM, key=_rank)
+            result.notes.append(
+                f"{hit.board}/{hit.slug} is only the first word of "
+                f"{result.company!r}, and this board publishes no company name "
+                "to check it against — a one-word slug can belong to an "
+                "unrelated company, so open the board and look before "
+                "trusting it"
+            )
         if empties:
             result.confidence = min(result.confidence, CONFIDENCE_MEDIUM, key=_rank)
             result.notes.append(
@@ -2421,12 +2633,27 @@ def _grade(result: DiscoveryResult) -> None:
                 + ", ".join(f"{p.board}/{p.slug}" for p in empties)
             )
     elif len(empties) == 1:
+        only = empties[0]
         result.confidence = CONFIDENCE_LOW
-        result.notes.append(
-            f"{empties[0].board}/{empties[0].slug} exists but has no open "
-            "postings, so nothing confirms it is the right company — a board "
-            "with no jobs on it looks the same either way"
-        )
+        if only.name_mismatch:
+            result.notes.append(
+                f"{only.board}/{only.slug} exists with no open postings, and "
+                f"it calls itself {only.company_name!r}, not {result.company!r} "
+                "— very likely a different company that happens to own the slug"
+            )
+        elif only.company_name:
+            result.notes.append(
+                f"{only.board}/{only.slug} has no open postings, but the board "
+                f"itself names the right company ({only.company_name!r}) — "
+                "likely the right slug on a week with nothing open; check it "
+                "by eye before trusting it"
+            )
+        else:
+            result.notes.append(
+                f"{only.board}/{only.slug} exists but has no open "
+                "postings, so nothing confirms it is the right company — a "
+                "board with no jobs on it looks the same either way"
+            )
     elif len(empties) > 1:
         result.ambiguous = True
         result.confidence = CONFIDENCE_LOW
@@ -2506,7 +2733,7 @@ def discover_company(
     board_list = [b for b in boards if b in BOARDS]
 
     for board in board_list:
-        every = slug_candidates(name, cased=(board == "smartrecruiters"), limit=None)
+        every = slug_candidates(name, cased=(board == "smartrecruiters"))
         result.candidates[board] = every[:cap]
         result.dropped_candidates[board] = every[cap:]
 
@@ -2517,6 +2744,16 @@ def discover_company(
             "(DISCOVER_MAX_SLUGS_PER_COMPANY=%d) and never tried: %s — check "
             "one directly with --check if you think it is the right spelling",
             result.company, len(dropped), cap, ", ".join(dropped),
+        )
+
+    if not any(result.candidates.values()):
+        # A name that derives no candidate at all ("!!!", "-"). Zero probes
+        # will be made, and without this note the report's "no board answered"
+        # wording would claim the boards were asked and said no — they were
+        # never asked, because there was nothing to ask about.
+        result.notes.append(
+            "no usable slug candidate could be derived from this name, so no "
+            "board was asked"
         )
 
     rounds = max((len(c) for c in result.candidates.values()), default=0)
@@ -2598,27 +2835,80 @@ def _probe_line(probe: BoardProbe) -> str:
     return f"  {probe.board:<16} {probe.slug:<22} {detail}"
 
 
-def _paste_block(result: DiscoveryResult) -> list[str]:
-    """The YAML to paste — or the reason there is none, as a comment.
+def _commented_continuations(lines: Sequence[str]) -> list[str]:
+    """Comment-prefix every physical line after the first of each logical one.
 
-    Anything below `medium`, and anything ambiguous, is emitted **commented
+    Structural, not a sanitiser of any one input: anything in the paste block
+    that came from the outside world — an exception message quoted into a
+    note, a company name typed on the command line — may contain a line break,
+    and a line break inside a "# note: …" line would put its second half on a
+    physical line of its own with no `#` in front. Pasting the block would
+    then install that fragment as real YAML, which is exactly what the
+    commenting discipline exists to make impossible. `str.splitlines` rather
+    than splitting on `\\n`: PyYAML also treats `\\r`, `\\x85`, `\\u2028` and
+    `\\u2029` as line breaks, so those must not smuggle either.
+    """
+    out: list[str] = []
+    for line in lines:
+        parts = str(line).splitlines() or [""]
+        out.append(parts[0])
+        out.extend(f"# {part}" for part in parts[1:])
+    return out
+
+
+def _pasteable_yaml(results: Sequence[DiscoveryResult]) -> list[str]:
+    """The uncommented half of the paste block: one key per board, ever.
+
+    Grouped by board across companies, because concatenating one `{board}:`
+    key per company emits the same top-level key twice the moment two
+    companies land on the same board — and YAML silently keeps only the last
+    one. `--discover "Glovo" "Cabify"`, both on Greenhouse, would print a
+    block that installs Cabify and quietly vanishes Glovo; pasted after an
+    existing `greenhouse:` section it would vanish that section's companies
+    instead, which is silent job loss with exit code 0. One key per board
+    makes the duplicate impossible within the block, and `Config.load` now
+    refuses a file where a paste-next-to-existing-key duplicate slipped in
+    anyway.
+    """
+    by_board: dict[str, list[DiscoveryResult]] = {}
+    for result in results:
+        hit = result.suggestion
+        if result.pasteable and hit is not None:
+            by_board.setdefault(hit.board, []).append(result)
+
+    lines: list[str] = []
+    for board in BOARDS:  # BOARDS order, so the block is deterministic
+        group = by_board.get(board)
+        if not group:
+            continue
+        lines.append(f"{board}:")
+        for result in group:
+            hit = result.suggestion
+            lines.append(
+                f"  - {hit.slug}"
+                f"{' ' * max(1, 22 - len(hit.slug))}"
+                f"# {result.company} — {hit.count} posting"
+                f"{'s' if hit.count != 1 else ''} ({result.confidence} confidence)"
+            )
+            # `high` currently grades with no notes attached, but if grading
+            # ever grows a qualifier that does not downgrade, dropping it here
+            # would hide it from the one place the user reads.
+            for note in result.notes:
+                lines.append(f"  # note: {note}")
+        lines.append("")
+    return lines
+
+
+def _commented_block(result: DiscoveryResult) -> list[str]:
+    """Why one company has nothing to paste, as comments — never as YAML.
+
+    Everything below `high`, and anything ambiguous, is emitted **commented
     out**. Pasting this block must never be able to install a guess: a wrong
     slug produces an empty board every morning and reads as a quiet market
     rather than as a mistake, which is the expensive way to be wrong here.
     """
     lines: list[str] = []
     hit = result.suggestion
-    if result.pasteable and hit is not None:
-        lines.append(f"{hit.board}:")
-        lines.append(
-            f"  - {hit.slug}"
-            f"{' ' * max(1, 22 - len(hit.slug))}"
-            f"# {result.company} — {hit.count} posting"
-            f"{'s' if hit.count != 1 else ''} ({result.confidence} confidence)"
-        )
-        for note in result.notes:
-            lines.append(f"  # note: {note}")
-        return lines
 
     if result.ambiguous:
         lines.append(
@@ -2648,6 +2938,15 @@ def _paste_block(result: DiscoveryResult) -> list[str]:
             "board(s) had been asked,"
         )
         lines.append("# so this is not a result: re-run this company on its own.")
+    elif not any(result.candidates.values()):
+        # Zero probes because derivation produced nothing to probe. "No board
+        # answered" would be a lie here — no board was asked a thing.
+        lines.append(
+            f"# {result.company} — no usable slug could be derived from this "
+            "name, so no board was asked."
+        )
+        lines.append("# Open their careers page, copy the Apply URL, and paste it "
+                     "into --check.")
     else:
         tried = sorted({p.slug for p in result.probes})
         lines.append(
@@ -2700,9 +2999,26 @@ def format_discovery(results: Sequence[DiscoveryResult], budget: RequestBudget) 
     lines.append("# " + "-" * 70)
     lines.append("# paste into watchlist.yaml — check anything commented out by hand")
     lines.append("# " + "-" * 70)
+
+    block: list[str] = []
+    yaml_lines = _pasteable_yaml(results)
+    if yaml_lines:
+        # The one hazard the printer cannot remove: pasting a board key into a
+        # file that already has that key. YAML keeps the last copy and silently
+        # drops every company under the first — so say it here, in the block
+        # people actually copy, and let `Config.load`'s duplicate-key refusal
+        # catch whoever pastes without reading.
+        block.append("# merge these lines into any key below that your "
+                     "watchlist.yaml already has —")
+        block.append("# a second copy of the same top-level key would silently "
+                     "replace the first,")
+        block.append("# so the loader refuses to load a file with one.")
+        block.extend(yaml_lines)
     for result in results:
-        lines.extend(_paste_block(result))
-        lines.append("")
+        if not (result.pasteable and result.suggestion is not None):
+            block.extend(_commented_block(result))
+            block.append("")
+    lines.extend(_commented_continuations(block))
 
     lines.append(
         f"{budget.spent} probe(s) for {len(results)} compan"
@@ -2798,9 +3114,10 @@ def _build_parser() -> argparse.ArgumentParser:
 def _run_discovery(args: argparse.Namespace) -> int:
     """`--discover NAME...`: print the watchlist lines, never write them.
 
-    Exit code 0 only when every name produced something that can be pasted
-    without a decision — so an ambiguous result, a low-confidence one, a company
-    found nowhere and a run the cap cut short all exit 1. The alternative is a
+    Exit code 0 only when every name graded `high` — the only confidence that
+    prints uncommented YAML. Everything below needs a decision from the user
+    (a medium's evidence hole, an ambiguous pair, a company found nowhere, a
+    run the cap cut short), so everything below exits 1. The alternative is a
     green exit on a report whose whole content is "you need to look at this".
     """
     results, budget = discover(
@@ -2839,6 +3156,16 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging("WARNING")
 
     if args.discover:
+        if args.check or args.check_all:
+            # Answering both questions in one run would double the request
+            # count without saying so — but *silently* dropping a flag the
+            # user typed is how a slug they meant to verify goes unverified.
+            ignored = "--check" if args.check else "--check-all"
+            print(
+                f"note: {ignored} was ignored — --discover runs alone; "
+                f"run {ignored} as its own command",
+                file=sys.stderr,
+            )
         return _run_discovery(args)
 
     targets: list[tuple[str, str]] = []

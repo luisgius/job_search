@@ -217,7 +217,7 @@ def paste_block(report: str) -> str:
     ],
 )
 def test_slug_candidates_for_the_ordinary_shapes(name, expected):
-    assert slug_candidates(name, limit=None) == expected
+    assert slug_candidates(name) == expected
 
 
 @pytest.mark.parametrize(
@@ -239,32 +239,32 @@ def test_non_ascii_names_survive_derivation(name, expected):
     """A name the pipeline cannot even spell is a company discovery cannot look
     for. German expands its umlauts in URLs at least as often as it drops them
     ("buecher"), and NFKD alone only ever produces the dropped form."""
-    assert slug_candidates(name, limit=None) == expected
+    assert slug_candidates(name) == expected
 
 
 def test_an_ampersand_gets_both_spellings():
     """"&" is punctuation to the normaliser, so "H&M" already joins to "hm" —
     but "h-and-m" is a real slug shape and is not derivable from the folded
     tokens alone."""
-    assert slug_candidates("H&M", limit=None) == ["hm", "h-m", "handm", "h-and-m"]
+    assert slug_candidates("H&M") == ["hm", "h-m", "handm", "h-and-m"]
 
 
 def test_a_one_character_candidate_is_never_tried():
     """The bare first token of "H&M" is "h". It is never a real slug, and a
     candidate costs a whole round of six probes to disprove."""
-    assert "h" not in slug_candidates("H&M", limit=None)
+    assert "h" not in slug_candidates("H&M")
 
 
 def test_derivation_never_returns_duplicates():
     """A name whose spellings coincide must not pay for the same probe twice."""
     for name in ("glovo", "Glovo", "H&M", "Bucher", "adyen nv"):
-        candidates = slug_candidates(name, cased=True, limit=None)
+        candidates = slug_candidates(name, cased=True)
         assert len(candidates) == len(set(candidates)), name
 
 
 @pytest.mark.parametrize("name", ["", "   ", None, "!!!", "-"])
 def test_a_nameless_name_derives_nothing_rather_than_probing(name):
-    assert slug_candidates(name, limit=None) == []
+    assert slug_candidates(name) == []
 
 
 # ==========================================================================
@@ -277,7 +277,7 @@ def test_smartrecruiters_candidates_keep_the_companys_own_capitals():
     exactly as it appears in the jobs.smartrecruiters.com URL, capitals and all.
     Lowercasing it away is how the one board a European company is actually on
     gets reported as a 404."""
-    assert slug_candidates("Factorial HR", cased=True, limit=None) == [
+    assert slug_candidates("Factorial HR", cased=True) == [
         "FactorialHR", "factorialhr", "Factorial", "factorial",
         "Factorial-HR", "factorial-hr",
     ]
@@ -286,7 +286,7 @@ def test_smartrecruiters_candidates_keep_the_companys_own_capitals():
 def test_the_cased_and_folded_spellings_are_both_tried():
     """Real SmartRecruiters tenants exist under both conventions, so neither
     spelling may be the only one asked about."""
-    candidates = slug_candidates("Glovo", cased=True, limit=None)
+    candidates = slug_candidates("Glovo", cased=True)
     assert candidates == ["Glovo", "glovo"]
 
 
@@ -309,14 +309,14 @@ def test_the_cased_spellings_survive_folding_and_expansion(name, expected):
     in `_company_tokens` hides that failure by falling back to the folded list,
     so it has to be asserted here rather than inferred from the ASCII cases.
     """
-    assert slug_candidates(name, cased=True, limit=None) == expected
+    assert slug_candidates(name, cased=True) == expected
 
 
 def test_a_lowercase_name_costs_smartrecruiters_nothing_extra():
     """When the user types the name in lower case the two spellings coincide,
     and dedupe must collapse them — a duplicate candidate is a wasted round of
     six probes against boards that already said no."""
-    assert slug_candidates("glovo", cased=True, limit=None) == ["glovo"]
+    assert slug_candidates("glovo", cased=True) == ["glovo"]
 
 
 def test_only_smartrecruiters_gets_the_cased_candidates():
@@ -454,6 +454,85 @@ def test_a_404_is_the_answer_and_is_not_retried():
     assert sum(1 for url in session.urls() if "greenhouse" in url) == 1
 
 
+def test_a_probe_spends_exactly_one_attempt_on_a_transient_failure():
+    """One probe is one HTTP request — the sentence the request budget's
+    docstring stakes the politeness claim on, and it used to be false: a
+    timeout spent `util.http_get`'s full three-attempt budget, so one probe
+    could be three real requests against a budget that recorded one. The probe
+    path passes `retries=1`, because the retry insurance protects real jobs in
+    the daily run and protects nothing here — a missed probe costs one
+    commented-out suggestion."""
+    session = discovery_session(
+        raises("ashby", "glovo", TimeoutError("read timed out")),
+    )
+    result = discover_company("Glovo", session=session)
+
+    assert sum(1 for url in session.urls() if "ashbyhq" in url) == 1
+    assert statuses(result)[("ashby", "glovo")] == PROBE_UNREACHABLE
+
+
+def test_a_board_that_says_429_is_not_asked_again():
+    """The unfriendliest possible probe is re-asking a host that just said
+    "too many requests" — twice, immediately, from a tool it never invited.
+    `util.http_get` retries 429 by design for the daily run; the probe's
+    `retries=1` turns that off here."""
+    session = discovery_session(rejects("lever", "glovo", 429))
+    result = discover_company("Glovo", session=session)
+
+    assert sum(1 for url in session.urls() if "lever" in url) == 1
+    assert statuses(result)[("lever", "glovo")] == PROBE_ERROR
+
+
+def test_a_status_wrapped_in_the_transport_sentence_is_still_an_answer():
+    """A 429/5xx that survives the retry loop comes out as `HttpError("GET …
+    failed after N attempts: … HTTP 429")` — a message carrying *both* the
+    transport sentence and a status code. Only the check order in the
+    classifier keeps that an answer (`error`) rather than `unreachable`: a
+    host that said 429 heard us, and a report that files it under "no answer"
+    blames the network for a refusal. This is the reorder mutation that
+    survived the original suite."""
+    session = discovery_session(rejects("workable", "glovo", 429))
+    results, budget = discover(["Glovo"], session=session)
+    result = results[0]
+
+    assert statuses(result)[("workable", "glovo")] == PROBE_ERROR
+    probe = {(p.board, p.slug): p for p in result.probes}[("workable", "glovo")]
+    assert "429" in probe.message
+
+    report = format_discovery(results, budget)
+    assert "answered, but not with a board" in report
+
+
+def test_stopping_early_on_a_clean_round_is_high_not_medium():
+    """The line `high` draws: every question that was *asked* got a real
+    answer (found/empty/absent) and exactly one board had postings. The
+    spellings a hit left unasked are printed as untried, never held against
+    the answer — the early stop is the politeness trade, and grading it
+    `medium` would punish the sweep for behaving."""
+    session = discovery_session(answers("greenhouse", "factorialhr", 12))
+    result = discover_company("Factorial HR", session=session)
+
+    assert result.stopped_early is True
+    assert result.untried              # spellings really were left unasked
+    assert result.confidence == "high"
+
+
+def test_a_hit_still_reports_smartrecruiters_folded_spelling_as_untried():
+    """`untried`'s own documented failure case. For "Glovo" the cased and
+    folded spellings are the same string on every board except the
+    case-sensitive one, so keying `asked` on the slug *alone* collapses the
+    (smartrecruiters, "glovo") pair into the five other boards' "glovo" and
+    the report says nothing was skipped — which is wrong: the one
+    case-sensitive board was never asked about its folded spelling."""
+    session = discovery_session(answers("workable", "glovo", 5))
+    results, budget = discover(["Glovo"], session=session)
+    result = results[0]
+
+    assert result.untried == [("smartrecruiters", "glovo")]
+    report = format_discovery(results, budget)
+    assert "never asked: smartrecruiters/glovo" in report
+
+
 def test_one_board_is_never_asked_about_a_slug_meant_for_another():
     """A sanity check on the fake as much as on the code: routing is by
     substring, and a test whose routes overlap proves nothing."""
@@ -544,6 +623,41 @@ def test_a_longer_published_name_is_not_a_mismatch():
     assert result.confidence == "high"
 
 
+def test_a_published_name_that_closes_up_the_spaces_is_not_a_mismatch():
+    """Tenants spell themselves in house style — "FactorialHR" for "Factorial
+    HR" — and a space-sensitive comparison flags exactly those as collisions:
+    a mismatch fabricated out of a spelling convention, downgrading the one
+    correct answer on the one board a European company is often actually on.
+    Agreement is containment with the spaces ignored."""
+    session = discovery_session(
+        answers("smartrecruiters", "FactorialHR", 9, company="FactorialHR"),
+    )
+    result = discover_company("Factorial HR", session=session)
+
+    assert result.matches[0].name_mismatch is False
+    assert result.confidence == "high"
+
+
+def test_a_smartrecruiters_posting_that_names_nobody_invents_no_mismatch():
+    """When the payload's `company` node has no name, `Job.company` falls back
+    to `company_from_slug` — our own guess. Comparing that guess to the name
+    it was derived from can only agree (proving nothing) or disagree over a
+    spelling we introduced ourselves (fabricating a collision), so the probe
+    treats it as "the board named nobody"."""
+    session = discovery_session(
+        (board_route("smartrecruiters", "Glovo"),
+         json_response({
+             "totalFound": 1,
+             "content": [{"id": "1", "name": "Backend Engineer",
+                          "company": {"identifier": "Glovo"}}],
+         })),
+    )
+    result = discover_company("Glovo", session=session)
+
+    assert result.matches[0].company_name == ""
+    assert result.matches[0].name_mismatch is False
+
+
 def test_the_four_boards_that_invent_a_name_never_produce_a_mismatch():
     """Greenhouse, Lever, Ashby and Personio have no company field, so
     `company_from_slug` fills it in — comparing that back against the name we
@@ -607,6 +721,122 @@ def test_an_empty_board_does_not_stop_the_sweep():
     assert result.confidence == "medium"
 
 
+def test_two_empty_boards_are_reported_as_ambiguity_not_as_no_answer():
+    """Two reachable-but-empty boards under one name is the two-boards-answered
+    finding with the postings removed: both exist, either could be the company,
+    and nothing arbitrates. Without the ambiguity flag the paste block printed
+    "no board answered" — a false sentence; two boards answered — and `--json`
+    said `ambiguous: false`. (Deleting the flag from this branch survived the
+    original suite.)"""
+    session = discovery_session(
+        answers("ashby", "glovo", 0),
+        answers("workable", "glovo", 0, company="Glovo"),
+    )
+    results, budget = discover(["Glovo"], session=session)
+    result = results[0]
+
+    assert result.ambiguous is True
+    assert result.confidence == "low"
+    assert result.to_dict()["ambiguous"] is True
+
+    block = paste_block(format_discovery(results, budget))
+    assert "AMBIGUOUS" in block
+    assert "no board answered" not in block
+    assert "ashby" in block and "workable" in block
+    for line in block.splitlines():
+        assert not line.strip() or line.lstrip().startswith("#"), line
+
+
+def test_an_empty_workable_board_that_names_the_company_says_so():
+    """Workable's account envelope names the tenant even when the job list is
+    empty, and the code used to throw that away — then print "nothing confirms
+    it is the right company", which is false there. The name is the only
+    company evidence an empty board has; when it matches, the note says what
+    is actually known: right company, nothing open today."""
+    session = discovery_session(
+        answers("workable", "glovo", 0, company="Glovo Spain SL"),
+    )
+    results, budget = discover(["Glovo"], session=session)
+    result = results[0]
+
+    probe = {(p.board, p.slug): p for p in result.probes}[("workable", "glovo")]
+    assert probe.company_name == "Glovo Spain SL"
+    assert probe.name_mismatch is False
+
+    notes = " ".join(result.notes)
+    assert "names the right company" in notes
+    assert "'Glovo Spain SL'" in notes
+    assert "nothing confirms" not in notes
+    # Still low and commented: with zero postings there is nothing to install
+    # today, and an empty board is cheap to check by eye first.
+    assert result.confidence == "low"
+    assert result.pasteable is False
+
+
+def test_an_empty_workable_board_with_the_wrong_name_is_evidence_against():
+    """The other half: a name MISmatch on an empty board is not a shrug, it is
+    positive evidence the slug belongs to somebody else — the exact situation
+    in which pasting it would plant a wrong company's board in the watchlist."""
+    session = discovery_session(
+        answers("workable", "glovo", 0, company="Fabrikam Insurance"),
+    )
+    result = discover_company("Glovo", session=session)
+
+    probe = {(p.board, p.slug): p for p in result.probes}[("workable", "glovo")]
+    assert probe.company_name == "Fabrikam Insurance"
+    assert probe.name_mismatch is True
+    notes = " ".join(result.notes)
+    assert "Fabrikam Insurance" in notes
+    assert "different company" in notes
+    assert result.confidence == "low"
+    assert result.pasteable is False
+
+
+# ==========================================================================
+# the squatter asymmetry: a bare first token on a nameless board
+# ==========================================================================
+
+
+def test_a_bare_first_token_hit_on_a_nameless_board_is_medium():
+    """Derivation offers the bare first token as a last resort ("Factorial HR"
+    -> "factorial", "Octopus Energy" -> "octopus"), and Greenhouse publishes
+    no company name to check a hit against — so FOUND there is exactly what a
+    squatter on a generic word looks like. The asymmetry decides the grade: a
+    missed real board prints "not found, check by hand" (one manual look); an
+    installed wrong slug is the named worst failure. Capped at medium, which
+    prints commented out with the reason."""
+    session = discovery_session(answers("greenhouse", "factorial", 8))
+    result = discover_company("Factorial HR", session=session)
+
+    assert result.suggestion.slug == "factorial"
+    assert result.confidence == "medium"
+    assert result.pasteable is False
+    assert "first word" in " ".join(result.notes)
+
+
+def test_a_bare_token_hit_with_a_matching_published_name_stays_high():
+    """Where the vendor names the tenant, the name check is the stronger
+    evidence and the heuristic stays out of the way: workable/factorial
+    answering as "Factorial HR" is verified, not a guess."""
+    session = discovery_session(
+        answers("workable", "factorial", 8, company="Factorial HR"),
+    )
+    result = discover_company("Factorial HR", session=session)
+
+    assert result.suggestion.slug == "factorial"
+    assert result.confidence == "high"
+    assert result.pasteable is True
+
+
+def test_a_whole_name_hit_is_not_a_bare_token_hit():
+    """"Glovo" found under "glovo" is the company's whole name, not a generic
+    first word — the heuristic must not tax single-word companies."""
+    session = discovery_session(answers("greenhouse", "glovo", 8))
+    result = discover_company("Glovo", session=session)
+
+    assert result.confidence == "high"
+
+
 def test_a_board_that_answers_with_something_that_is_not_a_board():
     """A parked domain or a login wall answers 200 with HTML. Personio's feed is
     XML, so this arrives as a parse failure — an *answer*, and it must not be
@@ -619,6 +849,54 @@ def test_a_board_that_answers_with_something_that_is_not_a_board():
 
     assert statuses(result)[("personio", "glovo")] == PROBE_ERROR
     assert result.confidence == "none"
+
+
+@pytest.mark.parametrize("board,slug", [
+    ("greenhouse", "glovo"),
+    ("lever", "glovo"),
+    ("workable", "glovo"),
+    ("ashby", "glovo"),
+    # SmartRecruiters is asked its cased spelling first, so route that one.
+    ("smartrecruiters", "Glovo"),
+])
+def test_a_200_error_envelope_is_an_error_not_an_empty_board(board, slug):
+    """`{"error": "not found"}` with status 200 used to classify `empty` —
+    "exists but has no open postings" fabricated from a body that never
+    mentioned jobs at all. `empty` is a finding and needs positive evidence
+    the response IS the vendor's board (its envelope shape); valid JSON that
+    lacks it is `error`: something answered, and it was not a board."""
+    session = discovery_session(
+        (board_route(board, slug), json_response({"error": "not found"})),
+    )
+    result = discover_company("Glovo", session=session)
+
+    assert statuses(result)[(board, slug)] == PROBE_ERROR
+    assert result.empties == []
+    assert result.confidence == "none"
+
+
+def test_an_error_envelope_never_mints_the_nothing_open_note():
+    """The found+empty combination writes "also reachable but with nothing
+    open" into the notes — a strong claim, and the error-envelope bug used to
+    manufacture it: a 200 error object on a second board upgraded a plain hit
+    into "found here, also exists there". The note must only ever name a board
+    that proved itself empty."""
+    session = discovery_session(
+        (board_route("ashby", "glovo"), json_response({"error": "not found"})),
+        answers("workable", "glovo", 7),
+    )
+    results, budget = discover(["Glovo"], session=session)
+    result = results[0]
+
+    assert statuses(result)[("ashby", "glovo")] == PROBE_ERROR
+    notes = " ".join(result.notes)
+    assert "also reachable but with nothing open" not in notes
+    assert "neither ruled in nor out" in notes
+    # Still downgraded — an unanswered board is a hole in the evidence — but
+    # for the honest reason, said honestly.
+    assert result.confidence == "medium"
+    report = format_discovery(results, budget)
+    assert "answered, but not with a board" in report
 
 
 def test_a_refusal_is_not_an_absence():
@@ -647,8 +925,8 @@ def test_a_board_that_times_out_does_not_cost_the_other_five():
     module is built on. The timeout is reported as a timeout, which is neither a
     404 nor an empty board, and the company is still found on Workable.
 
-    Slow on purpose: a transport failure spends `util.http_get`'s real retry
-    budget, which is the policy discovery reuses rather than replacing.
+    This used to be slow on purpose (three real attempts); the probe path now
+    holds `retries=1`, which the probe-cost tests below pin down.
     """
     session = discovery_session(
         raises("ashby", "glovo", TimeoutError("read timed out")),
@@ -708,7 +986,23 @@ def test_the_shipped_per_company_cap_covers_the_ordinary_shapes():
     """The cap is only defensible if it does not routinely cut a real spelling.
     Every derivation an ordinary name produces has to fit inside it."""
     for name in ("Glovo", "Factorial HR", "Adyen N.V.", "TravelPerk", "H&M", "Bücher"):
-        assert len(slug_candidates(name, limit=None)) <= DISCOVER_MAX_SLUGS_PER_COMPANY
+        assert len(slug_candidates(name)) <= DISCOVER_MAX_SLUGS_PER_COMPANY
+
+
+def test_the_per_company_cap_says_what_it_dropped_in_the_report():
+    """The printed half of the cap's audibility — and the half that matters:
+    the CLI runs `setup_logging("WARNING")`, so the INFO log line this cap
+    also writes is invisible in real use. If this line is not on the page, a
+    capped spelling is indistinguishable from a spelling that does not exist,
+    for every actual user."""
+    results, budget = discover(
+        ["Zürich Insurance"], session=discovery_session(), max_slugs=2,
+    )
+    report = format_discovery(results, budget)
+
+    assert "the per-company cap dropped these spellings untried" in report
+    assert "DISCOVER_MAX_SLUGS_PER_COMPANY=2" in report
+    assert "zuerichinsurance" in report
 
 
 def test_the_request_cap_stops_the_sweep():
@@ -778,6 +1072,27 @@ def test_a_capped_hit_is_downgraded_rather_than_trusted():
     assert results[0].pasteable is False
 
 
+def test_a_cap_plus_hit_round_still_counts_every_probe_it_prevented():
+    """The sweep deliberately keeps walking the remaining rounds after the cap
+    bites — even when that round also produced a hit — because the walk is
+    what turns "the cap stopped us" into a *number*. "Factorial HR" has 19
+    (board, slug) pairs (three spellings on five boards, four on the
+    case-sensitive one); a budget of 4 probes the first four and must record
+    the other 15 as prevented. Breaking on the hit alone under-reports them as
+    2, and the printed "N probe(s) were NOT made" — the user's only view of
+    the damage — shrinks with it."""
+    session = discovery_session(answers("workable", "factorialhr", 6))
+    results, budget = discover(["Factorial HR"], session=session, max_requests=4)
+    result = results[0]
+
+    assert result.capped is True
+    assert [p.board for p in result.matches] == ["workable"]
+    assert budget.spent == 4
+    assert len(budget.skipped) == 15
+    report = format_discovery(results, budget)
+    assert "15 probe(s) were NOT made" in report
+
+
 def test_the_budget_is_shared_across_companies():
     session = discovery_session()
     _results, budget = discover(
@@ -841,6 +1156,143 @@ def test_the_report_is_pasteable_yaml():
     assert parsed == {"workable": ["glovo"]}
 
 
+def test_two_companies_on_one_board_share_one_yaml_key():
+    """The P0. Each company used to print its own top-level `{board}:` key,
+    and `yaml.safe_load` keeps only the last duplicate — so discovering two
+    Greenhouse companies printed a block that *installs one and silently
+    vanishes the other*, with exit code 0. One key per board, every found
+    company under it, and the whole block parses to what it shows."""
+    import yaml
+
+    session = discovery_session(
+        answers("greenhouse", "glovo", 12, company="Glovo"),
+        answers("greenhouse", "cabify", 9, company="Cabify"),
+    )
+    results, budget = discover(["Glovo", "Cabify"], session=session)
+    block = paste_block(format_discovery(results, budget))
+
+    assert block.count("greenhouse:") == 1
+    parsed = yaml.safe_load(block)
+    assert parsed == {"greenhouse": ["glovo", "cabify"]}
+    # Both companies' evidence comments survive the grouping.
+    assert "# Glovo — 12 postings (high confidence)" in block
+    assert "# Cabify — 9 postings (high confidence)" in block
+
+
+def test_companies_on_different_boards_get_one_key_each():
+    import yaml
+
+    session = discovery_session(
+        answers("greenhouse", "glovo", 12, company="Glovo"),
+        answers("workable", "cabify", 9, company="Cabify"),
+    )
+    results, budget = discover(["Glovo", "Cabify"], session=session)
+    parsed = yaml.safe_load(paste_block(format_discovery(results, budget)))
+
+    assert parsed == {"greenhouse": ["glovo"], "workable": ["cabify"]}
+
+
+def test_the_paste_block_warns_about_merging_into_an_existing_key():
+    """The printer cannot see the user's watchlist, so the paste-next-to-an-
+    existing-key duplicate cannot be prevented here — it can only be said,
+    in the block people actually copy, with `Config.load`'s duplicate-key
+    refusal as the backstop for whoever pastes without reading."""
+    session = discovery_session(answers("workable", "glovo", 34))
+    results, budget = discover(["Glovo"], session=session)
+    block = paste_block(format_discovery(results, budget))
+
+    assert "merge these lines into any key below" in block
+    assert "silently replace the first" in block
+
+    # No pasteable YAML, no keys to collide — the warning would be noise.
+    nothing, cap = discover(["TravelPerk"], session=discovery_session())
+    assert "merge these lines" not in format_discovery(nothing, cap)
+
+
+def test_pasting_the_block_after_an_existing_key_cannot_silently_eat_it(
+    tmp_path: Path,
+):
+    """The two layers end to end, against the historical killer: the block a
+    real discovery prints, pasted at the bottom of a watchlist that already
+    has a `greenhouse:` section. YAML's last-wins would delete spotify and
+    datadog from every future run with no error; the loader now refuses the
+    file and names the key."""
+    from src.config import Config, ConfigError
+
+    session = discovery_session(answers("greenhouse", "glovo", 3))
+    results, budget = discover(["Glovo"], session=session)
+    block = paste_block(format_discovery(results, budget))
+
+    (tmp_path / "config.yaml").write_text("", encoding="utf-8")
+    watchlist = tmp_path / "watchlist.yaml"
+    watchlist.write_text(
+        "greenhouse:\n  - spotify\n  - datadog\n\n" + block + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="duplicate key 'greenhouse'"):
+        Config.load(tmp_path / "config.yaml", watchlist, root=tmp_path, env={})
+
+
+def test_a_medium_result_is_printed_commented_out():
+    """The promise every doc makes: only `high` prints uncommented. `medium`
+    here is one board of six timing out in the deciding round — a transient
+    blip — and an uncommented line would turn that blip into an *installed*
+    slug. The candidate is still offered, with the reason, behind a `#`."""
+    session = discovery_session(
+        raises("ashby", "glovo", TimeoutError("read timed out")),
+        answers("workable", "glovo", 11),
+    )
+    results, budget = discover(["Glovo"], session=session)
+    result = results[0]
+
+    assert result.confidence == "medium"
+    assert result.pasteable is False
+
+    block = paste_block(format_discovery(results, budget))
+    assert "medium confidence" in block
+    assert "workable: [glovo]" in block          # the candidate, offered...
+    for line in block.splitlines():              # ...and nothing installable
+        assert not line.strip() or line.lstrip().startswith("#"), line
+
+
+def test_a_note_with_a_line_break_cannot_smuggle_yaml_into_the_block():
+    """A break inside a `# note:` line used to put its second half on an
+    uncommented physical line of its own — pasteable YAML minted by whatever
+    text got quoted into the note. Pinned at the unit that owns the guarantee
+    (a result with a poisoned note fed straight to the formatter), because the
+    end-to-end probe route happens to truncate today's messages short of their
+    newline — a test through that route would pass with or without the fix,
+    and an assertion that cannot fail is worse than none. The fix is
+    structural: every physical line of the block is comment-prefixed, whatever
+    the input."""
+    import yaml
+
+    from src.sources.ats_boards import DiscoveryResult
+
+    poisoned = DiscoveryResult(company="Acme")
+    poisoned.notes.append("looks harmless\nlever: [smuggled]")
+    block = paste_block(format_discovery([poisoned], RequestBudget()))
+
+    for line in block.splitlines():
+        assert not line.strip() or line.lstrip().startswith("#"), line
+    assert yaml.safe_load(block) is None
+
+
+def test_a_company_name_with_a_line_break_cannot_smuggle_yaml_either():
+    """The same hole through the front door: the company name is CLI input,
+    is quoted into the block verbatim, and is not length-truncated at all."""
+    import yaml
+
+    results, budget = discover(
+        ["Evil\nlever: [evil]"], session=discovery_session(),
+    )
+    block = paste_block(format_discovery(results, budget))
+
+    for line in block.splitlines():
+        assert not line.strip() or line.lstrip().startswith("#"), line
+    assert yaml.safe_load(block) is None
+
+
 def test_the_paste_block_carries_the_evidence_as_a_comment():
     session = discovery_session(answers("workable", "glovo", 34))
     results, budget = discover(["Glovo"], session=session)
@@ -890,9 +1342,12 @@ def stub_discovery(monkeypatch):
     """
     calls: list[tuple[str, str]] = []
     found: dict[tuple[str, str], int] = {}
+    errors: dict[tuple[str, str], Exception] = {}
 
     def _fake(board, slug, *, session=None, **kwargs):
         calls.append((board, slug))
+        if (board, slug) in errors:
+            raise errors[(board, slug)]
         if (board, slug) in found:
             return [object()] * found[(board, slug)]
         raise HttpError(f"https://x/{slug} -> HTTP 404")
@@ -900,6 +1355,7 @@ def stub_discovery(monkeypatch):
     monkeypatch.setattr(ats_boards, "_fetch_board", _fake)
     _fake.calls = calls        # type: ignore[attr-defined]
     _fake.found = found        # type: ignore[attr-defined]
+    _fake.errors = errors      # type: ignore[attr-defined]
     return _fake
 
 
@@ -939,6 +1395,47 @@ def test_cli_discover_exit_code_is_zero_only_when_everything_is_pasteable(
     assert main(["--discover", "Glovo"]) == 0
     stub_discovery.found[("greenhouse", "glovo")] = 1
     assert main(["--discover", "Glovo"]) == 1
+
+
+def test_cli_discover_exits_nonzero_on_a_medium(stub_discovery):
+    """Exit 0 promises "paste this without a decision", and a medium *is* a
+    decision — one board never answered, so the sweep cannot rule it out. One
+    transient blip on one of six boards must not read as a clean pass."""
+    stub_discovery.found[("workable", "glovo")] = 11
+    stub_discovery.errors[("ashby", "glovo")] = HttpError(
+        "GET https://x/glovo failed after 1 attempts: read timed out"
+    )
+    assert main(["--discover", "Glovo"]) == 1
+
+
+def test_cli_discover_says_when_check_is_ignored(stub_boards, capsys):  # noqa: F811
+    """`--discover X --check B S` runs only the discovery — by design, since
+    answering both would double the request count. But a silently dropped flag
+    is how a slug the user meant to verify goes unverified, so the drop is
+    said out loud (on stderr, so `--json` stdout stays machine-readable)."""
+    main(["--discover", "Glovo", "--check", "greenhouse", "spotify"])
+    err = capsys.readouterr().err
+    assert "--check" in err
+    assert "ignored" in err
+
+
+def test_cli_discover_json_stdout_survives_an_ignored_check(stub_boards, capsys):  # noqa: F811
+    main(["--discover", "Glovo", "--check", "greenhouse", "spotify", "--json"])
+    out = capsys.readouterr().out
+    json.loads(out)  # the warning must not have leaked into the JSON
+
+
+def test_a_name_that_derives_nothing_says_so(stub_discovery, capsys):
+    """"!!!" derives zero candidates, so zero probes are made — and the old
+    report still said "no board answered for any candidate", which claims the
+    boards were asked and said no. Nothing was asked; the report must say that
+    instead, and send the user to --check."""
+    assert main(["--discover", "!!!"]) == 1
+
+    out = capsys.readouterr().out
+    assert "no usable slug" in out
+    assert "no board answered" not in out
+    assert stub_discovery.calls == []
 
 
 def test_cli_discover_json_is_machine_readable(stub_discovery, capsys):

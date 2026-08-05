@@ -304,14 +304,53 @@ def deep_merge(base: dict[str, Any], override: Any) -> dict[str, Any]:
     return result
 
 
+class _NoDuplicateKeysLoader(yaml.SafeLoader):
+    """`yaml.SafeLoader` plus one refusal: a mapping with a duplicated key.
+
+    PyYAML keeps the *last* value for a duplicated key and raises nothing, so a
+    watchlist that ends in a second `greenhouse:` block — say, one pasted from
+    `--discover` — silently deletes every company under the first one. From the
+    next morning on those boards are simply never fetched, which reads as a
+    quiet market rather than as a mistake: the exact silent job loss
+    `src/health.py` exists to catch, delivered by the config loader with no
+    error attached. Refusing to load the file is the only honest answer.
+
+    Checked at every nesting level, not just the top: two `path:` keys under
+    `db:` are the same mistake at smaller scale. YAML merge keys (`<<:`) are
+    exempt — overriding a merged key with an explicit one is the documented
+    point of the feature, not a paste accident.
+    """
+
+    def construct_mapping(self, node: Any, deep: bool = False) -> dict[Any, Any]:
+        if isinstance(node, yaml.MappingNode):
+            seen: set[Any] = set()
+            for key_node, _value_node in node.value:
+                if key_node.tag == "tag:yaml.org,2002:merge":
+                    continue
+                key = self.construct_object(key_node, deep=True)
+                try:
+                    duplicated = key in seen
+                except TypeError:  # unhashable key: SafeLoader has its own error
+                    continue
+                if duplicated:
+                    raise yaml.constructor.ConstructorError(
+                        "while constructing a mapping", node.start_mark,
+                        f"found duplicate key {key!r} — YAML keeps only the "
+                        "last one, silently discarding everything under the "
+                        "first", key_node.start_mark,
+                    )
+                seen.add(key)
+        return super().construct_mapping(node, deep=deep)
+
+
 def _read_yaml(path: str | Path) -> dict[str, Any]:
     p = Path(path)
     if not p.exists():
         return {}
     try:
-        loaded = yaml.safe_load(p.read_text(encoding="utf-8"))
+        loaded = yaml.load(p.read_text(encoding="utf-8"), Loader=_NoDuplicateKeysLoader)
     except yaml.YAMLError as exc:
-        raise ConfigError(f"{p} is not valid YAML: {exc}") from exc
+        raise ConfigError(f"{p} is not usable YAML: {exc}") from exc
     if loaded is None:
         return {}
     if not isinstance(loaded, dict):

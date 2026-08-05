@@ -1,6 +1,6 @@
 # Testing
 
-**1789 tests, ~53s, fully offline** (plus 54 network-only contract tests,
+**1835 tests, ~53s, fully offline** (plus 54 network-only contract tests,
 deselected by default).
 
 ```bash
@@ -17,7 +17,7 @@ pytest --cov=src --cov-report=term-missing
 | `test_edge_apply.py` | 111 | the apply leg against real 2026 form markup |
 | `test_ats_boards.py` | 108 | Greenhouse/Lever payload reality; slug + `--check` for all six |
 | `test_edge_fetch.py` | 86 | the shapes a real European job week produces |
-| `test_discover.py` | 83 | **`--discover`: its two caps, and never sounding surer than the evidence** |
+| `test_discover.py` | 115 | **`--discover`: its two caps, one-key-per-board paste, and never sounding surer than the evidence** |
 | `test_edge_match.py` | 76 | prompt injection; a model reply is untrusted input |
 | `test_main.py` | 64 | the pipeline end to end, offline |
 | `test_util.py` | 59 | retries, HTML flattening, every ATS date shape |
@@ -26,14 +26,14 @@ pytest --cov=src --cov-report=term-missing
 | `test_linkedin_email.py` | 52 | leniency under LinkedIn template change |
 | `test_scoring.py` | 52 | a job is never silently lost |
 | `test_llm_openrouter.py` | 50 | provider equivalence — same behaviour either way |
-| `test_config.py` | 58 | env-beats-file, validate-everything-at-once, **the shipped file vs `DEFAULTS`** |
+| `test_config.py` | 62 | env-beats-file, validate-everything-at-once, **duplicate keys refused**, **the shipped file vs `DEFAULTS`** |
 | `test_health.py` | 44 | a quiet day vs a broken pipeline |
 | `test_llm.py` | 43 | JSON recovery, retry policy |
 | `test_tailor.py` | 42 | **the anti-fabrication guarantee** |
 | `test_db.py` | 57 | **the double-apply guarantee** |
 | `test_workable.py` | 69 | split description/requirements/benefits; assembled locations |
 | `test_live_contract.py` | 54 | **the live APIs still emit what we parse** (network-only) |
-| `test_live_contract_policy.py` | 22 | **that file skips only when it should** — offline |
+| `test_live_contract_policy.py` | 32 | **that file skips only when it should** — offline, discovery gates included |
 | `test_ashby.py` | 40 | `secondaryLocations`; unlisted drafts stay hidden |
 | `test_smartrecruiters.py` | 48 | the two-call shape — and its cap |
 | `test_digest.py` | 66 | escaping, and legibility of failure |
@@ -329,11 +329,13 @@ returns nothing.
 ### A skip in this file is the dangerous outcome
 
 Everything above is gated twice — once by the session probe, once by the helper
-that makes the request — and both gates can skip. **A skip prints green**, so a
-bug in either gate does not look like a bug; it looks like a pass, and it
-disarms every test in the file at once. Two rules, and
-`tests/test_live_contract_policy.py` proves them offline, in the default run,
-on the machine where nobody is looking:
+that makes the request; the discovery tests carry a third gate of their own
+(`live_probe` / `swept_or_skip`, which classify rather than catch) — and every
+gate can skip. **A skip prints green**, so a bug in any gate does not look
+like a bug; it looks like a pass, and it disarms every test in the file at
+once. Two rules, and `tests/test_live_contract_policy.py` proves them offline
+for all three gates, in the default run, on the machine where nobody is
+looking:
 
 - **An API that answered and rejected us fails; a connection that never
   happened skips.** A 404, a 403 or a 500 means the endpoint exists and

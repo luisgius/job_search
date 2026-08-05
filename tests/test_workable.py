@@ -460,9 +460,20 @@ def test_workable_tolerates_junk_entries_in_the_jobs_list():
     assert len(fetch_workable("contoso", session=wk_session(payload))) == 1
 
 
-def test_workable_tolerates_a_payload_with_no_jobs_key():
-    assert fetch_workable("contoso", session=wk_session({"name": "X"})) == []
-    assert fetch_workable("contoso", session=wk_session([])) == []
+def test_workable_refuses_a_200_whose_body_is_not_a_board():
+    """A 200 with no `jobs` list is not a quiet account — it is an error
+    envelope, a login wall or the wrong endpoint, and parsing it as zero
+    postings makes a broken slug read as a company that never hires. Loud is
+    the only honest answer; if a real empty tenant ever omits the empty list,
+    the live contract tests are where that shows up, as a loud failure rather
+    than a silent zero."""
+    with pytest.raises(ValueError, match="not a workable board"):
+        fetch_workable("contoso", session=wk_session({"error": "not found"}))
+    with pytest.raises(ValueError, match="not a workable board"):
+        fetch_workable("contoso", session=wk_session({"name": "X"}))
+    with pytest.raises(ValueError, match="not a workable board"):
+        fetch_workable("contoso", session=wk_session([]))
+    assert fetch_workable("contoso", session=wk_session({"name": "X", "jobs": []})) == []
 
 
 def test_workable_survives_a_location_that_is_not_an_object():

@@ -154,11 +154,22 @@ Glovo — confidence: HIGH
 # ----------------------------------------------------------------------
 # paste into watchlist.yaml — check anything commented out by hand
 # ----------------------------------------------------------------------
+# merge these lines into any key below that your watchlist.yaml already has —
+# a second copy of the same top-level key would silently replace the first,
+# so the loader refuses to load a file with one.
 workable:
   - glovo                 # Glovo — 34 postings (high confidence)
 
 6 probe(s) for 1 company (cap DISCOVER_MAX_REQUESTS=120).
 ```
+
+Companies that land on the same board share one `workable:`/`greenhouse:` key —
+YAML keeps only the last copy of a duplicated key, so a block with two would
+silently install one company and vanish the other. The same rule guards the
+file itself: a watchlist with a duplicated top-level key (say, a pasted block
+next to an existing `greenhouse:` section) is refused at load time with the key
+named, because the silent alternative deletes every company under the first
+copy from every future run.
 
 **Read the confidence, not the suggestion.** `high` means exactly one board
 answered with real postings and nothing qualified it. Anything else is printed
@@ -171,9 +182,12 @@ every morning and looks exactly like a quiet market. It never edits
 It is also the only part of this tool that talks to boards nobody told it
 about, so it is bounded: at most 4 spellings per company and 120 requests per
 run, it stops as soon as a board answers with postings, and it says out loud
-what each bound dropped. `--max-requests` raises it — deliberately, because
-traffic that looks like a scanner gets you blocked from the boards the daily
-run needs. `--json` gives the whole thing as data.
+what each bound dropped. One probe is one HTTP request — a probe never
+retries, not even a 429, so the cap is what the boards actually see (the one
+exception: a bare Personio slug that misses on `.de` is retried once on
+`.com`). `--max-requests` raises the cap — deliberately, because traffic that
+looks like a scanner gets you blocked from the boards the daily run needs.
+`--json` gives the whole thing as data.
 
 Or do it by hand. Slugs come out of the URL on a company's careers page. Open
 the company's "Apply" link and read the host — that tells you which board they

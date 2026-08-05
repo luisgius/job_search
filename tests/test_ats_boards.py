@@ -297,9 +297,21 @@ def test_greenhouse_tolerates_junk_entries_in_the_jobs_list():
     assert len(fetch_greenhouse("acme", session=gh_session(payload))) == 1
 
 
-def test_greenhouse_tolerates_a_payload_with_no_jobs_key():
-    assert fetch_greenhouse("acme", session=gh_session({"meta": {"total": 0}})) == []
-    assert fetch_greenhouse("acme", session=gh_session([])) == []
+def test_greenhouse_refuses_a_200_whose_body_is_not_a_board():
+    """A 200 with valid JSON but no `jobs` list is an error envelope or a login
+    wall, not a quiet company. This used to parse as zero postings, which
+    manufactured "exists, nothing open" out of `{"error": "not found"}` — for
+    the daily run a broken slug that reads as a quiet market forever, and for
+    `--discover` fabricated evidence. The JSON twin of Personio's root-tag
+    check."""
+    with pytest.raises(ValueError, match="not a greenhouse board"):
+        fetch_greenhouse("acme", session=gh_session({"error": "not found"}))
+    with pytest.raises(ValueError, match="not a greenhouse board"):
+        fetch_greenhouse("acme", session=gh_session({"meta": {"total": 0}}))
+    with pytest.raises(ValueError, match="not a greenhouse board"):
+        fetch_greenhouse("acme", session=gh_session([]))
+    # The real empty state still parses as the real empty state.
+    assert fetch_greenhouse("acme", session=gh_session({"jobs": []})) == []
 
 
 def test_greenhouse_marks_remote_positively_only():

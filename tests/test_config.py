@@ -97,6 +97,71 @@ def test_empty_yaml_file_is_treated_as_absent(tmp_path: Path):
     assert cfg.get("apply.dry_run") is True
 
 
+# ==========================================================================
+# duplicate keys — the watchlist killer
+#
+# PyYAML keeps the *last* value for a duplicated key and raises nothing. A
+# watchlist that already has `greenhouse: [spotify, datadog]` and gains a
+# second `greenhouse:` block at the bottom — say, one pasted from a
+# `--discover` report — therefore deletes spotify and datadog from every
+# future run, silently, with exit code 0. A deleted job is invisible forever,
+# and a quiet board is indistinguishable from a quiet market, so the loader
+# refuses the file and names the key instead.
+# ==========================================================================
+
+
+def test_a_duplicate_top_level_watchlist_key_is_refused_not_last_wins(tmp_path: Path):
+    (tmp_path / "config.yaml").write_text("", encoding="utf-8")
+    (tmp_path / "watchlist.yaml").write_text(
+        "greenhouse:\n  - spotify\n  - datadog\nlever:\n  - plaid\n"
+        "greenhouse:\n  - glovo\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError) as excinfo:
+        Config.load(tmp_path / "config.yaml", tmp_path / "watchlist.yaml",
+                    root=tmp_path, env={})
+    message = str(excinfo.value)
+    assert "duplicate key 'greenhouse'" in message
+    assert "watchlist.yaml" in message
+
+
+def test_a_duplicate_key_in_config_yaml_is_refused_too(tmp_path: Path):
+    """Same footgun, other file: the second `scoring:` block would silently
+    replace the first, and the user would believe both took effect."""
+    (tmp_path / "config.yaml").write_text(
+        "scoring:\n  threshold: 70\nscoring:\n  max_jobs: 10\n", encoding="utf-8"
+    )
+    with pytest.raises(ConfigError, match="duplicate key 'scoring'"):
+        Config.load(tmp_path / "config.yaml", tmp_path / "w.yaml",
+                    root=tmp_path, env={})
+
+
+def test_a_nested_duplicate_key_is_refused_at_any_depth(tmp_path: Path):
+    """Two `path:` keys under `db:` are the same mistake at smaller scale, and
+    last-wins there means the tracker quietly lands in the wrong file."""
+    (tmp_path / "config.yaml").write_text(
+        "db:\n  path: a.sqlite3\n  path: b.sqlite3\n", encoding="utf-8"
+    )
+    with pytest.raises(ConfigError, match="duplicate key 'path'"):
+        Config.load(tmp_path / "config.yaml", tmp_path / "w.yaml",
+                    root=tmp_path, env={})
+
+
+def test_anchors_aliases_and_merge_keys_are_not_duplicates(tmp_path: Path):
+    """The refusal must not outlaw YAML's own reuse features: an alias is not
+    a duplicated key, and overriding a merged-in key with an explicit one is
+    the documented point of `<<:` rather than a paste accident."""
+    (tmp_path / "config.yaml").write_text(
+        "applicant: &shared\n  name: Ada\n  email: ada@example.com\n"
+        "scoring:\n  <<: *shared\n  threshold: 70\n",
+        encoding="utf-8",
+    )
+    cfg = Config.load(tmp_path / "config.yaml", tmp_path / "w.yaml",
+                      root=tmp_path, env={})
+    assert cfg.get("scoring.threshold") == 70
+    assert cfg.get("scoring.name") == "Ada"
+
+
 ROOT = Path(__file__).resolve().parent.parent
 
 

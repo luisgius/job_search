@@ -313,9 +313,19 @@ def test_ashby_tolerates_junk_entries_in_the_jobs_list():
     assert len(fetch_ashby("initech", session=ab_session(payload))) == 1
 
 
-def test_ashby_tolerates_a_payload_with_no_jobs_key():
-    assert fetch_ashby("initech", session=ab_session({"apiVersion": "1"})) == []
-    assert fetch_ashby("initech", session=ab_session([])) == []
+def test_ashby_refuses_a_200_whose_body_is_not_a_board():
+    """A 200 without a `jobs` list is an error envelope, not an empty board —
+    parsing it as zero postings turns a broken slug into a company that reads
+    as never hiring. `{"apiVersion": "1"}` alone is refused too: the version
+    marker without the list the parser feeds on proves the endpoint spoke,
+    not that it published a board."""
+    with pytest.raises(ValueError, match="not an? ashby board"):
+        fetch_ashby("initech", session=ab_session({"error": "not found"}))
+    with pytest.raises(ValueError, match="not an? ashby board"):
+        fetch_ashby("initech", session=ab_session({"apiVersion": "1"}))
+    with pytest.raises(ValueError, match="not an? ashby board"):
+        fetch_ashby("initech", session=ab_session([]))
+    assert fetch_ashby("initech", session=ab_session({"jobs": []})) == []
 
 
 def test_ashby_survives_junk_inside_secondary_locations():

@@ -438,11 +438,19 @@ def test_smartrecruiters_tolerates_junk_entries_in_the_content_list():
                                      details=False)) == 1
 
 
-def test_smartrecruiters_tolerates_a_payload_with_no_content_key():
+def test_smartrecruiters_refuses_a_200_whose_body_is_not_a_board():
+    """A 200 with neither a `content` list nor a numeric `totalFound` is not
+    this vendor's envelope — it is an error object or a login wall, and
+    parsing it as zero postings fabricates "exists, nothing open" out of it.
+    `{"totalFound": 0}` alone still counts as the envelope: the count *is*
+    SmartRecruiters speaking, even on a page with no list attached."""
     assert fetch_smartrecruiters("Umbrella", session=sr_session({"totalFound": 0}),
                                  details=False) == []
-    assert fetch_smartrecruiters("Umbrella", session=sr_session([]),
-                                 details=False) == []
+    with pytest.raises(ValueError, match="not a smartrecruiters board"):
+        fetch_smartrecruiters("Umbrella", session=sr_session({"error": "not found"}),
+                              details=False)
+    with pytest.raises(ValueError, match="not a smartrecruiters board"):
+        fetch_smartrecruiters("Umbrella", session=sr_session([]), details=False)
 
 
 def test_smartrecruiters_records_provenance_in_raw():

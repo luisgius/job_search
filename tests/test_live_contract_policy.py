@@ -21,11 +21,22 @@ from __future__ import annotations
 
 import pytest
 
+from src.sources.ats_boards import (
+    PROBE_ABSENT,
+    PROBE_EMPTY,
+    PROBE_ERROR,
+    PROBE_FOUND,
+    PROBE_UNREACHABLE,
+    BoardProbe,
+    DiscoveryResult,
+)
 from src.util import HttpError
 from tests.test_live_contract import (
     answered_and_rejected,
     fetch_raw,
+    live_probe,
     probe_network,
+    swept_or_skip,
 )
 
 SKIPPED = pytest.skip.Exception
@@ -232,3 +243,102 @@ def test_the_shipped_probe_list_does_not_rest_on_one_company():
     assert len(_PROBE_URLS) >= 3
     hosts = {url.split("/")[2] for url, _params in _PROBE_URLS}
     assert len(hosts) == len(_PROBE_URLS), f"probe hosts repeat: {sorted(hosts)}"
+
+
+# ==========================================================================
+# the discovery gates — the third gate, added with `--discover`
+#
+# `live_probe` and `swept_or_skip` guard the tests that settle the assumption
+# every discovery confidence rests on ("a slug nobody owns is a 404"). Unlike
+# the raw helpers they never see an exception: `probe_board` classifies, so
+# the policy applies to the classification. Same rule, same reasoning — only
+# "nobody ever answered" is a train tunnel. A 403, a 429 or a 404 is a board
+# that heard us, and skipping on one would print green over the exact change
+# those tests exist to notice.
+# ==========================================================================
+
+
+def probe_answering(status: str, message: str = ""):
+    def _probe(board: str, slug: str) -> BoardProbe:
+        return BoardProbe(board=board, slug=slug, status=status, message=message)
+
+    return _probe
+
+
+def test_only_a_probe_that_nobody_answered_skips():
+    verdict, message = outcome(
+        live_probe, "greenhouse", "x",
+        probe=probe_answering(
+            PROBE_UNREACHABLE, "GET https://x failed after 1 attempts: timeout"
+        ),
+    )
+    assert verdict == "skip", message
+    assert "unreachable" in message
+
+
+@pytest.mark.parametrize("status,message", [
+    (PROBE_ERROR, "HTTP 403 (board refused the request (blocked or private))"),
+    (PROBE_ERROR, "HTTP 429 (rate limited — try again later)"),
+    (PROBE_ABSENT, "HTTP 404 (slug not found)"),
+    (PROBE_FOUND, "3 postings"),
+    (PROBE_EMPTY, "0 postings"),
+])
+def test_an_answered_probe_is_handed_to_the_assertions(status, message):
+    """Everything that is an *answer* — a refusal and a rejection included —
+    must pass through the gate so the caller's assertions run and fail loudly.
+    The nonexistent-slug test asserts `absent` and only `absent`; a gate that
+    skipped a 403 or a 429 would disarm that assertion and print green over a
+    board that can no longer be ruled out for any company."""
+    verdict, gate_message = outcome(
+        live_probe, "greenhouse", "x", probe=probe_answering(status, message)
+    )
+    assert verdict == "returned", (
+        f"an answered probe ({status}) came out as {verdict!r}: {gate_message}"
+    )
+
+
+def sweep(*probes: BoardProbe) -> DiscoveryResult:
+    return DiscoveryResult(company="Probe Co", probes=list(probes))
+
+
+def answered(status: str, board: str = "greenhouse") -> BoardProbe:
+    return BoardProbe(board=board, slug="x", status=status, message="…")
+
+
+def test_a_sweep_that_asked_nothing_skips():
+    verdict, message = outcome(swept_or_skip, sweep())
+    assert verdict == "skip", message
+    assert "budget" in message
+
+
+def test_a_sweep_nobody_answered_at_all_skips():
+    verdict, message = outcome(
+        swept_or_skip,
+        sweep(*[answered(PROBE_UNREACHABLE, b) for b in ("greenhouse", "lever")]),
+    )
+    assert verdict == "skip", message
+    assert "unreachable" in message
+
+
+def test_one_answered_rejection_among_timeouts_reaches_the_assertions():
+    """One board 403ing while the rest time out is a network that exists and
+    an API that spoke — not an offline machine. The result is handed back so
+    the caller's assertion fails loudly instead of the file printing green."""
+    verdict, message = outcome(
+        swept_or_skip,
+        sweep(answered(PROBE_UNREACHABLE), answered(PROBE_ERROR, "lever")),
+    )
+    assert verdict == "returned", message
+
+
+def test_a_sweep_of_pure_404s_reaches_the_assertions():
+    """All-absent is the dangerous one to swallow: it is not a train tunnel,
+    it is the derivation no longer producing the company's real slug — the
+    exact regression `test_discovery_finds_a_company_from_its_name_alone`
+    exists to catch, and a skip here would catch it never."""
+    verdict, message = outcome(
+        swept_or_skip,
+        sweep(*[answered(PROBE_ABSENT, b)
+                for b in ("greenhouse", "lever", "workable")]),
+    )
+    assert verdict == "returned", message

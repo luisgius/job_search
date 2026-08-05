@@ -61,6 +61,16 @@ digest.render        -> output/digest_YYYY-MM-DD.html
 `cfg.source_enabled(name)`, `cfg.validate(require_llm=)`. Defaults live in
 `DEFAULTS` / `WATCHLIST_DEFAULTS` — read them before inventing a key.
 
+**A duplicated mapping key is a `ConfigError`, not a last-wins.** PyYAML keeps
+the last copy of a duplicated key and raises nothing, so a watchlist that ends
+in a second `greenhouse:` block — a pasted `--discover` report is the obvious
+source — used to silently delete every company under the first block from
+every future run: quiet job loss that reads as a quiet market, with exit code
+0. `_read_yaml` loads through a `SafeLoader` subclass that refuses the file
+and names the key, at every nesting level. YAML anchors, aliases and `<<:`
+merge keys still work — overriding a merged key explicitly is the point of
+that feature, not a paste accident.
+
 Named constants, because a number written in two places is a number free to
 drift: `DEFAULT_MAX_AGE_HOURS` (72, the freshness window) and
 `DEFAULT_REPOST_MIN_GAP_DAYS` (14, the ghost-job flag). Both are imported by
@@ -197,13 +207,17 @@ PERSONIO_XML_URL             = "https://{host}/xml"   # host = {slug}.jobs.perso
 BOARDS: tuple[str, ...] = ("greenhouse", "lever", "workable", "ashby",
                            "smartrecruiters", "personio")
 
-def fetch_greenhouse(slug, *, session=None, content=True) -> list[Job]
-def fetch_lever(slug, *, session=None) -> list[Job]
-def fetch_workable(slug, *, session=None, details=True) -> list[Job]
-def fetch_ashby(slug, *, session=None) -> list[Job]
+def fetch_greenhouse(slug, *, session=None, content=True, retries=3) -> list[Job]
+def fetch_lever(slug, *, session=None, retries=3) -> list[Job]
+def fetch_workable(slug, *, session=None, details=True, retries=3,
+                   envelope=None) -> list[Job]   # envelope: dict out-param —
+                                    # account-level facts (the tenant's own
+                                    # name) a zero-job payload still carries
+def fetch_ashby(slug, *, session=None, retries=3) -> list[Job]
 def fetch_smartrecruiters(slug, *, session=None, details=True,
-                          max_descriptions=SMARTRECRUITERS_MAX_DESCRIPTIONS) -> list[Job]
-def fetch_personio(slug, *, session=None) -> list[Job]
+                          max_descriptions=SMARTRECRUITERS_MAX_DESCRIPTIONS,
+                          max_pages=SMARTRECRUITERS_MAX_PAGES, retries=3) -> list[Job]
+def fetch_personio(slug, *, session=None, language=None, retries=3) -> list[Job]
 def fetch(config, *, session=None, errors=None) -> list[Job]
 def check_slug(board: str, slug: str, *, session=None) -> tuple[bool, str]
 def main(argv=None) -> int          # supports: --check greenhouse spotify
@@ -214,12 +228,22 @@ DISCOVER_MAX_REQUESTS = 120
 PROBE_FOUND / PROBE_EMPTY / PROBE_ABSENT / PROBE_ERROR / PROBE_UNREACHABLE
 CONFIDENCE_HIGH / CONFIDENCE_MEDIUM / CONFIDENCE_LOW / CONFIDENCE_NONE
 
-def slug_candidates(name, *, cased=False, limit=DISCOVER_MAX_SLUGS_PER_COMPANY) -> list[str]
+def slug_candidates(name, *, cased=False) -> list[str]   # uncapped, pure derivation;
+                                    # the per-company cap has one owner:
+                                    # discover_company's max_slugs
 def probe_board(board, slug, *, session=None, expect="") -> BoardProbe
 def discover_company(name, *, session=None, boards=BOARDS, max_slugs=…, budget=None) -> DiscoveryResult
 def discover(names, *, session=None, …, max_requests=…, budget=None) -> tuple[list[DiscoveryResult], RequestBudget]
 def format_discovery(results, budget) -> str
 ```
+
+Every JSON fetcher checks the vendor's *envelope shape* before reading
+postings out of it (Greenhouse/Workable/Ashby need their `jobs` list, Lever a
+bare array or a wrapped one, SmartRecruiters a `content` list or a numeric
+`totalFound`) and raises when a 200 lacks it — the JSON twin of Personio's
+root-tag check. Without it, `{"error": "not found"}` with status 200 parsed as
+zero postings: a broken slug that reads as a quiet company forever in the
+daily run, and fabricated "exists, nothing open" evidence in `--discover`.
 Every `fetch_<board>` raises on transport/HTTP failure; `fetch` isolates each
 slug so one dead board costs that company and nothing else, and never raises.
 `session=` is the only network seam, always via `util.http_get` /
@@ -320,29 +344,59 @@ more than the convenience is worth, so the design is shaped by that:
   exactly what it dropped, for the reason `SMARTRECRUITERS_MAX_PAGES` does. A
   cap that bites silently turns "we stopped guessing" into "this company is on
   no board", which is the one reading that must never be given.
-- **`util.http_get`'s retry policy is reused, not replaced.** A 404 is an answer
-  and is never retried, so a probe against a slug nobody owns costs exactly one
-  request. `_DISCOVER_PROBE_KWARGS` turns off descriptions and holds
-  SmartRecruiters to one listing page — the offset walk is right for the daily
-  run and would otherwise turn one probe into twenty against a budget that
-  thinks it spent one.
+- **One probe is one request — enforced, not hoped.** `_DISCOVER_PROBE_KWARGS`
+  passes `retries=1` to every fetcher: `util.http_get`'s three-attempt policy
+  is the right insurance for the daily run, where a transient failure costs
+  real jobs, but a probe that misses costs one commented-out suggestion — and
+  the default would re-ask a host that just said 429, twice, under a cap whose
+  whole point is not looking like a scanner. A 404 was never retried anyway.
+  The same kwargs turn off descriptions and hold SmartRecruiters to one
+  listing page — the offset walk is right for the daily run and would
+  otherwise turn one probe into twenty against a budget that thinks it spent
+  one. The single residual multiplier is Personio's documented two-host
+  fallback: a `.de` miss is retried once on `.com`, so a Personio miss is two
+  requests against the budget's one.
 - **Five answers, never collapsed**: `found` (postings), `empty` (reachable,
-  nothing open), `absent` (404/410 — the answer that lets a board be ruled
-  *out*), `error` (403/429/5xx, or a body that is not a board), `unreachable`
-  (no answer at all). A confidence, not a verdict, is derived from them:
-  `high` only for a single unqualified hit; anything ambiguous, name-mismatched,
-  half-swept or postings-free is `low` and is printed **commented out** so that
-  pasting the block can never install a guess.
-- **Where the vendor publishes its own name** (Workable, SmartRecruiters) it is
-  compared against the name asked for, leniently — containment either way is
-  agreement — because `acme` on Lever is not the same company as `acme` on
-  Greenhouse. The other four derive the name from the slug, so comparing it back
-  would be a constant compared to a constant and is not done.
+  nothing open — which demands the vendor's envelope shape, so a 200 error
+  object cannot fake it), `absent` (404/410 — the answer that lets a board be
+  ruled *out*), `error` (403/429/5xx, or a body that is not a board),
+  `unreachable` (no answer at all). A confidence, not a verdict, is derived
+  from them, and **only `high` prints uncommented**: `high` means every
+  question that was asked got a real answer (found/empty/absent) and exactly
+  one board had postings — spellings a hit left unasked are printed as
+  untried, never held against it. `medium` is one clear answer with a named
+  hole in the evidence (a probe nobody answered, or an empty twin of the
+  winning slug); it, and everything below it, is printed **commented out** so
+  that pasting the block can never install a guess — one board of six timing
+  out must never produce an installed slug.
+- **Where the vendor publishes its own name** (Workable per account,
+  SmartRecruiters per posting) it is compared against the name asked for,
+  leniently — containment either way is agreement, spaces ignored, so
+  "FactorialHR" and "Factorial HR" are one company. Workable's name lives on
+  the account envelope and is read even off an *empty* board (the one case
+  with no other company evidence); a mismatch there is evidence against the
+  slug, said in the note. The four boards that publish no name never mint a
+  mismatch — comparing `company_from_slug` back to the name it was derived
+  from would be a constant compared to a constant — and a hit on the *bare
+  first token* of a multi-word name on those boards is capped at `medium`,
+  because a generic one-word slug with no name to check is exactly what a
+  squatter looks like.
+- **The paste block groups by board, never by company.** One `greenhouse:` key
+  with every found company under it: per-company keys would emit the same
+  top-level key twice the moment two companies land on one board, and YAML
+  keeps only the last — a block that installs one company and silently
+  vanishes the other. The block also says, in a comment, to merge into any key
+  the watchlist already has; `Config.load`'s duplicate-key refusal backstops
+  whoever pastes without reading. Every physical line of the commented half is
+  comment-prefixed structurally, so a line break inside quoted text (an error
+  message in a note, a company name) cannot smuggle an uncommented line in.
 - **It never writes `watchlist.yaml`.** It prints. The file is the one the user
   curates by hand, and a tool that rewrites it will eventually eat something
   they wrote — while a wrong guess that stays on the terminal costs nothing.
-- Exit code 0 only when every name produced something pasteable without a
-  decision; ambiguous, low-confidence, not-found and cap-truncated all exit 1.
+- Exit code 0 only when every name graded `high`; medium, ambiguous,
+  low-confidence, not-found and cap-truncated all exit 1. `--discover` given
+  alongside `--check` runs alone and says on stderr that `--check` was
+  ignored.
 
 ### `src/sources/adzuna.py`
 ```python

@@ -1104,7 +1104,7 @@ def test_the_personio_fixture_does_not_claim_elements_reality_never_sends():
 NONEXISTENT_SLUG = "no-such-company-job-hunter-probe-9f3a"
 
 
-def live_probe(board: str, slug: str):
+def live_probe(board: str, slug: str, *, probe=None):
     """One discovery probe, under this file's skip-or-fail policy.
 
     `probe_board` never raises — it classifies — so the policy is applied to the
@@ -1113,13 +1113,37 @@ def live_probe(board: str, slug: str):
     included, is an answer and is handed back for the test to assert on: a 403
     or a 429 means the board heard us and refused, which is a finding, and a
     test that skips on it prints green while proving nothing.
+
+    `probe` is the seam: `test_live_contract_policy.py` drives this gate
+    offline, in the default run, which is the only way to prove the policy on
+    the machine where nobody is looking.
     """
     from src.sources.ats_boards import PROBE_UNREACHABLE, probe_board
 
-    probe = probe_board(board, slug)
-    if probe.status == PROBE_UNREACHABLE:
-        pytest.skip(f"network unreachable: {board}/{slug}: {probe.message}")
-    return probe
+    result = (probe or probe_board)(board, slug)
+    if result.status == PROBE_UNREACHABLE:
+        pytest.skip(f"network unreachable: {board}/{slug}: {result.message}")
+    return result
+
+
+def swept_or_skip(result):
+    """The same policy for a whole discovery sweep instead of one probe.
+
+    Skip only when nothing was asked (the budget was already spent) or when
+    *nothing at all* answered — which is an offline machine. A single answered
+    probe among the failures, a 403 included, means there is a network and an
+    API spoke; the sweep's result is handed back so the test's assertions run
+    and fail loudly on it. In particular a sweep of pure 404s must reach the
+    assertions: all-absent is not a train tunnel, it is the derivation failing
+    to produce the real slug — the exact finding the caller exists to make.
+    """
+    from src.sources.ats_boards import PROBE_UNREACHABLE
+
+    if not result.probes:
+        pytest.skip("the request budget was spent before anything was asked")
+    if all(p.status == PROBE_UNREACHABLE for p in result.probes):
+        pytest.skip(f"network unreachable: {result.probes[0].message}")
+    return result
 
 
 @pytest.mark.parametrize("board", [
@@ -1175,11 +1199,7 @@ def test_discovery_finds_a_company_from_its_name_alone():
     from src.sources.ats_boards import discover_company
 
     budget = RequestBudget(12)
-    result = discover_company(GREENHOUSE_SLUGS[0].title(), budget=budget)
-    if not result.probes:
-        pytest.skip("the request budget was spent before anything was asked")
-    if all(p.status == "unreachable" for p in result.probes):
-        pytest.skip(f"network unreachable: {result.probes[0].message}")
+    result = swept_or_skip(discover_company(GREENHOUSE_SLUGS[0].title(), budget=budget))
 
     hits = {(p.board, p.slug) for p in result.matches}
     assert ("greenhouse", GREENHOUSE_SLUGS[0]) in hits, (

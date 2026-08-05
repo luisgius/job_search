@@ -12,6 +12,11 @@
 # you can disagree with it. It never edits this file: this is the one you
 # curate by hand, and a tool that rewrites it will eventually eat something.
 #
+# When you paste, MERGE into any key this file already has. Two `greenhouse:`
+# blocks would make YAML keep only the last one — silently dropping every
+# company under the first — so the loader refuses a file with a duplicated
+# key and names it, instead of quietly losing boards from the daily run.
+#
 # Read the confidence rather than the suggestion. `high` means one board
 # answered with real postings and nothing qualified it. Anything else is
 # printed COMMENTED OUT on purpose — two boards answering (a slug shared with a
