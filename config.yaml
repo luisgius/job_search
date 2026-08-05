@@ -219,6 +219,13 @@ filters:
     - intern
     - apprenticeship
     - apprentice
+    # Personio states `trainee` as an employment type, and in the European
+    # market it is the graduate-programme family that title_exclude above
+    # already rules out in nine languages. It is here rather than there
+    # because this list reads only what the board declares as structured
+    # data — so it cannot mistake a role actually titled "Trainee Manager"
+    # for a training position.
+    - trainee
     - temporary
     - temp
     - seasonal

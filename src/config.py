@@ -172,7 +172,8 @@ DEFAULTS: dict[str, Any] = {
         # glance. Add them yourself if you only want permanent roles.
         "employment_type_exclude": [
             "internship", "intern", "apprenticeship", "apprentice",
-            "temporary", "temp", "seasonal", "volunteer", "work experience",
+            "trainee", "temporary", "temp", "seasonal", "volunteer",
+            "work experience",
         ],
         "require_keywords_any": [],
         "min_description_chars": 0,
