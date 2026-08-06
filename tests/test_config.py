@@ -211,7 +211,21 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
     defaults = _flatten(DEFAULTS)
 
     #: dotted key -> why the shipped file deliberately differs.
-    DELIBERATE: dict[str, str] = {}
+    #:
+    #: The applicant block is per-user identity: DEFAULTS ships it empty so a
+    #: fresh clone fails validation loudly instead of applying as nobody, and
+    #: the user's own config fills it in. That is divergence by design — the
+    #: one kind this list exists to record.
+    _APPLICANT = "per-user identity; DEFAULTS stays empty so a fresh clone fails validation"
+    DELIBERATE: dict[str, str] = {
+        "applicant.name": _APPLICANT,
+        "applicant.email": _APPLICANT,
+        "applicant.phone": _APPLICANT,
+        "applicant.location": _APPLICANT,
+        "applicant.linkedin": _APPLICANT,
+        "applicant.github": _APPLICANT,
+        "applicant.website": _APPLICANT,
+    }
 
     unknown = sorted(set(shipped) - set(defaults) - set(DELIBERATE))
     assert not unknown, (

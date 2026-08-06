@@ -1,60 +1,107 @@
-# YOUR NAME
+# LUIS GIMENEZ
 
-<!--
-  REPLACE EVERYTHING IN THIS FILE WITH YOUR REAL CV.
+lgimenezuso@gmail.com | +34 651 647 102 | Kraków, Poland | Open to Relocate (EU) | GitHub: github.com/luisgius
 
-  This file drives BOTH the fit-scoring and the tailoring. The model can only
-  reorder, re-emphasise and rephrase what is written here — it is explicitly
-  forbidden from inventing employers, dates, degrees or numbers. So:
+## PROFESSIONAL SUMMARY
 
-    * concrete bullets with metrics beat adjectives
-      GOOD: "Cut p99 checkout latency 840ms -> 210ms by batching Redis reads"
-      BAD:  "Improved performance of critical systems"
-    * list every technology you would accept a job in, by name
-    * keep the headings below — the tailoring prompt reads them
-    * 1-3 pages of markdown is the sweet spot
--->
+Data Scientist at Uber with a Dual Degree in Computer Science & Business,
+specializing in machine learning forecasting, causal inference, and
+production-grade LLM applications. Built and deployed an ML forecasting system
+at Uber that outperformed incumbent manual forecasts, and predictive models at
+Buynomics that optimized revenue for Tier-1 CPG clients. Expert in bridging
+cutting-edge AI (PyTorch, GenAI, RAG) with scalable software architecture
+(FastAPI, Docker).
 
-City, Country · you@example.com · +00 000 000 000
-[linkedin.com/in/you](https://linkedin.com/in/you) · [github.com/you](https://github.com/you)
+## SKILLS
 
-## Summary
+- **Machine Learning & Statistics:** Python (Pandas, NumPy, Scikit-learn),
+  LightGBM, PyTorch, SQL, Time-Series Forecasting, Quantile Regression,
+  Conformal Prediction, Causal Inference, Experimental Design, A/B Testing,
+  Predictive Modeling, Clustering.
+- **Generative AI & LLMs:** RAG Architectures, LangChain, LangGraph,
+  OpenAI/Anthropic APIs, Vector Databases (FAISS), Hybrid Search
+  (BM25 + Embeddings), Prompt Engineering.
+- **ML Engineering & Cloud:** Docker, FastAPI, Git, AWS, Azure, API
+  Deployment, ETL Pipelines, Data Visualization, Power BI.
 
-One or two sentences: what you are, how many years, the domain you are
-strongest in, and what you are looking for next.
+## PROFESSIONAL EXPERIENCE
 
-## Skills
+### Data Scientist | Uber | Kraków, Poland | Mar 2026 – Present | Full-time
 
-- **Languages:** Python, Go, TypeScript, SQL
-- **Data/Infra:** PostgreSQL, Kafka, Airflow, dbt, Spark
-- **Cloud:** AWS (ECS, Lambda, RDS), Terraform, Docker, Kubernetes
-- **Practices:** CI/CD, observability, code review, incident response
+- Built and deployed an ML forecasting system (LightGBM quantile regression
+  with conformal prediction intervals) to predict driver reactivation across
+  India at city × product × week granularity, outperforming the incumbent
+  manual forecasting process.
+- Formulated business questions into testable hypotheses, applying causal
+  inference and rigorous experimental design to estimate effects and guide
+  supply-side operational decisions.
+- Engineered features and cleaned large-scale datasets (Python, SQL) and
+  shipped model overrides through a shadow-to-live rollout, validating
+  performance against production before launch.
+- Visualized and reported findings to stakeholders, delivering forecast
+  reliability analyses and full project documentation for both technical and
+  business audiences.
 
-## Experience
+### Junior Data Scientist | Buynomics | Cologne, Germany | Jul 2025 – Jan 2026 | Full-time
 
-### Senior Backend Engineer — Company Name
-*Berlin, Germany · Mar 2022 – Present*
+- Engineered ML pipelines: built and deployed revenue prediction and
+  clustering models (Python, PyTorch) for a Tier-1 CPG client (Bel Group),
+  successfully mapping transaction data for 500+ SKUs.
+- Automated data ingestion: designed Python ETL workflows to connect raw
+  country-level data to the Buynomics ML platform, improving data reliability
+  and model training speed.
+- Validated model performance: defined statistical evaluation metrics to
+  benchmark model accuracy, ensuring production-ready outputs for commercial
+  decision-making.
 
-- Metric-carrying bullet. What you built, the technology, and the number that
-  proves it mattered.
-- Second bullet. Scope: team size, request volume, data volume, budget.
-- Third bullet. Something you led, migrated, or fixed under pressure.
+### Data Analyst – BI & Visualization | Porsche AG | Stuttgart, Germany | Jul 2024 – Jan 2025 | Internship
 
-### Backend Engineer — Previous Company
-*Remote · Jan 2019 – Feb 2022*
+- Optimized test workflows: developed Python scripts to automate test bench
+  data collection, reducing manual processing time by ~70% (from hours to
+  minutes) and ensuring consistent data quality.
+- Built predictive KPI models: designed data models and Power BI dashboards
+  providing real-time performance visibility for R&D and QA departments.
 
-- Bullet with a metric.
-- Bullet with a metric.
+### ERP Consultant | Capgemini | Valencia, Spain | Oct 2023 – Apr 2024 | Internship
 
-## Education
+- Consulted for an enterprise healthcare client — translated business
+  requirements into technical specifications and designed cross-departmental
+  workflows; documentation adopted as organizational standard.
 
-**BSc Computer Science** — University Name, 2018
+## PROJECTS
 
-## Languages
+### AI-Powered RAG Recommendation System | M.Sc. Thesis Project 2024
 
-English (fluent) · German (B1) · Spanish (native)
+- Built end-to-end RAG pipeline: engineered a hybrid search system
+  (BM25 + Vector) using LangChain and LangGraph to retrieve context and
+  generate personalized explanations.
+- Production architecture: implemented FAISS for vector storage and deployed
+  the model via FastAPI; iteratively optimized prompts to reduce LLM
+  hallucinations.
 
-## Work authorisation
+### Reinforcement Learning for Algorithmic Trading | Personal Project 2024 – 2025
 
-e.g. "EU citizen — no sponsorship required." Say this explicitly; the scorer
-uses it and many EU postings gate on it.
+- Built RL models (Python/PyTorch) for financial time-series decision-making;
+  implemented a backtesting framework.
+
+## EDUCATION
+
+### B.Sc. Computer Science & B.Sc. Business Administration (Dual Degree) | Universidad Politécnica de Valencia | Sep 2018 – Jul 2024
+
+- Double major: completed two full bachelor's degrees concurrently
+  (300+ ECTS), combining software engineering with business strategy.
+- Erasmus exchange: International Business Management | UBB, Cluj-Napoca,
+  Romania.
+
+## CERTIFICATIONS
+
+- Machine Learning Specialization (Stanford Online / DeepLearning.AI)
+- Python for Data Science (Maven Analytics)
+- Financial Markets (Yale University)
+
+## LANGUAGES
+
+- English: Full Professional Proficiency (C1)
+- German: Beginner (A2)
+- Spanish: Native
+- Polish: Beginner

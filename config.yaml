@@ -4,12 +4,18 @@
 # ---------------------------------------------------------------------------
 
 applicant:
-  name: ""                 # REQUIRED — "Ada Lovelace"
-  email: ""                # REQUIRED — used on application forms
-  phone: ""                # REQUIRED before you turn dry_run off
-  location: ""             # "Berlin, Germany"
-  linkedin: ""             # "https://www.linkedin.com/in/you"
-  github: ""
+  # Taken from cv/Luis_Gimenez_CV.pdf — the email here matches the one ON the
+  # CV on purpose: the address a recruiter sees on the form and the address on
+  # the attached document must be the same person.
+  name: "Luis Gimenez"
+  email: "lgimenezuso@gmail.com"
+  # Kept OUT of this file on purpose: the repo is public and a phone number
+  # in a public repo gets scraped. Set it here on your own machine — apply
+  # only requires it before you turn dry_run off.
+  phone: ""
+  location: "Kraków, Poland"
+  linkedin: ""             # the PDF names it without the URL — paste yours here
+  github: "https://github.com/luisgius"
   website: ""
 
 llm:

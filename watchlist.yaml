@@ -115,10 +115,13 @@ adzuna:
   # defended against exactly that. Adzuna aggregates a large share of the same
   # listings across these ten countries and has an API you are allowed to use.
   countries: [es, de, nl, fr, it, at, be, ch, gb, pl]
+  # Matched to cv/base_cv.md: a Data Scientist profile, so "backend" is out
+  # and "machine learning" is in — as a query it catches ML Engineer and ML
+  # Scientist titles both.
   queries:
+    - "data scientist"
+    - "machine learning"
     - "python"
-    - "backend"
-    - "data engineer"
   # One request per country x query, so this list multiplies. Ten countries x
   # three queries is thirty calls a run — fine for a free key, but trim the
   # countries before you add queries.
