@@ -344,7 +344,7 @@ def test_max_jobs_caps_spend_and_says_so(tmp_path, caplog):
 
 
 def test_a_missing_api_key_costs_one_error_not_one_per_job(tmp_path):
-    cfg = write_config(tmp_path, {"keys": {"anthropic": ""}})
+    cfg = write_config(tmp_path, {"keys": {"openrouter": ""}})
     jobs = [make_job(ats_job_id=str(i)) for i in range(5)]
     errors: list[str] = []
     scored = score_jobs(jobs, BASE_CV, cfg, client=None, errors=errors)

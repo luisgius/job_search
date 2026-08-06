@@ -80,7 +80,7 @@ DEFAULTS: dict[str, Any] = {
         # "anthropic" talks to the SDK; "openrouter" speaks the OpenAI
         # chat-completions dialect over plain HTTP, which also covers any
         # other OpenAI-compatible gateway via `base_url`.
-        "provider": "anthropic",
+        "provider": "openrouter",
         "base_url": "",
     },
     "sources": {
@@ -179,7 +179,7 @@ DEFAULTS: dict[str, Any] = {
         "min_description_chars": 0,
     },
     "scoring": {
-        "model": "claude-sonnet-5",
+        "model": "anthropic/claude-sonnet-5",
         "threshold": 65,
         "max_jobs": 40,
         "max_tokens": 1500,
@@ -188,7 +188,7 @@ DEFAULTS: dict[str, Any] = {
     },
     "tailoring": {
         "enabled": True,
-        "model": "claude-sonnet-5",
+        "model": "anthropic/claude-sonnet-5",
         "max_per_run": 10,
         "max_tokens": 4000,
         "temperature": 0.2,
@@ -422,7 +422,7 @@ class Config:
 
     @property
     def provider(self) -> str:
-        return str(self.get("llm.provider", "anthropic") or "anthropic").strip().lower()
+        return str(self.get("llm.provider", "openrouter") or "openrouter").strip().lower()
 
     @property
     def llm_key(self) -> str:

@@ -345,7 +345,7 @@ def test_valid_config_has_no_problems(config):
 def test_validate_reports_every_problem_at_once(tmp_path: Path):
     cfg = write_config(
         tmp_path,
-        {"applicant": {"name": "", "email": ""}, "keys": {"anthropic": ""}},
+        {"applicant": {"name": "", "email": ""}, "keys": {"openrouter": ""}},
         cv=None,
     )
     problems = cfg.validate()
@@ -353,7 +353,7 @@ def test_validate_reports_every_problem_at_once(tmp_path: Path):
     assert len(problems) >= 4
     assert "applicant.name" in joined
     assert "applicant.email" in joined
-    assert "anthropic" in joined
+    assert "openrouter" in joined
     assert "cv" in joined
 
 
@@ -363,7 +363,7 @@ def test_validate_rejects_a_malformed_email(tmp_path: Path):
 
 
 def test_validate_can_skip_the_llm_key_check(tmp_path: Path):
-    cfg = write_config(tmp_path, {"keys": {"anthropic": ""}})
+    cfg = write_config(tmp_path, {"keys": {"openrouter": ""}})
     assert cfg.validate() != []
     assert cfg.validate(require_llm=False) == []
 

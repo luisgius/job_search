@@ -238,7 +238,7 @@ def write_config(
             "location": "Berlin, Germany",
             "linkedin": "https://linkedin.com/in/ada",
         },
-        "keys": {"anthropic": "test-key"},
+        "keys": {"anthropic": "test-key", "openrouter": "test-key"},
         "sources": {"greenhouse": True, "lever": False,
                     "adzuna": False, "linkedin_email": False},
         "output": {"dir": str(tmp_path / "output"), "open_browser": False},
@@ -498,7 +498,30 @@ def llm_client(responses: Any = None, **kwargs: Any):
     """A real `LLMClient` wrapping a `FakeAnthropic` — the seam under test."""
     from src.llm import LLMClient
 
-    return LLMClient("test-key", client=FakeAnthropic(responses, **kwargs))
+    return LLMClient("test-key", provider="anthropic",
+                     client=FakeAnthropic(responses, **kwargs))
+
+
+@pytest.fixture(autouse=True)
+def _no_accidental_network(request, monkeypatch):
+    """The offline suite now ENFORCES offline instead of asserting it.
+
+    Every real HTTP client in this stack honours the proxy environment, so
+    pointing it at a port nothing listens on makes any accidental egress fail
+    in milliseconds with a ProxyError naming this fixture's doing -- instead
+    of what actually happened once: a provider-default flip routed 54 tests
+    around their injected fakes and into the real internet, where each one
+    burned the transport's full retry backoff against a blocked host and the
+    suite took eight minutes to say so. Tests marked `network` keep the real
+    environment; they are the one place egress is the point.
+    """
+    if request.node.get_closest_marker("network"):
+        return
+    for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+                "http_proxy", "https_proxy", "all_proxy"):
+        monkeypatch.setenv(var, "http://127.0.0.1:9")
+    for var in ("NO_PROXY", "no_proxy"):
+        monkeypatch.setenv(var, "")
 
 
 @pytest.fixture

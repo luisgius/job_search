@@ -17,7 +17,7 @@ llm:
   # "openrouter" speaks the OpenAI chat-completions dialect over plain HTTP —
   # which also covers any other OpenAI-compatible gateway (LiteLLM, a local
   # vLLM, a corporate proxy) by setting base_url below.
-  provider: anthropic
+  provider: openrouter
   base_url: ""             # only for a non-OpenRouter compatible gateway
 
 keys:
@@ -241,7 +241,7 @@ scoring:
   # With provider: openrouter, model ids are vendor-qualified —
   # "anthropic/claude-sonnet-5", "openai/gpt-5", "google/gemini-2.5-pro".
   # A bare name is a 404 from OpenRouter; --validate-only catches that.
-  model: claude-sonnet-5   # claude-haiku-4-5-20251001 is ~10x cheaper, a bit blunter
+  model: anthropic/claude-sonnet-5   # anthropic/claude-haiku-4.5 is ~10x cheaper, blunter
   threshold: 65            # 65 medium · 75 strict
   max_jobs: 40             # hard cap on LLM calls per run — your cost ceiling
   max_tokens: 1500
@@ -250,7 +250,7 @@ scoring:
 
 tailoring:
   enabled: true
-  model: claude-sonnet-5
+  model: anthropic/claude-sonnet-5
   max_per_run: 10
   max_tokens: 4000
   temperature: 0.2

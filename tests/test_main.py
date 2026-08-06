@@ -144,7 +144,7 @@ def test_the_run_is_hermetic(tmp_path: Path, stub_sources, memory_tracker):
     """No network, no key, no browser — asserted by the absence of any real
     session, and by the run completing with a fake LLM client."""
     stub_sources.results["ats_boards"] = fresh_jobs(1)
-    cfg = pipeline_config(tmp_path, keys={"anthropic": ""})
+    cfg = pipeline_config(tmp_path, keys={"anthropic": "", "openrouter": ""})
     scored, stats = run_pipeline(cfg, tracker=memory_tracker, now=NOW,
                                  llm_client=llm_client(LLM_SCRIPT))
     assert len(scored) == 1
@@ -616,14 +616,14 @@ def test_validate_only_reports_and_exits(tmp_path: Path, capsys):
 
 def test_an_invalid_config_exits_1_and_lists_every_problem(tmp_path: Path, capsys):
     write_config(tmp_path, {"applicant": {"name": "", "email": ""},
-                            "keys": {"anthropic": ""}}, cv=None)
+                            "keys": {"openrouter": ""}}, cv=None)
     code = main(["--validate-only", "--config", str(tmp_path / "config.yaml"),
                  "--watchlist", str(tmp_path / "watchlist.yaml")])
     assert code == 1
     err = capsys.readouterr().err
     assert "problem(s)" in err
     assert "applicant.name" in err
-    assert "anthropic" in err
+    assert "openrouter" in err
 
 
 def test_a_missing_config_file_still_validates_the_defaults(tmp_path: Path, capsys):
@@ -873,7 +873,7 @@ def no_llm_config(tmp_path: Path, **overrides):
         "sources": {"greenhouse": True, "lever": False},
         "output": {"dir": str(tmp_path / "output"), "open_browser": False},
         "db": {"path": str(tmp_path / "output" / "tracker.sqlite3")},
-        "keys": {"anthropic": ""},
+        "keys": {"anthropic": "", "openrouter": ""},
     }
     base.update(overrides or {})
     return write_config(tmp_path, base, watchlist={"greenhouse": ["acme"]}, cv=None)

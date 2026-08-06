@@ -282,8 +282,11 @@ def test_client_from_config_builds_the_configured_provider(tmp_path: Path):
     assert built.base_url == OPENROUTER_BASE_URL
 
 
-def test_client_from_config_defaults_to_anthropic(config):
-    assert client_from_config(config).provider == "anthropic"
+def test_client_from_config_defaults_to_openrouter(config):
+    """The user's stated choice. The default lives in THREE places that must
+    agree — DEFAULTS, Config.provider()'s fallback and llm.DEFAULT_PROVIDER —
+    and this test is what notices when one of them is edited alone."""
+    assert client_from_config(config).provider == "openrouter"
 
 
 def test_the_key_lookup_follows_the_provider(tmp_path: Path):
@@ -350,9 +353,15 @@ def test_validate_rejects_an_unknown_provider(tmp_path: Path):
     assert any("llm.provider" in p for p in cfg.validate())
 
 
-def test_the_anthropic_path_is_unaffected_by_the_new_checks(config):
-    """The default configuration must keep validating exactly as before."""
+def test_the_default_configuration_validates_clean(config):
     assert config.validate() == []
+
+
+def test_an_explicit_anthropic_provider_still_validates_clean(tmp_path: Path):
+    """Switching the shipped default to openrouter must not break the road
+    back: anthropic remains a first-class provider one config line away."""
+    cfg = write_config(tmp_path, {"llm": {"provider": "anthropic"}})
+    assert cfg.validate() == []
 
 
 # ==========================================================================

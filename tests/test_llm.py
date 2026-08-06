@@ -132,8 +132,48 @@ def test_extract_json_does_not_hang_on_pathological_input():
 
 
 def test_missing_key_fails_at_construction_not_three_stages_later():
-    with pytest.raises(LLMError, match="ANTHROPIC_API_KEY"):
+    with pytest.raises(LLMError, match="OPENROUTER_API_KEY"):
         LLMClient("")
+
+
+def test_an_injected_sdk_client_implies_the_anthropic_dialect():
+    """The regression that let the offline suite reach the real internet.
+
+    `client=` is the Anthropic SDK seam; there is nothing else it can be. When
+    the shipped default flipped to openrouter, every LLMClient built around a
+    FakeAnthropic without naming its provider kept the default -- and
+    `complete()` routed around the injected fake into a real POST, 54 tests at
+    a time. An injected client now decides the dialect when the caller does
+    not say one.
+    """
+    llm = LLMClient("", client=FakeAnthropic())
+    assert llm.provider == "anthropic"
+
+
+def test_a_client_with_an_explicit_openrouter_provider_is_refused():
+    """The contradictory pair must be an error, not a shrug: the openrouter
+    path would silently ignore `client=` and every call would hit the
+    network."""
+    with pytest.raises(LLMError, match="silently ignored"):
+        LLMClient("k", client=FakeAnthropic(), provider="openrouter")
+
+
+def test_a_session_with_an_explicit_anthropic_provider_is_refused():
+    class _S:  # never used -- refusal must happen first
+        pass
+
+    with pytest.raises(LLMError, match="silently ignored"):
+        LLMClient("k", session=_S(), provider="anthropic")
+
+
+def test_the_offline_suite_is_walled_off_from_the_internet():
+    """Pins the conftest guard itself: any code that ignores its injected fake
+    and reaches for a real HTTP client dies on an unroutable proxy in
+    milliseconds, instead of retrying a blocked host for minutes and turning
+    one seam bug into an eight-minute red suite."""
+    import os
+    assert os.environ.get("HTTPS_PROXY") == "http://127.0.0.1:9"
+    assert os.environ.get("NO_PROXY") == ""
 
 
 def test_an_injected_client_needs_no_key():

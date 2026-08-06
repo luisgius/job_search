@@ -52,7 +52,7 @@ _MAX_CANDIDATES = 40
 #: Providers `LLMClient` can talk to.
 PROVIDERS: tuple[str, ...] = ("anthropic", "openrouter")
 
-DEFAULT_PROVIDER = "anthropic"
+DEFAULT_PROVIDER = "openrouter"
 
 #: OpenRouter speaks the OpenAI chat-completions dialect, so this base URL also
 #: works for any other OpenAI-compatible gateway (LiteLLM, vLLM, Together...)
@@ -229,18 +229,44 @@ class LLMClient:
         api_key: str,
         *,
         client: Any = None,
-        provider: str = DEFAULT_PROVIDER,
+        provider: str | None = None,
         base_url: str | None = None,
         session: Any = None,
         max_retries: int = DEFAULT_MAX_RETRIES,
         sleep: Callable[[float], None] | None = None,
         headers: Mapping[str, str] | None = None,
     ) -> None:
-        self.provider = str(provider or DEFAULT_PROVIDER).strip().lower()
+        # Each provider speaks through exactly one seam: `client=` is the
+        # Anthropic SDK object, `session=` is the openrouter HTTP session.
+        # An omitted provider is therefore inferable from which seam was
+        # injected — and a *contradictory* pair is an error, not a shrug.
+        # This is not pedantry: when the shipped default flipped to
+        # openrouter, every test that wrapped a FakeAnthropic without naming
+        # its provider kept constructing happily while `complete()` routed
+        # around the fake and POSTed to the real internet, 54 times. A seam
+        # that can silently discard its injection is how an offline suite
+        # stops being one.
+        if provider is None:
+            resolved = "anthropic" if client is not None else DEFAULT_PROVIDER
+        else:
+            resolved = str(provider or DEFAULT_PROVIDER).strip().lower()
+        self.provider = resolved
         if self.provider not in PROVIDERS:
             raise LLMError(
                 f"unknown llm.provider {provider!r} — expected one of "
                 f"{', '.join(PROVIDERS)}"
+            )
+        if self.provider == "openrouter" and client is not None:
+            raise LLMError(
+                "an SDK client= was injected but the provider is openrouter, "
+                "which speaks over session= — the injected client would be "
+                "silently ignored and every call would hit the real network"
+            )
+        if self.provider == "anthropic" and session is not None:
+            raise LLMError(
+                "a session= was injected but the provider is anthropic, "
+                "which speaks through the SDK client= — the injected session "
+                "would be silently ignored"
             )
         self.api_key = str(api_key or "")
         self.max_retries = max(0, int(max_retries))
