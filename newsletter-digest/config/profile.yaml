@@ -1,0 +1,50 @@
+# Perfil de intereses. Este fichero es el que iterarás mas a menudo.
+# Cuanto mas concreto seas, mejor discrimina el scoring.
+
+owner: "Luis"
+
+domains:
+  - name: "Data Science / ML / forecasting"
+    weight: 1.0
+    detail: >
+      Series temporales, forecasting con modelos de gradient boosting,
+      regresion cuantilica, prediccion conforme e intervalos de confianza,
+      validacion temporal y deteccion de leakage, calibracion de modelos,
+      MLOps y puesta en produccion de modelos.
+
+  - name: "IA aplicada y herramientas de dev"
+    weight: 1.0
+    detail: >
+      LLMs aplicados a problemas reales, agentes, RAG, evaluacion de
+      sistemas LLM, tooling de desarrollo, librerias nuevas de Python
+      que ahorren trabajo real.
+
+  - name: "Inversion y finanzas personales"
+    weight: 1.0
+    detail: >
+      Carteras indexadas a largo plazo, fiscalidad para expatriados en
+      Europa, brokers europeos, independencia financiera, analisis
+      macro con implicacion practica.
+
+  - name: "Endurance / triatlon / entrenamiento"
+    weight: 1.0
+    detail: >
+      Preparacion de medio Ironman y maraton, periodizacion, zonas de
+      entrenamiento, nutricion deportiva, prevencion de lesiones,
+      analisis de datos de entrenamiento.
+
+# Temas que NO quieres ver aunque el remitente sea relevante.
+exclusions:
+  - "Ofertas comerciales, descuentos y promociones de producto"
+  - "Rondas de financiacion y cotilleo de la industria sin contenido tecnico"
+  - "Contenido puramente motivacional sin sustancia"
+
+scoring:
+  # Umbrales de los tres cubos de salida.
+  read_full:
+    min_relevance: 4
+    min_actionability: 3
+  skim:
+    min_relevance: 3
+  # Si en una ejecucion ningun item llega a 'skim', no se envia el email.
+  skip_send_if_empty: true

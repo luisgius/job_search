@@ -1,0 +1,4 @@
+anthropic>=0.40
+beautifulsoup4>=4.12
+lxml>=5.0
+PyYAML>=6.0

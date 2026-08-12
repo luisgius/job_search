@@ -1,0 +1,13 @@
+# --- secretos ---
+.env
+
+# --- python ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.py[cod]
+
+# NOTA: config/senders.yaml y state.json SI se commitean a proposito.
+# senders.yaml lo necesita el workflow en tiempo de ejecucion, y state.json
+# es lo que mantiene la cadencia de 3 dias entre ejecuciones de Actions.

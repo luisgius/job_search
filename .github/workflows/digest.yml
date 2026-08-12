@@ -1,0 +1,62 @@
+name: newsletter-digest
+
+on:
+  schedule:
+    # 04:00 UTC = 06:00 en Cracovia en horario de verano (05:00 en invierno).
+    # GitHub Actions SIEMPRE usa UTC, no aplica cambios de hora.
+    #
+    # La cadencia real de 3 dias la decide main.py, no el cron: un `*/3` en el
+    # dia del mes se rompe en los cambios de mes (del 31 salta al 1).
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Ignorar la cadencia de 3 dias y ejecutar ya"
+        type: boolean
+        default: false
+
+# Necesario para que el job pueda commitear state.json de vuelta.
+permissions:
+  contents: write
+
+# El proyecto vive en un subdirectorio del repo, no en la raiz.
+defaults:
+  run:
+    working-directory: newsletter-digest
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          # Este path es relativo a la raiz del repo: `defaults.run` solo
+          # afecta a los pasos `run`, no a los `uses`.
+          cache-dependency-path: newsletter-digest/requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      - name: Run digest
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DIGEST_TO: ${{ secrets.DIGEST_TO }}
+        run: |
+          python main.py ${{ inputs.force && '--force' || '' }}
+
+      - name: Persist state
+        run: |
+          if [[ -n "$(git status --porcelain state.json)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add state.json
+            git commit -m "chore: update digest state [skip ci]"
+            git push
+          else
+            echo "Sin cambios de estado."
+          fi
