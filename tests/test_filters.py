@@ -372,14 +372,24 @@ def test_dedupe_prefers_an_ats_source_on_a_tie():
 
 
 def test_dedupe_keeps_genuinely_different_jobs():
-    a = make_job(company="Acme", title="Backend Engineer", ats_job_id="1")
-    b = make_job(company="Acme", title="Data Engineer", ats_job_id="2")
-    c = make_job(company="Globex", title="Backend Engineer", ats_job_id="3")
+    # Distinct URLs, because distinct jobs have them: dedupe's first pass now
+    # (correctly) treats one canonical URL as one posting, whatever the rest
+    # of the record claims.
+    a = make_job(company="Acme", title="Backend Engineer", ats_job_id="1",
+                 url="https://boards.greenhouse.io/acme/jobs/1")
+    b = make_job(company="Acme", title="Data Engineer", ats_job_id="2",
+                 url="https://boards.greenhouse.io/acme/jobs/2")
+    c = make_job(company="Globex", title="Backend Engineer", ats_job_id="3",
+                 url="https://boards.greenhouse.io/globex/jobs/3")
     assert len(dedupe([a, b, c])) == 3
 
 
 def test_dedupe_is_order_stable_and_deterministic():
-    batch = [make_job(company=f"C{i}", ats_job_id=str(i)) for i in range(5)]
+    batch = [
+        make_job(company=f"C{i}", ats_job_id=str(i),
+                 url=f"https://boards.greenhouse.io/c{i}/jobs/{i}")
+        for i in range(5)
+    ]
     assert [j.company for j in dedupe(batch)] == [j.company for j in batch]
     assert dedupe(batch) == dedupe(batch)
 
@@ -420,3 +430,136 @@ def test_first_title_match_returns_the_first_hit_in_term_order():
 def test_first_title_match_tolerates_junk():
     assert first_title_match(None, ["ml"]) is None
     assert first_title_match("ML Engineer", None) is None
+
+
+# ==========================================================================
+# Phase 4 — junior stamp, sponsorship exception, language gate, URL dedupe
+# ==========================================================================
+
+from src.filters import dedupe  # noqa: E402
+
+_DS_FILTERS = {
+    "countries": ["PL", "DE", "NL"],
+    "title_include": ["data scientist", "machine learning engineer"],
+    "title_exclude": ["senior"],
+    "title_junior_markers": ["junior", "graduate"],
+}
+
+
+def test_a_junior_marker_stamps_metadata_without_gating():
+    cfg = {"filters": dict(_DS_FILTERS)}
+    job = make_job(title="Junior Data Scientist", location="Berlin, Germany")
+    result = apply_filters([job], cfg, now=NOW)
+    assert result.kept == [job]
+    assert job.raw["level"] == "junior"
+
+
+def test_a_plain_title_is_not_junior():
+    """Target level is mid — junior is acceptable, never the default."""
+    cfg = {"filters": dict(_DS_FILTERS)}
+    job = make_job(title="Data Scientist", location="Berlin, Germany")
+    apply_filters([job], cfg, now=NOW)
+    assert "level" not in job.raw
+
+
+def test_the_exclude_list_still_wins_over_the_stamp():
+    cfg = {"filters": dict(_DS_FILTERS)}
+    job = make_job(title="Senior Data Scientist", location="Berlin, Germany")
+    result = apply_filters([job], cfg, now=NOW)
+    assert result.kept == []
+    assert "level" not in job.raw
+
+
+def test_a_sponsorship_country_needs_the_posting_to_say_so():
+    cfg = {"filters": {"countries": ["PL"], "countries_if_sponsorship": ["GB"]}}
+    silent = make_job(title="Data Scientist", location="London, UK",
+                      description="Great team, hybrid working.")
+    result = apply_filters([silent], cfg, now=NOW)
+    assert result.kept == []
+    assert "visa sponsorship" in result.rejected[0][1]
+
+    offered = make_job(title="Data Scientist", location="London, UK",
+                       description="Visa sponsorship is available for this role.")
+    result = apply_filters([offered], cfg, now=NOW)
+    assert result.kept == [offered]
+    assert offered.country == "GB"
+
+
+def test_demanding_a_visa_is_not_offering_one():
+    """"Must have a valid work visa" is the opposite sentence — matching it
+    would wave through exactly the postings the exception exists to drop."""
+    cfg = {"filters": {"countries": ["PL"], "countries_if_sponsorship": ["GB"]}}
+    job = make_job(title="Data Scientist", location="London, UK",
+                   description="Applicants must have a valid work visa already.")
+    assert apply_filters([job], cfg, now=NOW).kept == []
+
+
+GERMAN_AD = (
+    "Wir suchen einen Data Scientist für unser Team in Berlin. Du entwickelst "
+    "Prognosemodelle, arbeitest eng mit dem Produktteam zusammen und "
+    "präsentierst deine Ergebnisse den Stakeholdern. Sehr gute Deutschkenntnisse "
+    "sind erforderlich, ebenso Erfahrung mit Python und SQL im Produktivbetrieb."
+)
+
+
+def test_a_non_english_description_is_dropped_and_says_which_language():
+    cfg = {"filters": {"languages": ["en"]}}
+    job = make_job(title="Data Scientist", description=GERMAN_AD)
+    result = apply_filters([job], cfg, now=NOW)
+    assert result.kept == []
+    assert result.counts.get("language") == 1
+    assert "German" in result.rejected[0][1]
+
+
+def test_an_english_description_passes_the_language_gate():
+    cfg = {"filters": {"languages": ["en"]}}
+    job = make_job(title="Data Scientist", description=(
+        "We are looking for a data scientist to build forecasting models, "
+        "work closely with product teams and present results to stakeholders. "
+        "Strong Python and SQL experience in production is required."
+    ))
+    assert apply_filters([job], cfg, now=NOW).kept == [job]
+
+
+def test_a_short_description_is_kept_in_doubt():
+    """Two sources ship synthesized skill snippets; judging language on them
+    is guesswork, and the safe direction is always "show the job"."""
+    cfg = {"filters": {"languages": ["en"]}}
+    job = make_job(title="Data Scientist", description="Prognosemodelle. SQL.")
+    assert apply_filters([job], cfg, now=NOW).kept == [job]
+
+
+def test_an_empty_language_list_disables_the_gate():
+    job = make_job(title="Data Scientist", description=GERMAN_AD)
+    assert apply_filters([job], {"filters": {}}, now=NOW).kept == [job]
+
+
+def test_dedupe_merges_on_the_canonical_url_first():
+    """The same posting arrives as the ATS record and as an aggregator copy
+    whose URL only differs by tracking clutter — one job, and the ATS copy
+    (richer source rank) is the survivor."""
+    ats = make_job(source="greenhouse", company="Acme GmbH",
+                   title="Data Scientist",
+                   url="https://boards.greenhouse.io/acme/jobs/123",
+                   description="Long ATS description with all the details.")
+    copy = make_job(source="adzuna", company="ACME",
+                    title="Data Scientist (m/f/d)",
+                    url="https://boards.greenhouse.io/acme/jobs/123?utm_source=adzuna",
+                    description="Short snippet.")
+    survivors = dedupe([copy, ats])
+    assert survivors == [ats]
+
+
+def test_meaningful_query_parameters_keep_jobs_apart():
+    """`?gh_jid=` IS the job identity on Greenhouse embed boards — stripping
+    it would merge every posting a company has."""
+    a = make_job(url="https://acme.example/careers?gh_jid=1", ats_job_id="1")
+    b = make_job(url="https://acme.example/careers?gh_jid=2", ats_job_id="2",
+                 title="Machine Learning Engineer")
+    assert len(dedupe([a, b])) == 2
+
+
+def test_jobs_without_urls_are_never_merged_by_the_url_pass():
+    a = make_job(url="", ats_job_id="1", title="Data Scientist", company="A")
+    b = make_job(url="", ats_job_id="2", title="ML Engineer", company="B")
+    assert len(dedupe([a, b])) == 2

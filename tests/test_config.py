@@ -237,6 +237,21 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         # Per-role presentations of the user's own CV — per-user identity,
         # like the applicant block: DEFAULTS ships no variants.
         "cv.variants": _APPLICANT,
+        # Phase 4: the user's actual search shape. DEFAULTS stays the wide,
+        # generic EU tool (every country, any title, any language); the
+        # shipped config narrows to what THIS user can take: 18 sponsorship-
+        # free countries plus GB-with-sponsorship, DS/ML mid-level titles,
+        # English postings.
+        "filters.countries": "Phase 4 search shape (see comment above)",
+        "filters.title_include": "Phase 4 search shape (see comment above)",
+        "filters.title_exclude": "Phase 4 search shape (see comment above)",
+        "filters.languages": "Phase 4 search shape (see comment above)",
+        "filters.countries_if_sponsorship": "Phase 4 search shape (see comment above)",
+        # Phase 5: prompt-only positioning for this candidate; DEFAULTS ship
+        # empty because there is no generic candidate.
+        "scoring.candidate_context": _APPLICANT,
+        "scoring.positive_signals": _APPLICANT,
+        "scoring.score_caps": _APPLICANT,
     }
 
     unknown = sorted(set(shipped) - set(defaults) - set(DELIBERATE))

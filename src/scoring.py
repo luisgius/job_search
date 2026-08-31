@@ -165,12 +165,70 @@ def _applicant_line(applicant: Mapping[str, Any] | None) -> str:
     return "\n".join(parts)
 
 
-def build_prompt(job: Job, cv_markdown: str, applicant: Mapping[str, Any] | None) -> str:
+def _candidate_rules(config: Any) -> str:
+    """The per-candidate scoring rules block, rendered from config.
+
+    Three knobs, all prompt-only and all empty by default:
+
+    * `scoring.candidate_context` — a paragraph of positioning the CV alone
+      does not state ("1.5 years total", "gap: no NLP research");
+    * `scoring.positive_signals` — themes that should weigh UP when the
+      posting matches them;
+    * `scoring.score_caps` — `{when, cap}` pairs: when the posting matches
+      the condition, the score must not exceed the cap. This is the lesson a
+      rejection teaches ("requires transformer research" -> cap 60): the cap
+      spends zero tailoring hours on a loop the candidate cannot pass, while
+      still showing the job in the digest below threshold.
+
+    The threshold (65) and max_jobs stay untouched by any of this.
+    """
+    lines: list[str] = []
+    context = str(_cfg(config, "scoring.candidate_context", "") or "").strip()
+    if context:
+        lines.append(f"POSITIONING (from the candidate, not in the CV)\n{context}")
+
+    signals = _cfg(config, "scoring.positive_signals", []) or []
+    signal_terms = [str(item).strip() for item in signals if str(item).strip()] \
+        if isinstance(signals, list) else []
+    if signal_terms:
+        lines.append(
+            "POSITIVE SIGNALS — weigh the score UP when the posting matches:\n"
+            + "\n".join(f"- {term}" for term in signal_terms)
+        )
+
+    caps = _cfg(config, "scoring.score_caps", []) or []
+    cap_lines: list[str] = []
+    if isinstance(caps, list):
+        for entry in caps:
+            if not isinstance(entry, Mapping):
+                continue
+            when = str(entry.get("when") or "").strip()
+            cap = _int(entry.get("cap"), -1)
+            if when and 0 <= cap <= 100:
+                cap_lines.append(
+                    f"- If the posting {when}: the score MUST NOT exceed "
+                    f"{cap}. Say which cap fired in `reasons`."
+                )
+    if cap_lines:
+        lines.append("HARD CAPS — non-negotiable ceilings:\n" + "\n".join(cap_lines))
+
+    return "\n\n".join(lines)
+
+
+def build_prompt(
+    job: Job,
+    cv_markdown: str,
+    applicant: Mapping[str, Any] | None,
+    *,
+    rules: str = "",
+) -> str:
     """The scoring prompt: candidate header + full CV + one posting + rubric.
 
     The CV goes in whole (it is the only source of truth about the candidate)
     while the posting is truncated — the ad's second half is benefits copy,
-    and the CV is what the score is actually about.
+    and the CV is what the score is actually about. `rules` is
+    `_candidate_rules(config)`: positioning, positive signals and hard caps
+    the user configured for themselves.
     """
     posted = (
         job.posted_at.strftime("%Y-%m-%d %H:%M UTC")
@@ -202,6 +260,8 @@ def build_prompt(job: Job, cv_markdown: str, applicant: Mapping[str, Any] | None
 
     header = _applicant_line(applicant)
     candidate_block = f"CANDIDATE\n{header}\n\n" if header else ""
+    if rules.strip():
+        candidate_block += f"{rules.strip()}\n\n"
     facts_block = "\n".join(facts)
 
     return f"""\
@@ -375,7 +435,8 @@ def score_job(job: Job, cv_markdown: str, config: Any, *, client: Any = None) ->
             # The posting itself, so an object quoted out of it can never be
             # mistaken for the model's verdict.
             forbid_verbatim=job.description,
-            prompt=build_prompt(job, cv_markdown, _applicant(config)),
+            prompt=build_prompt(job, cv_markdown, _applicant(config),
+                                rules=_candidate_rules(config)),
             max_tokens=max_tokens,
             temperature=temperature,
         )

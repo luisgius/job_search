@@ -12,10 +12,12 @@ Two things matter as much as the filtering itself:
   the digest reshuffles for no reason and the tracker looks noisy.
 
 Filter order is cheapest-first: title -> employment type -> location ->
-freshness -> keywords -> description length.
+freshness -> language -> keywords -> description length.
 """
 
 from __future__ import annotations
+
+import re
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
@@ -25,7 +27,7 @@ from typing import Any, NamedTuple
 from . import config as config_module
 from . import geo
 from .models import Job, collapse_initialisms, ensure_utc, normalize_text, utcnow
-from .util import get_logger
+from .util import canonical_url, get_logger
 
 logger = get_logger(__name__)
 
@@ -36,6 +38,7 @@ REASON_CATEGORIES: tuple[str, ...] = (
     "title_not_included",
     "employment_type_excluded",
     "location_outside_eu",
+    "language",
     "stale",
     "undated",
     "missing_keyword",
@@ -69,6 +72,17 @@ SOURCE_RANK: dict[str, int] = {
 # A posting dated slightly in the future is a source clock/timezone quirk, not
 # a time machine. Anything inside this window is silently accepted as fresh.
 FUTURE_TOLERANCE_HOURS = 2.0
+
+#: What "the posting explicitly offers sponsorship" looks like in the ad
+#: itself. Deliberately narrow: "visa" alone matches every ad that *demands*
+#: an existing visa ("must have a valid work visa"), which is the opposite
+#: statement. Only offer-shaped phrasings count.
+_SPONSORSHIP_RE = re.compile(
+    r"\b(visa sponsorship|sponsorship (?:is )?(?:provided|available|offered|possible)|"
+    r"we (?:can |will |do )?sponsor|sponsor(?:ing)? (?:a |your )?(?:work )?(?:visa|permit)s?|"
+    r"visa (?:support|assistance)|relocation (?:and|&|\+) visa)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -235,6 +249,16 @@ def _check_title(job: Job, config: Any) -> _Check:
             f"title matches none of filters.title_include ({wanted})",
             "title_not_included",
         )
+
+    # Metadata, never a gate: "Junior Data Scientist" passes exactly like any
+    # other included title, and the flag records what the ad itself declares
+    # so scoring and the digest can say so. A plain "Data Scientist" is NOT
+    # stamped — the target level is mid, junior is acceptable, not the default.
+    markers = _terms(_cfg(config, "filters.title_junior_markers", []))
+    if markers and _first_match(tokens, markers):
+        raw = getattr(job, "raw", None)
+        if isinstance(raw, dict) and not raw.get("level"):
+            raw["level"] = "junior"
     return _Check(True, "")
 
 
@@ -326,6 +350,27 @@ def _check_location(job: Job, config: Any) -> _Check:
         return _Check(True, "")
 
     if country:
+        # Some countries are reachable only with the employer's help. A
+        # country in `filters.countries_if_sponsorship` passes when — and
+        # only when — the posting itself says sponsorship is on offer;
+        # the burden of proof is on the ad, never on hope.
+        sponsors = {
+            str(code).strip().upper()
+            for code in (_cfg(config, "filters.countries_if_sponsorship", []) or [])
+            if str(code).strip()
+        }
+        if country in sponsors:
+            statement = f"{job.title}\n{job.description or ''}"
+            if _SPONSORSHIP_RE.search(statement):
+                job.country = country
+                return _Check(True, "")
+            return _Check(
+                False,
+                f"location {job.location!r} resolves to "
+                f"{geo.country_name(country)} ({country}), allowed only when "
+                "the posting explicitly offers visa sponsorship — it does not",
+                "location_outside_eu",
+            )
         # Resolved somewhere we cannot work. Say where, so the digest can
         # tell "wrong country" from "unparseable".
         return _Check(
@@ -391,6 +436,110 @@ def passes_location(job: Job, config: Any) -> tuple[bool, str]:
     """
     check = _check_location(job, config)
     return check.ok, check.reason
+
+
+# --------------------------------------------------------------------------
+# language
+# --------------------------------------------------------------------------
+
+#: Languages the detector chooses among. Detection quality rises as the
+#: candidate set shrinks, so this is the set of languages EU job ads are
+#: actually written in — not every language lingua knows.
+_DETECTOR_CANDIDATES: tuple[str, ...] = (
+    "en", "de", "pl", "es", "fr", "nl", "it", "pt", "cs", "da", "sv", "fi",
+    "ro", "hu",
+)
+
+#: Below this, keep. Language detection on short mixed text is guesswork, and
+#: two of the sources ship synthesized skill-list snippets that read as
+#: English whatever the ad's real language — in doubt, the safe direction in
+#: this pipeline is always "show the job".
+DEFAULT_LANGUAGE_MIN_CHARS = 150
+
+#: The detector must be at least this sure before a job is dropped over it.
+LANGUAGE_MIN_CONFIDENCE = 0.70
+
+_language_detector_cache: dict[tuple[str, ...], Any] = {}
+_lingua_warned = False
+
+
+def _language_detector(allowed: frozenset[str]) -> Any | None:
+    """A cached lingua detector over the candidate set, or None to disable.
+
+    lingua is a real dependency but an optional capability: a machine without
+    it keeps every job and logs one warning, because losing the language gate
+    must never cost a run — same contract as every other soft failure here.
+    """
+    global _lingua_warned
+    codes = tuple(sorted(set(_DETECTOR_CANDIDATES) | allowed))
+    cached = _language_detector_cache.get(codes)
+    if cached is not None:
+        return cached
+    try:
+        from lingua import IsoCode639_1, LanguageDetectorBuilder
+    except ImportError:
+        if not _lingua_warned:
+            logger.warning(
+                "filters.languages is set but lingua is not installed — "
+                "keeping every language (pip install lingua-language-detector)"
+            )
+            _lingua_warned = True
+        return None
+    members = []
+    for code in codes:
+        member = getattr(IsoCode639_1, code.upper(), None)
+        if member is not None:
+            members.append(member)
+    if len(members) < 2:
+        return None  # a detector needs alternatives to choose between
+    detector = LanguageDetectorBuilder.from_iso_codes_639_1(*members).build()
+    _language_detector_cache[codes] = detector
+    return detector
+
+
+def _check_language(job: Job, config: Any) -> _Check:
+    """Drop postings not written in a language the user reads.
+
+    Runs on the description only: EU ads routinely pair a German title with an
+    English body (that is an English ad), and titles are too short to judge.
+    An empty `filters.languages` disables the gate entirely.
+    """
+    allowed = {
+        str(code).strip().lower()
+        for code in (_cfg(config, "filters.languages", []) or [])
+        if str(code).strip()
+    }
+    if not allowed:
+        return _Check(True, "")
+
+    text = str(job.description or "").strip()
+    try:
+        min_chars = int(_cfg(config, "filters.language_min_chars",
+                             DEFAULT_LANGUAGE_MIN_CHARS))
+    except (TypeError, ValueError):
+        min_chars = DEFAULT_LANGUAGE_MIN_CHARS
+    if len(text) < max(0, min_chars):
+        return _Check(True, "")
+
+    detector = _language_detector(frozenset(allowed))
+    if detector is None:
+        return _Check(True, "")
+
+    # 2000 chars decide as well as 20000 and cost a tenth of the time.
+    values = detector.compute_language_confidence_values(text[:2000])
+    if not values:
+        return _Check(True, "")
+    top = values[0]
+    code = top.language.iso_code_639_1.name.lower()
+    if code in allowed or top.value < LANGUAGE_MIN_CONFIDENCE:
+        return _Check(True, "")
+    return _Check(
+        False,
+        f"description reads as {top.language.name.title()} "
+        f"(confidence {top.value:.2f}), not one of filters.languages "
+        f"({', '.join(sorted(allowed))})",
+        "language",
+    )
 
 
 def is_fresh(
@@ -518,6 +667,7 @@ def apply_filters(
         min_chars = 0
 
     result = FilterResult()
+    language_drops: dict[str, int] = {}
     for job in jobs or []:
         failure: _Check | None = None
         try:
@@ -526,6 +676,7 @@ def apply_filters(
                 lambda j=job: _check_employment_type(j, config),
                 lambda j=job: _check_location(j, config),
                 lambda j=job: _check_freshness(j, max_age, skip_undated, moment),
+                lambda j=job: _check_language(j, config),
                 lambda j=job: _check_keywords(j, config),
                 lambda j=job: _check_length(j, min_chars),
             )
@@ -544,7 +695,17 @@ def apply_filters(
         result.rejected.append((job, failure.reason))
         category = failure.category or "filter_error"
         result.counts[category] = result.counts.get(category, 0) + 1
+        if category == "language":
+            source = (job.source or "unknown").lower()
+            language_drops[source] = language_drops.get(source, 0) + 1
 
+    if language_drops:
+        # Per-source, because that is the actionable grain: "am I losing a
+        # whole country's volume to the language gate?" is answered by which
+        # SOURCE the drops cluster in, and only this log line can say.
+        detail = ", ".join(f"{k}={v}" for k, v in sorted(language_drops.items()))
+        logger.info("language filter dropped %d posting(s) by source: %s",
+                    sum(language_drops.values()), detail)
     logger.info("filters: %s", result.summary())
     return result
 
@@ -591,14 +752,35 @@ def dedupe(jobs: list[Job]) -> list[Job]:
     country gets one stamped here first (same resolution `apply_filters`
     does, and idempotent with it).
     """
-    best: dict[str, Job] = {}
-    order: list[str] = []
+    stamped: list[Job] = []
     for job in jobs or []:
         if not job.country:
             resolved = geo.country_of(job.location)
             if resolved:
                 job.country = resolved.upper()
-        key = job.dedupe_key
+        stamped.append(job)
+
+    # Pass 1 — the apply URL. Two records whose canonical URL agrees are the
+    # same posting however differently their sources spelled the company or
+    # the city, and the URL is checked *first* because it is the stronger
+    # claim: `?utm_source=` clutter and host casing are presentation
+    # (util.canonical_url), the path is identity.
+    by_url = _collapse(stamped, lambda job: canonical_url(job.url))
+    # Pass 2 — the fuzzy identity, for the copies that arrive with different
+    # URLs entirely (the ATS record vs the aggregator's own page).
+    return _collapse(by_url, lambda job: job.dedupe_key)
+
+
+def _collapse(jobs: list[Job], key_of: Any) -> list[Job]:
+    """Group by `key_of`, keep the richest per group, first-seen order.
+
+    A job with no usable key (an empty URL) is its own group: no key is no
+    evidence of sameness, and merging the keyless would merge strangers.
+    """
+    best: dict[str, Job] = {}
+    order: list[str] = []
+    for index, job in enumerate(jobs):
+        key = key_of(job) or f"__keyless__{index}"
         current = best.get(key)
         if current is None:
             best[key] = job

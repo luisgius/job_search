@@ -905,3 +905,95 @@ def test_write_digest_is_utf8(tmp_path: Path):
     text = path.read_text(encoding="utf-8")
     assert "Zürich" in text
     assert "Ingénieur" in text
+
+
+# ==========================================================================
+# Phase 6 — the per-source health block
+# ==========================================================================
+
+from src.digest import _error_source, _source_health, build_context  # noqa: E402
+from src.models import RunStats  # noqa: E402
+from tests.conftest import NOW, make_scored  # noqa: E402
+
+
+def _stats(**overrides):
+    stats = RunStats()
+    stats.source_counts = overrides.pop("source_counts", {"greenhouse": 12})
+    stats.source_after_filters = overrides.pop("source_after_filters",
+                                               {"greenhouse": 3})
+    stats.errors = overrides.pop("errors", [])
+    return stats
+
+
+def test_error_source_reads_the_shapes_sources_actually_write():
+    assert _error_source("greenhouse/spotify: HTTP 500") == "greenhouse"
+    assert _error_source("arbeitnow: page 1: boom") == "arbeitnow"
+    assert _error_source("adzuna source failed: no keys") == "adzuna"
+    assert _error_source("") == ""
+
+
+def test_health_rows_carry_the_five_columns():
+    stats = _stats()
+    rows = _source_health(stats, stats.to_dict(), [], {"greenhouse": 2},
+                          tracker=None, now=NOW)
+    assert rows == [{
+        "name": "greenhouse", "fetched": 12, "after_filters": 3,
+        "new_today": 2, "status": "ok", "last_ok": "this run",
+    }]
+
+
+def test_a_failed_source_reads_error_and_a_half_failed_one_degraded():
+    stats = _stats(
+        source_counts={"greenhouse": 0, "lever": 5},
+        source_after_filters={"greenhouse": 0, "lever": 2},
+        errors=["greenhouse/spotify: HTTP 500", "lever/plaid: HTTP 429"],
+    )
+    rows = {r["name"]: r for r in _source_health(
+        stats, stats.to_dict(), stats.errors, {}, tracker=None, now=NOW)}
+    assert rows["greenhouse"]["status"] == "error"
+    assert rows["lever"]["status"] == "degraded"
+
+
+def test_a_silent_source_with_a_baseline_reads_degraded():
+    """The Tier 2 story this block exists for: the endpoint died quietly,
+    fetched reads zero, and only the recent-run baseline says that is news."""
+    import json as _json
+
+    class FakeTracker:
+        def recent_runs(self, limit=10):
+            return [{
+                "started_at": "2026-08-03T08:00:00+00:00",
+                "finished_at": "2026-08-03T08:05:00+00:00",
+                "stats_json": _json.dumps({"source_counts": {"justjoin_it": 40}}),
+            }] * 3
+
+    stats = _stats(source_counts={"justjoin_it": 0},
+                   source_after_filters={"justjoin_it": 0})
+    rows = _source_health(stats, stats.to_dict(), [], {},
+                          tracker=FakeTracker(), now=NOW)
+    assert rows[0]["status"] == "degraded"
+    assert rows[0]["last_ok"] not in ("never", "this run")
+
+
+def test_an_honest_zero_with_no_history_is_ok_not_alarming():
+    stats = _stats(source_counts={"teamtailor": 0},
+                   source_after_filters={"teamtailor": 0})
+    rows = _source_health(stats, stats.to_dict(), [], {}, tracker=None, now=NOW)
+    assert rows[0]["status"] == "ok"
+    assert rows[0]["last_ok"] == "never"
+
+
+def test_the_health_block_reaches_the_rendered_page():
+    stats = _stats(source_counts={"greenhouse": 4, "nofluffjobs": 0},
+                   source_after_filters={"greenhouse": 1, "nofluffjobs": 0},
+                   errors=["nofluffjobs: answered 200 but the body is not "
+                           "the posting listing"])
+    context = build_context([make_scored(score=80)], stats, None, now=NOW)
+    names = [row["name"] for row in context["source_health"]]
+    assert names == ["greenhouse", "nofluffjobs"]
+
+    from src.digest import render_html
+    html = render_html(context)
+    assert 'id="source-health"' in html
+    assert "nofluffjobs" in html
+    assert "degraded" in html or "error" in html

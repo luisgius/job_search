@@ -380,3 +380,81 @@ def test_concurrency_of_one_takes_the_plain_loop(tmp_path):
     cfg = write_config(tmp_path, {"scoring": {"concurrency": 1}})
     jobs = [make_job(ats_job_id=str(i)) for i in range(3)]
     assert len(score_jobs(jobs, BASE_CV, cfg, client=llm_client([payload()]))) == 3
+
+
+# ==========================================================================
+# Phase 5 — per-candidate rules: positioning, signals, hard caps
+# ==========================================================================
+
+from src.scoring import _candidate_rules  # noqa: E402
+
+
+_RULES_CFG = {"scoring": {
+    "candidate_context": "Total experience: ~1.5 years. Gap: no NLP research.",
+    "positive_signals": ["forecasting", "causal inference"],
+    "score_caps": [
+        {"when": "requires deep NLP research", "cap": 60},
+    ],
+}}
+
+
+def test_candidate_rules_render_all_three_blocks():
+    rules = _candidate_rules(_RULES_CFG)
+    assert "1.5 years" in rules
+    assert "POSITIVE SIGNALS" in rules and "- forecasting" in rules
+    assert "MUST NOT exceed 60" in rules
+    assert "requires deep NLP research" in rules
+
+
+def test_empty_config_renders_no_rules():
+    assert _candidate_rules({"scoring": {}}) == ""
+    assert _candidate_rules(None) == ""
+
+
+def test_malformed_caps_are_skipped_not_fatal():
+    cfg = {"scoring": {"score_caps": [
+        "not-a-mapping",
+        {"when": "", "cap": 60},          # no condition
+        {"when": "x", "cap": 300},        # cap out of range
+        {"when": "requires magic", "cap": 55},
+    ]}}
+    rules = _candidate_rules(cfg)
+    assert "MUST NOT exceed 55" in rules
+    assert "300" not in rules
+
+
+def test_the_rules_reach_the_model(tmp_path):
+    """The whole point: what the config states must arrive in the prompt the
+    model actually sees — threshold and max_jobs stay untouched."""
+    from src.models import Job
+
+    captured = {}
+
+    class Client:
+        def complete_json(self, *, model, system, require_keys, forbid_verbatim,
+                          prompt, max_tokens, temperature):
+            captured["prompt"] = prompt
+            return {"score": 70, "reasons": ["ok"], "strengths": [],
+                    "gaps": [], "verdict": "fine"}
+
+    from src.scoring import score_job
+    cfg = dict(_RULES_CFG)
+    job = Job(source="greenhouse", company="Acme", title="Data Scientist",
+              url="https://x.example/1", description="Forecasting role.")
+    score = score_job(job, "# CV\nSome experience.", cfg, client=Client())
+    assert score.value == 70
+    assert "MUST NOT exceed 60" in captured["prompt"]
+    assert "1.5 years" in captured["prompt"]
+
+
+def test_the_shipped_config_carries_the_samba_tv_cap():
+    """The lesson that motivated Phase 5, pinned to the shipped file."""
+    import yaml as _yaml
+    from pathlib import Path as _P
+
+    shipped = _yaml.safe_load(
+        (_P(__file__).resolve().parent.parent / "config.yaml").read_text())
+    caps = shipped["scoring"]["score_caps"]
+    assert any(int(c["cap"]) == 60 and "fine-tuning" in c["when"] for c in caps)
+    assert shipped["scoring"]["threshold"] == 65   # untouched by design
+    assert shipped["scoring"]["max_jobs"] == 40    # untouched by design

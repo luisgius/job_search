@@ -192,6 +192,22 @@ DEFAULTS: dict[str, Any] = {
         ],
         "require_keywords_any": [],
         "min_description_chars": 0,
+        # Metadata stamp, never a gate: an included title that also carries
+        # one of these markers gets `raw["level"] = "junior"`, so scoring and
+        # the digest can say what the ad itself declares. A plain title is
+        # NOT junior — mid is the target, junior is acceptable, not default.
+        "title_junior_markers": [
+            "junior", "associate", "graduate", "early career", "entry level",
+        ],
+        # ISO-639-1 codes of the languages the user reads; empty = no gate.
+        # Judged on the description only (a German title over an English body
+        # is an English ad), with lingua, and only above min_chars — short
+        # or synthesized snippets are guesswork, and in doubt the job stays.
+        "languages": [],
+        "language_min_chars": 150,
+        # Countries reachable only with the employer's help: allowed when —
+        # and only when — the posting explicitly offers visa sponsorship.
+        "countries_if_sponsorship": [],
     },
     "scoring": {
         "model": "anthropic/claude-sonnet-5",
@@ -200,6 +216,11 @@ DEFAULTS: dict[str, Any] = {
         "max_tokens": 1500,
         "temperature": 0.0,
         "concurrency": 4,
+        # Prompt-only personalisation, empty by default — see config.yaml for
+        # the shipped example. None of these move threshold or max_jobs.
+        "candidate_context": "",
+        "positive_signals": [],
+        "score_caps": [],
     },
     "tailoring": {
         "enabled": True,

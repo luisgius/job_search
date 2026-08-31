@@ -115,8 +115,11 @@ def stub_sources(monkeypatch):
 
 
 def fresh_jobs(n=3):
+    # Distinct URLs, as distinct jobs have: dedupe's first pass treats one
+    # canonical URL as one posting, whatever the rest of the record says.
     return [make_job(company=f"Company{i}", title="Backend Engineer",
-                     location="Berlin, Germany", hours_old=2, ats_job_id=str(i))
+                     location="Berlin, Germany", hours_old=2, ats_job_id=str(i),
+                     url=f"https://boards.greenhouse.io/company{i}/jobs/{i}")
             for i in range(n)]
 
 

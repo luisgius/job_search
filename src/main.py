@@ -599,6 +599,13 @@ def run_pipeline(
         logger.warning("filtering failed (%s) — keeping every job", exc)
         stats.errors.append(f"filtering failed: {exc}")
     stats.after_filters = len(kept)
+    for job in kept:
+        name = (job.source or "unknown").lower()
+        stats.source_after_filters[name] = stats.source_after_filters.get(name, 0) + 1
+    # Zero-seed the sources that fetched something and kept nothing, so the
+    # digest's health block can print the honest "40 fetched, 0 kept" row.
+    for name in stats.source_counts:
+        stats.source_after_filters.setdefault(name, 0)
 
     # -- 4. tracker gate --------------------------------------------------
     fresh = _gate_on_tracker(kept, rejected, tracker, config, stats, moment)

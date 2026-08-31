@@ -167,46 +167,74 @@ filters:
   # cheapest way to cut noise. Leaving it wide is fine if you are open to
   # relocating or the role is remote.
   countries:
-    # EU-27
-    - AT   # Austria
-    - BE   # Belgium
-    - BG   # Bulgaria
-    - HR   # Croatia
-    - CY   # Cyprus
-    - CZ   # Czechia
-    - DK   # Denmark
-    - EE   # Estonia
-    - FI   # Finland
-    - FR   # France
-    - DE   # Germany
-    - GR   # Greece
-    - HU   # Hungary
-    - IE   # Ireland
-    - IT   # Italy
-    - LV   # Latvia
-    - LT   # Lithuania
-    - LU   # Luxembourg
-    - MT   # Malta
+    # Trimmed to where this user actually applies (Phase 4): every country
+    # here needs no sponsorship for an EU citizen. GB moved out on purpose —
+    # it lives in countries_if_sponsorship below, because a UK posting is
+    # only reachable when the employer says out loud that they sponsor.
+    - PL   # Poland (home)
     - NL   # Netherlands
-    - PL   # Poland
-    - PT   # Portugal
-    - RO   # Romania
-    - SK   # Slovakia
-    - SI   # Slovenia
     - ES   # Spain
+    - DE   # Germany
+    - IE   # Ireland
+    - PT   # Portugal
+    - DK   # Denmark
     - SE   # Sweden
-    # EEA / EFTA / UK — outside the EU, the same job market
-    - IS   # Iceland
-    - LI   # Liechtenstein
+    - FI   # Finland
     - "NO" # Norway — MUST stay quoted: YAML reads a bare NO as false
     - CH   # Switzerland
-    - GB   # United Kingdom
+    - AT   # Austria
+    - BE   # Belgium
+    - FR   # France
+    - IT   # Italy
+    - EE   # Estonia
+    - CZ   # Czechia
+    - LU   # Luxembourg
   allow_remote: true
   # "Remote" with no European hint anywhere is usually a US role.
   remote_requires_eu_hint: true
 
-  # Empty = allow any title. Whole-word, case-insensitive matching.
-  title_include: []
+  # Reachable only with the employer's help (Spanish national, UK needs a
+  # sponsored visa): these pass ONLY when the posting explicitly offers
+  # sponsorship — "visa sponsorship available", "we sponsor", and similar
+  # offer-shaped phrasings. "Must have a valid work visa" is the opposite
+  # sentence and does not count.
+  countries_if_sponsorship:
+    - GB
+
+  # Drop postings whose description is not in a language you read. Judged on
+  # the description only (a German title over an English body is an English
+  # ad), only above language_min_chars (snippets are guesswork — in doubt,
+  # the job stays), and the per-source drop counts land in the run log so a
+  # whole country's volume can never vanish silently.
+  languages:
+    - en
+
+  # Empty = allow any title. Whole-word, case-insensitive matching — so
+  # "data scientist" also catches "Senior Data Scientist" (which the exclude
+  # list then kills) and "Applied ML" catches "Applied ML Scientist". This
+  # list is the shape of the search: DS/ML mid-level. Emptying it reopens
+  # the gate to every title.
+  title_include:
+    - data scientist
+    - data scientist i
+    - data scientist ii
+    - machine learning engineer
+    - ml engineer
+    - ai engineer
+    - applied scientist
+    - applied ml
+    - analytics scientist
+    - decision scientist
+
+  # Stamped as raw["level"]="junior" when an included title carries one of
+  # these — metadata for scoring/digest, never a gate. A plain "Data
+  # Scientist" is NOT junior: mid is the target, junior is acceptable.
+  title_junior_markers:
+    - junior
+    - associate
+    - graduate
+    - early career
+    - entry level
   # This list REPLACES the shipped defaults rather than adding to them, so it
   # spells them all out. There is no stemming — "intern" does not catch
   # "internships" — and an EU search is not an English-language search, so the
@@ -262,6 +290,20 @@ filters:
     # Italian
     - tirocinio
     - stagista
+    # Seniority and roles outside the mid-level DS/ML target (Phase 4).
+    # "manager" also kills "Data Science Manager" — deliberate: people
+    # management is a different job. "research scientist" is the Samba TV
+    # lesson: those loops want publication records, not production ML.
+    - senior
+    - sr
+    - lead
+    - staff
+    - principal
+    - head of
+    - director
+    - manager
+    - phd
+    - research scientist
   description_exclude:
     - security clearance
     - must be a us citizen
@@ -305,6 +347,35 @@ scoring:
   max_tokens: 1500
   temperature: 0.0
   concurrency: 4
+
+  # --- Phase 5: who is being scored, beyond what the CV says ---------------
+  # All three are PROMPT-ONLY: they shape the model's judgement and never
+  # touch threshold (65) or max_jobs (40).
+  #
+  # The positioning states what a CV structurally cannot: total experience
+  # ("1.5 years" — the CV lists jobs, not a sum) and the honest gap.
+  candidate_context: |
+    Total experience: ~1.5 years as a Data Scientist (Uber: supply/driver
+    forecasting for marketplace operations; Buynomics: revenue prediction and
+    clustering for a Tier-1 CPG client). Strengths: tabular ML, time-series
+    forecasting, LightGBM, SQL at scale, product analytics, causal inference
+    and experimental design. Real gap: no deep NLP or LLM *research*
+    experience — one production RAG project (thesis), no transformer
+    fine-tuning, no publications.
+  # Themes that should pull a score UP when the posting matches them.
+  positive_signals:
+    - time-series forecasting or demand planning
+    - marketplace or operations analytics
+    - experimentation, A/B testing
+    - causal inference
+  # Ceilings the model must respect, each one a lesson a real rejection
+  # taught. Samba TV: interviewed, rejected for exactly this — an hour of
+  # tailoring on such a loop is spent knowing the ending. The job still
+  # reaches the digest (below threshold); it just stops costing evenings.
+  score_caps:
+    - when: "requires deep NLP research, LLM research, or transformer
+        fine-tuning experience (not merely using LLM APIs or RAG)"
+      cap: 60
 
 tailoring:
   enabled: true

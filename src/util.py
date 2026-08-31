@@ -321,3 +321,57 @@ def env_flag(name: str, default: bool = False) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+# --------------------------------------------------------------------------
+# URL canonicalisation
+# --------------------------------------------------------------------------
+
+#: Query parameters that identify a *click*, not a posting. Everything else
+#: is kept: some ATS URLs carry the job identity in the query (`?gh_jid=…` on
+#: Greenhouse embed boards), and dropping an unknown parameter risks merging
+#: two genuinely different postings — the expensive direction to be wrong in.
+_TRACKING_PARAM_RE = re.compile(
+    r"^(utm_\w+|gclid|fbclid|msclkid|mc_cid|mc_eid|ref|referer|referrer|"
+    r"source|src|gh_src|lever-source|lever-origin|origin|trk|trackingid|"
+    r"campaign|medium)$",
+    re.IGNORECASE,
+)
+
+
+def canonical_url(url: str | None) -> str:
+    """One spelling for every way a posting's URL arrives.
+
+    The same job reaches the pipeline as `https://Boards.Greenhouse.io/acme/
+    jobs/123?utm_source=linkedin`, `http://boards.greenhouse.io/acme/jobs/123/`
+    and `…/jobs/123#apply`. Scheme and host casing, tracking parameters, the
+    fragment and a trailing slash are presentation; everything else — path,
+    meaningful query — is identity and is preserved byte for byte.
+
+    Returns "" for anything unparseable, so callers can treat "no URL" and
+    "broken URL" the same way: no key.
+    """
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    text = str(url or "").strip()
+    if not text:
+        return ""
+    try:
+        parts = urlsplit(text)
+    except ValueError:
+        return ""
+    if not parts.netloc:
+        return ""
+    kept = [
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if not _TRACKING_PARAM_RE.match(key)
+    ]
+    path = parts.path.rstrip("/") or "/"
+    return urlunsplit((
+        (parts.scheme or "https").lower(),
+        parts.netloc.lower(),
+        path,
+        urlencode(kept),
+        "",  # fragment: never identity
+    ))

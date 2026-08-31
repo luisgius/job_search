@@ -386,6 +386,9 @@ class RunStats:
     digest_items: int = 0
     errors: list[str] = field(default_factory=list)
     source_counts: dict[str, int] = field(default_factory=dict)
+    #: Jobs still standing after the hard filters, by source — what the
+    #: digest's health block reads to say "fetched 40, kept 3" per source.
+    source_after_filters: dict[str, int] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -402,4 +405,5 @@ class RunStats:
             "digest_items": self.digest_items,
             "errors": list(self.errors),
             "source_counts": dict(self.source_counts),
+            "source_after_filters": dict(self.source_after_filters),
         }

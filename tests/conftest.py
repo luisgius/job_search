@@ -66,7 +66,7 @@ def make_job(
     source: str = "greenhouse",
     company: str = "Acme",
     title: str = "Backend Engineer",
-    url: str = "https://boards.greenhouse.io/acme/jobs/1",
+    url: str | None = None,
     location: str = "Berlin, Germany",
     description: str = "We are looking for a backend engineer with Python and PostgreSQL.",
     posted_at: datetime | None = None,
@@ -82,7 +82,16 @@ def make_job(
 
     `hours_old` is a convenience over `posted_at` — pass `hours_old=None` to
     get an undated posting, which is its own important code path.
+
+    The default URL is derived from the company and the ats_job_id, because
+    that is how the world works: distinct jobs have distinct URLs, and a
+    factory that gave every job the same one made `dedupe`'s URL pass merge
+    strangers in half the suite. The all-defaults job still gets the exact
+    historical URL (`…/acme/jobs/1`), so nothing that asserted it moved.
     """
+    if url is None:
+        label = re.sub(r"[^a-z0-9]+", "", company.lower()) or "acme"
+        url = f"https://boards.greenhouse.io/{label}/jobs/{ats_job_id or '1'}"
     if posted_at is None and hours_old is not None:
         posted_at = hours_ago(hours_old)
     return Job(

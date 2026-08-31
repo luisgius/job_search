@@ -249,6 +249,14 @@ section {
 .tag.src {
   text-transform: lowercase;
 }
+.health {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.health.ok       { background: #e6f4ea; color: #137333; }
+.health.degraded { background: #fef7e0; color: #b06000; }
+.health.error    { background: #fce8e6; color: #c5221f; }
 .badge {
   flex: none;
   min-width: 48px;
@@ -694,6 +702,38 @@ footer code {
      it was a quiet day — a run that fetched zero jobs looks exactly like one that had nothing
      to show.</p>
 </div>
+{% endif %}
+
+{# ---------------- 0. source health ---------------- #}
+{% if source_health %}
+<section id="source-health">
+  <div class="sec-head">
+    <h2>Sources</h2>
+    <span class="hint">how each feed did this run — a Tier 2 endpoint that silently died shows here first</span>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>source</th><th class="num">fetched</th><th class="num">kept</th>
+          <th class="num">new today</th><th>status</th><th>last OK</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in source_health %}
+        <tr>
+          <td>{{ row.name }}</td>
+          <td class="num">{{ row.fetched }}</td>
+          <td class="num">{{ row.after_filters }}</td>
+          <td class="num">{{ row.new_today }}</td>
+          <td><span class="health {{ row.status }}">{{ row.status }}</span></td>
+          <td>{{ row.last_ok }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 {% endif %}
 
 {# ---------------- 1. needs your click ---------------- #}

@@ -3,6 +3,9 @@ PyYAML>=6.0
 requests>=2.31
 Jinja2>=3.1
 python-dateutil>=2.8
+# language gate (filters.languages); the pipeline degrades gracefully
+# without it, but it is part of the standard install
+lingua-language-detector>=2.0
 
 # --- LLM scoring + tailoring ---
 anthropic>=0.40

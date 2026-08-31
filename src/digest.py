@@ -37,6 +37,7 @@ from urllib.parse import quote
 from jinja2 import Environment, FileSystemLoader
 
 from . import config as config_module
+from . import health as health_module
 from .models import ApplyStatus, ScoredJob, ensure_utc, utcnow
 from .util import ensure_dir, get_logger, html_to_text, truncate
 
@@ -537,6 +538,134 @@ def _config_summary(config: Any) -> dict[str, Any]:
     }
 
 
+def _error_source(message: str) -> str:
+    """Best-effort source name out of one error string.
+
+    Sources write errors as "greenhouse/spotify: …", "arbeitnow: page 1: …"
+    or "adzuna source failed: …" — the token before the first colon, minus
+    any slug, is the source. Anything unrecognisable maps to "" and simply
+    does not colour a health row; a mis-mapped error must never mark the
+    wrong source red.
+    """
+    head = str(message or "").split(":", 1)[0].strip().lower()
+    head = head.split("/", 1)[0].strip()
+    if head.endswith(" source failed"):
+        head = head[: -len(" source failed")].strip()
+    return head
+
+
+def _run_rows(tracker: Any) -> list[Mapping[str, Any]]:
+    reader = getattr(tracker, "recent_runs", None)
+    if not callable(reader):
+        return []
+    try:
+        return list(reader(limit=health_module.BASELINE_RUNS + 1) or [])
+    except Exception:  # a broken history must not cost the page
+        return []
+
+
+def _last_ok_labels(rows: list[Mapping[str, Any]], names: Iterable[str],
+                    now: datetime) -> dict[str, str]:
+    """Per source, when a run last fetched >0 from it — as relative time."""
+    import json as json_module
+
+    labels: dict[str, str] = {}
+    wanted = set(names)
+    for row in rows:  # newest first
+        if not wanted:
+            break
+        try:
+            data = json_module.loads(str(row.get("stats_json") or "{}"))
+        except ValueError:
+            continue
+        counts = data.get("source_counts") or {}
+        stamp = ensure_utc(
+            _parse_stamp(row.get("finished_at") or row.get("started_at"))
+        )
+        if stamp is None:
+            continue
+        for name in list(wanted):
+            if int(counts.get(name, 0) or 0) > 0:
+                labels[name] = relative_time(stamp, now)
+                wanted.discard(name)
+    return labels
+
+
+def _parse_stamp(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _source_health(
+    stats: Any,
+    stats_data: Mapping[str, Any],
+    errors: list[str],
+    new_by_source: Mapping[str, int],
+    tracker: Any,
+    now: datetime,
+) -> list[dict[str, Any]]:
+    """The per-source health rows the top of the page renders.
+
+    This block exists for one reader in one situation: the morning a Tier 2
+    endpoint silently died. `fetched 0 · degraded` on a source that averaged
+    forty postings is that story in five columns; without it, the digest just
+    looks quiet.
+
+    Status is three-valued on purpose:
+      * ``error``    — the source failed outright (an error and nothing fetched);
+      * ``degraded`` — it errored but still delivered something, or it
+        delivered nothing while its recent runs averaged more than zero
+        (the "went silent" signal `src/health.py` alerts on);
+      * ``ok``       — everything else, including an honest zero on a source
+        with no history.
+    """
+    fetched = dict(
+        stats_data.get("source_counts")
+        or getattr(stats, "source_counts", None) or {}
+    )
+    if not fetched:
+        return []
+    after = dict(
+        stats_data.get("source_after_filters")
+        or getattr(stats, "source_after_filters", None) or {}
+    )
+    error_sources = {_error_source(message) for message in errors}
+    error_sources.discard("")
+
+    rows = _run_rows(tracker)
+    try:
+        baselines = health_module.source_baselines(rows)
+    except Exception:
+        baselines = {}
+    last_ok = _last_ok_labels(rows, fetched.keys(), now)
+
+    table: list[dict[str, Any]] = []
+    for name in sorted(fetched):
+        count = int(fetched.get(name, 0) or 0)
+        if name in error_sources:
+            status = "error" if count == 0 else "degraded"
+        elif count == 0 and float(baselines.get(name, 0) or 0) > 0:
+            status = "degraded"
+        else:
+            status = "ok"
+        table.append({
+            "name": name,
+            "fetched": count,
+            "after_filters": int(after.get(name, 0) or 0),
+            "new_today": int(new_by_source.get(name, 0) or 0),
+            "status": status,
+            "last_ok": ("this run" if count > 0 else last_ok.get(name, "never")),
+        })
+    return table
+
+
 def build_context(
     scored_jobs: Iterable[ScoredJob] | None = None,
     stats: Any = None,
@@ -567,9 +696,12 @@ def build_context(
     buckets["other"] = []
     by_status = {status.value: name for name, status in SECTIONS}
 
+    new_by_source: dict[str, int] = {}
     for scored in list(scored_jobs or []):
         if scored is None or getattr(scored, "job", None) is None:
             continue
+        source_name = (getattr(scored.job, "source", "") or "unknown").lower()
+        new_by_source[source_name] = new_by_source.get(source_name, 0) + 1
         try:
             item = _item(
                 scored,
@@ -617,6 +749,9 @@ def build_context(
             {"label": "matched", "value": _int(stats_data.get("matches"), 0)},
         ],
         "source_counts": source_counts,
+        "source_health": _source_health(
+            stats, stats_data, errors, new_by_source, tracker, moment
+        ),
         "filter_counts": filter_counts,
         "errors": errors,
         "totals": totals,
@@ -679,6 +814,7 @@ def _skeleton() -> dict[str, Any]:
         "stats": {},
         "funnel": [],
         "source_counts": {},
+        "source_health": [],
         "filter_counts": {},
         "errors": [],
         "totals": {name: 0 for name in list(sections) + ["all"]},
