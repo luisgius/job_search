@@ -410,3 +410,115 @@ def test_tailor_jobs_never_raises(tmp_path: Path):
     out = tailor_jobs(items, BASE_CV, cfg,
                       client=llm_client([TransientAPIError()] * 20), errors=errors)
     assert len(out) == 3
+
+
+# ==========================================================================
+# per-role CV variants — same facts, per-job presentation
+# ==========================================================================
+
+from src.tailor import load_cv_variants, select_cv  # noqa: E402
+
+
+ML_MARKER = "prototype-to-production presentation marker"
+PRODUCT_MARKER = "analytics-meets-product presentation marker"
+
+
+def _variant_text(marker: str) -> str:
+    """A distinct, plausible variant: long enough to clear the stub floor."""
+    return f"# Ada Lovelace\n\n## Summary\n{marker}\n\n" + ("real content. " * 40)
+
+
+def variants_config(tmp_path: Path, entries=None, **overrides):
+    (tmp_path / "cv").mkdir(exist_ok=True)
+    (tmp_path / "cv" / "ml.md").write_text(_variant_text(ML_MARKER), encoding="utf-8")
+    (tmp_path / "cv" / "product.md").write_text(
+        _variant_text(PRODUCT_MARKER), encoding="utf-8"
+    )
+    cv = {"path": "cv/base_cv.md", "variants": entries if entries is not None else [
+        {"path": "cv/ml.md",
+         "title_terms": ["ml", "machine learning engineer", "ai"]},
+        {"path": "cv/product.md",
+         "title_terms": ["product", "analytics"]},
+    ]}
+    return tailor_config(tmp_path, cv=cv, **overrides)
+
+
+class CapturingClient:
+    """Duck-typed LLM client, via the public `client=` seam: records every
+    prompt so a test can see which CV each job was tailored from."""
+
+    def __init__(self):
+        self.calls: list[dict] = []
+
+    def complete(self, *, model, system, prompt, max_tokens, temperature=0.0):
+        self.calls.append({"system": system, "prompt": prompt})
+        return TAILORED_CV if system == CV_SYSTEM_PROMPT else COVER
+
+
+def test_select_cv_picks_the_first_matching_variant():
+    variants = [(["ml", "ai"], "ml.md", "ML-TEXT"),
+                (["product", "analytics"], "product.md", "PRODUCT-TEXT")]
+    md, why = select_cv(make_job(title="ML Engineer"), "BASE-TEXT", variants)
+    assert md == "ML-TEXT" and "ml.md" in why
+    md, why = select_cv(make_job(title="Product Analytics Lead"), "BASE-TEXT", variants)
+    assert md == "PRODUCT-TEXT"
+    # Both match -> config order is the priority order, like the watchlist.
+    md, _ = select_cv(make_job(title="ML Product Engineer"), "BASE-TEXT", variants)
+    assert md == "ML-TEXT"
+
+
+def test_select_cv_defaults_to_the_base_cv():
+    variants = [(["ml"], "ml.md", "ML-TEXT")]
+    md, why = select_cv(make_job(title="Data Scientist"), "BASE-TEXT", variants)
+    assert md == "BASE-TEXT" and why == ""
+
+
+def test_select_cv_matches_whole_words_only():
+    """"ml" must hit "ML Engineer" and never "HTML Developer" — the same
+    contract every filters.title_* term has."""
+    variants = [(["ml"], "ml.md", "ML-TEXT")]
+    assert select_cv(make_job(title="HTML Developer"), "B", variants)[0] == "B"
+    assert select_cv(make_job(title="ML Engineer"), "B", variants)[0] == "ML-TEXT"
+
+
+def test_load_cv_variants_resolves_against_the_config_root(tmp_path: Path):
+    cfg = variants_config(tmp_path)
+    loaded = load_cv_variants(cfg)
+    assert [label for _, label, _ in loaded] == ["ml.md", "product.md"]
+    assert ML_MARKER in loaded[0][2]
+
+
+def test_load_cv_variants_degrades_broken_entries(tmp_path: Path):
+    """A missing file, a stub, or an entry without terms costs that variant
+    only — the job tailors from the base CV, which is a worse emphasis, not a
+    wrong document."""
+    (tmp_path / "cv").mkdir(exist_ok=True)
+    (tmp_path / "cv" / "stub.md").write_text("too short", encoding="utf-8")
+    cfg = variants_config(tmp_path, entries=[
+        {"path": "cv/missing.md", "title_terms": ["ml"]},
+        {"path": "cv/stub.md", "title_terms": ["ml"]},
+        {"path": "cv/ml.md", "title_terms": []},
+        {"path": "", "title_terms": ["ml"]},
+        {"path": "cv/product.md", "title_terms": ["product"]},
+    ])
+    loaded = load_cv_variants(cfg)
+    assert [label for _, label, _ in loaded] == ["product.md"]
+
+
+def test_tailor_jobs_hands_each_job_its_variant(tmp_path: Path):
+    """The integration claim: the ML job's prompt carries the ML variant, the
+    unmatched job's prompt carries the base CV — and the variant text is what
+    the anti-fabrication ground truth becomes for that job."""
+    cfg = variants_config(tmp_path)
+    client = CapturingClient()
+    items = [
+        make_scored(score=90, title="Machine Learning Engineer", ats_job_id="a"),
+        make_scored(score=88, title="Data Scientist", ats_job_id="b"),
+    ]
+    tailor_jobs(items, BASE_CV, cfg, client=client)
+
+    cv_prompts = [c["prompt"] for c in client.calls if c["system"] == CV_SYSTEM_PROMPT]
+    assert len(cv_prompts) == 2
+    assert ML_MARKER in cv_prompts[0]
+    assert BASE_CV.strip().splitlines()[0] in cv_prompts[1]
+    assert ML_MARKER not in cv_prompts[1]

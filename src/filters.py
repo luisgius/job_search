@@ -201,6 +201,18 @@ def _first_match(tokens: list[str], terms: Iterable[str]) -> str | None:
     return None
 
 
+def first_title_match(title: Any, terms: Any) -> str | None:
+    """Public whole-word title matcher, for callers outside the filter pass.
+
+    Same semantics as the include/exclude rules — accent-folded,
+    punctuation-free, whole words and phrases — so a `cv.variants` term in the
+    config behaves exactly like a `filters.title_include` term does: "ml"
+    matches "ML Engineer" and never "HTML Developer". Returns the matched term
+    (normalised) or None.
+    """
+    return _first_match(_tokens(str(title or "")), _terms(terms))
+
+
 # --------------------------------------------------------------------------
 # individual filters
 # --------------------------------------------------------------------------

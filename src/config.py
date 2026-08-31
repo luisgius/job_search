@@ -229,6 +229,13 @@ DEFAULTS: dict[str, Any] = {
     },
     "cv": {
         "path": "cv/base_cv.md",
+        # Optional per-role presentations of the SAME facts, picked per job at
+        # tailoring time by whole-word title match (first hit wins; no hit
+        # falls back to `path`). Scoring always reads `path`: the variants
+        # carry identical facts, so scoring each job against its variant would
+        # buy nothing and cost a second copy of the truth to keep in sync.
+        # Each entry: {path: cv/base_cv_ml.md, title_terms: [ml engineer, …]}.
+        "variants": [],
     },
     "notify": {
         # The failure this exists for is the quiet one: a morning where every
@@ -523,6 +530,34 @@ class Config:
         # same terms as the API key: `--no-llm` needs neither.
         if require_llm and not self.cv_path.exists():
             problems.append(f"CV not found at {self.cv_path} — paste your CV there")
+
+        # Variants are optional, but a *configured* variant that cannot work
+        # is a config problem on the same terms as the CV itself: the run
+        # would silently tailor every ML job from the wrong presentation.
+        variants = self.get("cv.variants", []) or []
+        if not isinstance(variants, list):
+            problems.append("cv.variants must be a list of {path, title_terms} entries")
+            variants = []
+        for index, entry in enumerate(variants):
+            where = f"cv.variants[{index}]"
+            if not isinstance(entry, dict):
+                problems.append(f"{where} must be a mapping with path and title_terms")
+                continue
+            raw_path = str(entry.get("path") or "").strip()
+            if not raw_path:
+                problems.append(f"{where} has no path")
+            else:
+                resolved = Path(raw_path)
+                if not resolved.is_absolute():
+                    resolved = self.root / resolved
+                if require_llm and not resolved.exists():
+                    problems.append(f"{where}: CV variant not found at {raw_path}")
+            terms = entry.get("title_terms")
+            if not isinstance(terms, list) or not any(str(t).strip() for t in terms):
+                problems.append(
+                    f"{where} has no title_terms — a variant nothing can ever "
+                    "match is dead config"
+                )
 
         # `isinstance(True, int)` is True, and YAML turns a bare `yes` into a
         # bool — so bools have to be rejected explicitly or `threshold: yes`

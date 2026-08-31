@@ -398,3 +398,25 @@ def test_dedupe_on_empty_input():
 
 def test_source_rank_puts_ats_above_aggregators_above_email():
     assert SOURCE_RANK["greenhouse"] > SOURCE_RANK["adzuna"] > SOURCE_RANK["linkedin_email"]
+
+
+# ==========================================================================
+# first_title_match — the public matcher cv.variants selection rides on
+# ==========================================================================
+
+from src.filters import first_title_match  # noqa: E402
+
+
+def test_first_title_match_is_whole_word_and_accent_folded():
+    assert first_title_match("ML Engineer", ["ml"]) == "ml"
+    assert first_title_match("HTML Developer", ["ml"]) is None
+    assert first_title_match("Ingeniería de Analytics", ["analytics"]) == "analytics"
+
+
+def test_first_title_match_returns_the_first_hit_in_term_order():
+    assert first_title_match("ML Product Engineer", ["product", "ml"]) == "product"
+
+
+def test_first_title_match_tolerates_junk():
+    assert first_title_match(None, ["ml"]) is None
+    assert first_title_match("ML Engineer", None) is None

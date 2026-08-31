@@ -14,7 +14,7 @@ applicant:
   # only requires it before you turn dry_run off.
   phone: ""
   location: "Kraków, Poland"
-  linkedin: ""             # the PDF names it without the URL — paste yours here
+  linkedin: "https://linkedin.com/in/luis-gimenez-uso"   # as printed on the CVs
   github: "https://github.com/luisgius"
   website: ""
 
@@ -34,6 +34,43 @@ keys:
   openrouter: ""           # or env OPENROUTER_API_KEY
   adzuna_app_id: ""        # or env ADZUNA_APP_ID
   adzuna_app_key: ""       # or env ADZUNA_APP_KEY
+
+cv:
+  # Three presentations of the SAME facts (cv/*.pdf are the originals, the
+  # .md files are what the pipeline reads). Scoring always uses `path` — the
+  # variants carry identical facts, so scoring against them would buy
+  # nothing. Tailoring picks per job: first variant whose title_terms
+  # whole-word-match the job title wins (same matching as filters.title_*,
+  # so "ml" hits "ML Engineer" and never "HTML Developer"); no hit -> path.
+  #
+  # The phone number is deliberately absent from all three .md files — this
+  # repo is public. Set applicant.phone on your own machine: tailoring
+  # injects the contact block from `applicant`, so generated documents
+  # carry it even though the committed CVs do not.
+  path: cv/base_cv.md
+  variants:
+    - path: cv/base_cv_ml.md
+      title_terms:
+        - machine learning engineer
+        - ml engineer
+        - ml
+        - mlops
+        - ai engineer
+        - ai
+        - applied scientist
+        - deep learning
+        - computer vision
+        - nlp
+        - llm
+    - path: cv/base_cv_product.md
+      title_terms:
+        - product
+        - analytics
+        - experimentation
+        - insights
+        - growth
+        - decision scientist
+        - business intelligence
 
 sources:
   # Greenhouse and Lever are where US companies post. If you are searching in
@@ -296,9 +333,6 @@ db:
   # Don't re-surface a job you've already been shown within this many days.
   # Jobs you actually applied to are never surfaced again, window or not.
   skip_seen_days: 30
-
-cv:
-  path: cv/base_cv.md
 
 notify:
   # A run that fetched nothing because every board 404'd produces the same

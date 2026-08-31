@@ -234,6 +234,9 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         "sources.landing_jobs": _GLOBAL_FEEDS,
         "sources.justjoin_it": _GLOBAL_FEEDS,
         "sources.nofluffjobs": _GLOBAL_FEEDS,
+        # Per-role presentations of the user's own CV — per-user identity,
+        # like the applicant block: DEFAULTS ships no variants.
+        "cv.variants": _APPLICANT,
     }
 
     unknown = sorted(set(shipped) - set(defaults) - set(DELIBERATE))
@@ -581,3 +584,51 @@ def test_validate_flags_missing_phone_only_when_live_applying(tmp_path: Path):
 def test_validate_flags_linkedin_without_credentials(tmp_path: Path):
     cfg = write_config(tmp_path, {"sources": {"linkedin_email": True}})
     assert any("gmail_credentials.json" in p for p in cfg.validate())
+
+
+# ==========================================================================
+# cv.variants validation
+# ==========================================================================
+
+
+def _variants_config(tmp_path: Path, variants):
+    (tmp_path / "cv").mkdir(exist_ok=True)
+    (tmp_path / "cv" / "base_cv.md").write_text("x" * 300, encoding="utf-8")
+    (tmp_path / "cv" / "ml.md").write_text("y" * 300, encoding="utf-8")
+    (tmp_path / "config.yaml").write_text(
+        yaml.safe_dump({"cv": {"path": "cv/base_cv.md", "variants": variants},
+                        "keys": {"openrouter": "k"},
+                        "applicant": {"name": "Ada", "email": "a@example.com"}}),
+        encoding="utf-8",
+    )
+    return Config.load(tmp_path / "config.yaml", tmp_path / "w.yaml",
+                       root=tmp_path, env={})
+
+
+def test_a_healthy_variant_list_validates_clean(tmp_path: Path):
+    cfg = _variants_config(tmp_path, [{"path": "cv/ml.md", "title_terms": ["ml"]}])
+    assert [p for p in cfg.validate() if "cv.variants" in p] == []
+
+
+def test_a_missing_variant_file_is_a_config_problem(tmp_path: Path):
+    """The failure this catches is silent otherwise: every ML job would tailor
+    from the wrong presentation, forever, with exit code 0."""
+    cfg = _variants_config(tmp_path, [{"path": "cv/nope.md", "title_terms": ["ml"]}])
+    problems = cfg.validate()
+    assert any("cv.variants[0]" in p and "not found" in p for p in problems)
+
+
+def test_a_variant_without_terms_is_dead_config_and_says_so(tmp_path: Path):
+    cfg = _variants_config(tmp_path, [{"path": "cv/ml.md", "title_terms": []}])
+    assert any("no title_terms" in p for p in cfg.validate())
+
+
+def test_a_variant_that_is_not_a_mapping_is_reported(tmp_path: Path):
+    cfg = _variants_config(tmp_path, ["cv/ml.md"])
+    assert any("must be a mapping" in p for p in cfg.validate())
+
+
+def test_variants_are_not_required_by_no_llm_runs(tmp_path: Path):
+    """`--no-llm` needs neither CV nor variants — same terms as the API key."""
+    cfg = _variants_config(tmp_path, [{"path": "cv/nope.md", "title_terms": ["ml"]}])
+    assert [p for p in cfg.validate(require_llm=False) if "not found" in p] == []

@@ -1,6 +1,6 @@
 # LUIS GIMENEZ
 
-lgimenezuso@gmail.com | +34 651 647 102 | Kraków, Poland | Open to Relocate (EU) | GitHub: github.com/luisgius
+lgimenezuso@gmail.com | Open to Relocate (EU) | LinkedIn: linkedin.com/in/luis-gimenez-uso | GitHub: github.com/luisgius
 
 ## PROFESSIONAL SUMMARY
 
@@ -8,21 +8,23 @@ Data Scientist at Uber with a Dual Degree in Computer Science & Business,
 specializing in machine learning forecasting, causal inference, and
 production-grade LLM applications. Built and deployed an ML forecasting system
 at Uber that outperformed incumbent manual forecasts, and predictive models at
-Buynomics that optimized revenue for Tier-1 CPG clients. Expert in bridging
-cutting-edge AI (PyTorch, GenAI, RAG) with scalable software architecture
+Buynomics that optimized revenue for Tier-1 CPG clients. Skilled at bridging
+applied AI (PyTorch, GenAI, RAG) with scalable software architecture
 (FastAPI, Docker).
 
 ## SKILLS
 
 - **Machine Learning & Statistics:** Python (Pandas, NumPy, Scikit-learn),
   LightGBM, PyTorch, SQL, Time-Series Forecasting, Quantile Regression,
-  Conformal Prediction, Causal Inference, Experimental Design, A/B Testing,
-  Predictive Modeling, Clustering.
+  Logistic Regression (GLM), Conformal Prediction, Causal Inference,
+  Experimental Design, A/B Testing, Predictive Modeling, Clustering.
 - **Generative AI & LLMs:** RAG Architectures, LangChain, LangGraph,
   OpenAI/Anthropic APIs, Vector Databases (FAISS), Hybrid Search
-  (BM25 + Embeddings), Prompt Engineering.
-- **ML Engineering & Cloud:** Docker, FastAPI, Git, AWS, Azure, API
-  Deployment, ETL Pipelines, Data Visualization, Power BI.
+  (BM25 + Embeddings), Retrieval & Relevance Evaluation (NDCG, MRR,
+  Precision@k), Prompt Engineering.
+- **ML Engineering & Cloud:** Distributed Data Processing (Spark, Presto),
+  Docker, FastAPI, Git, AWS, Azure, API Deployment, ETL Pipelines,
+  Data Visualization, Power BI.
 
 ## PROFESSIONAL EXPERIENCE
 
@@ -35,9 +37,9 @@ cutting-edge AI (PyTorch, GenAI, RAG) with scalable software architecture
 - Formulated business questions into testable hypotheses, applying causal
   inference and rigorous experimental design to estimate effects and guide
   supply-side operational decisions.
-- Engineered features and cleaned large-scale datasets (Python, SQL) and
-  shipped model overrides through a shadow-to-live rollout, validating
-  performance against production before launch.
+- Engineered features and cleaned large-scale datasets (Python, SQL over
+  Presto and Spark) and shipped model overrides through a shadow-to-live
+  rollout, validating performance against production before launch.
 - Visualized and reported findings to stakeholders, delivering forecast
   reliability analyses and full project documentation for both technical and
   business audiences.
@@ -46,7 +48,8 @@ cutting-edge AI (PyTorch, GenAI, RAG) with scalable software architecture
 
 - Engineered ML pipelines: built and deployed revenue prediction and
   clustering models (Python, PyTorch) for a Tier-1 CPG client (Bel Group),
-  successfully mapping transaction data for 500+ SKUs.
+  including a logistic purchase-decision component, successfully mapping
+  transaction data for 500+ SKUs.
 - Automated data ingestion: designed Python ETL workflows to connect raw
   country-level data to the Buynomics ML platform, improving data reliability
   and model training speed.
@@ -70,7 +73,7 @@ cutting-edge AI (PyTorch, GenAI, RAG) with scalable software architecture
 
 ## PROJECTS
 
-### AI-Powered RAG Recommendation System | M.Sc. Thesis Project 2024
+### AI-Powered RAG Recommendation System | Bachelor's Thesis Project 2024
 
 - Built end-to-end RAG pipeline: engineered a hybrid search system
   (BM25 + Vector) using LangChain and LangGraph to retrieve context and
@@ -78,6 +81,9 @@ cutting-edge AI (PyTorch, GenAI, RAG) with scalable software architecture
 - Production architecture: implemented FAISS for vector storage and deployed
   the model via FastAPI; iteratively optimized prompts to reduce LLM
   hallucinations.
+- Relevance evaluation: benchmarked retrieval quality using ranking metrics
+  (Precision@k, Recall@k, NDCG, MRR) alongside an LLM-as-judge framework to
+  compare lexical, vector and hybrid search configurations.
 
 ### Reinforcement Learning for Algorithmic Trading | Personal Project 2024 – 2025
 

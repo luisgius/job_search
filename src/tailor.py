@@ -27,6 +27,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
+from .filters import first_title_match
 from .llm import LLMError, client_from_config
 from .models import ApplyStatus, Artifacts, Job, ScoredJob, normalize_text
 from .util import ensure_dir, get_logger, slugify, truncate
@@ -436,6 +437,73 @@ def _write_job_json(path: Path, scored: ScoredJob) -> None:
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+# --------------------------------------------------------------------------
+# per-role CV variants
+# --------------------------------------------------------------------------
+
+#: A variant shorter than this is a stub, not a CV — same floor as
+#: `main.MIN_CV_CHARS` (duplicated here rather than imported: main imports
+#: this module, and a constant is not worth a cycle).
+VARIANT_MIN_CHARS = 200
+
+
+def load_cv_variants(config: Any) -> list[tuple[list[str], str, str]]:
+    """`(title_terms, label, markdown)` per usable `cv.variants` entry.
+
+    The variants are per-role *presentations* of the same facts (an ML-flavoured
+    summary, a product-flavoured skills order), so a broken entry degrades to
+    the base CV rather than failing the stage: a job tailored from the general
+    presentation is a worse emphasis, not a wrong document. `Config.validate`
+    is where a broken entry is *reported*; here it only has to not hurt.
+    """
+    raw = _cfg(config, "cv.variants", []) or []
+    if not isinstance(raw, list):
+        return []
+    root = getattr(config, "root", None)
+    variants: list[tuple[list[str], str, str]] = []
+    for entry in raw:
+        if not isinstance(entry, Mapping):
+            continue
+        path_text = str(entry.get("path") or "").strip()
+        terms = entry.get("title_terms")
+        terms = [str(t).strip() for t in terms if str(t).strip()] \
+            if isinstance(terms, list) else []
+        if not path_text or not terms:
+            continue
+        path = Path(path_text)
+        if not path.is_absolute() and root is not None:
+            path = Path(root) / path
+        try:
+            markdown = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            logger.warning("cv variant %s unreadable (%s) — using the base CV "
+                           "for its titles", path_text, exc)
+            continue
+        if len(markdown.strip()) < VARIANT_MIN_CHARS:
+            logger.warning("cv variant %s is %d chars — a stub, not a CV; "
+                           "using the base CV for its titles",
+                           path_text, len(markdown.strip()))
+            continue
+        variants.append((terms, path.name, markdown))
+    return variants
+
+
+def select_cv(
+    job: Job, base_markdown: str, variants: list[tuple[list[str], str, str]]
+) -> tuple[str, str]:
+    """The CV this job should be tailored from: `(markdown, why)`.
+
+    First variant whose `title_terms` whole-word-match the job title wins —
+    list order in the config is the priority order, the same contract the
+    watchlist has. No match returns the base CV and an empty reason.
+    """
+    for terms, label, markdown in variants:
+        hit = first_title_match(job.title, terms)
+        if hit:
+            return markdown, f"{label} (title matched {hit!r})"
+    return base_markdown, ""
+
+
 def tailor_job(
     scored: ScoredJob,
     cv_markdown: str,
@@ -585,10 +653,14 @@ def tailor_jobs(
         return items
 
     out_dir = _output_dir(config)
+    variants = load_cv_variants(config)
     tailored = 0
     for item in eligible:
         before = item.status_detail
-        tailor_job(item, cv_markdown, config, client=llm, out_dir=out_dir)
+        cv_for_job, why = select_cv(item.job, cv_markdown, variants)
+        if why:
+            logger.info("tailoring %s from cv variant %s", item.job.label, why)
+        tailor_job(item, cv_for_job, config, client=llm, out_dir=out_dir)
         if item.artifacts and item.artifacts.cv_md:
             tailored += 1
         elif item.status_detail and item.status_detail != before and errors is not None:
