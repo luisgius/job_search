@@ -7,6 +7,8 @@ config.local.yaml
 # --- your CV is personal data; keep the template, ignore real ones ---
 cv/*.md
 !cv/base_cv.md
+!cv/base_cv_ml.md
+!cv/base_cv_product.md
 cv/*.pdf
 
 # --- pipeline output: regenerated every run ---
