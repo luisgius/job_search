@@ -1,6 +1,6 @@
 # Testing
 
-**1835 tests, ~53s, fully offline** (plus 54 network-only contract tests,
+**1998 tests, ~60s, fully offline** (plus 70 network-only contract tests,
 deselected by default).
 
 ```bash
@@ -15,37 +15,46 @@ pytest --cov=src --cov-report=term-missing
 | `test_geo.py` | 178 | US/EU city collisions — the expensive mistake |
 | `test_autoapply.py` | 134 | **the screener-bail guarantee** |
 | `test_edge_apply.py` | 111 | the apply leg against real 2026 form markup |
-| `test_ats_boards.py` | 108 | Greenhouse/Lever payload reality; slug + `--check` for all six |
+| `test_ats_boards.py` | 108 | Greenhouse/Lever payload reality; slug + `--check` for all eight |
 | `test_edge_fetch.py` | 86 | the shapes a real European job week produces |
 | `test_discover.py` | 115 | **`--discover`: its two caps, one-key-per-board paste, and never sounding surer than the evidence** |
-| `test_edge_match.py` | 76 | prompt injection; a model reply is untrusted input |
+| `test_edge_match.py` | 77 | prompt injection; a model reply is untrusted input |
 | `test_main.py` | 64 | the pipeline end to end, offline |
-| `test_util.py` | 59 | retries, HTML flattening, every ATS date shape |
-| `test_filters.py` | 58 | whole-word matching, dedupe richness |
+| `test_util.py` | 59 | retries, HTML flattening, every ATS date shape, URL canonicalisation |
+| `test_filters.py` | 73 | whole-word matching, the language gate, URL-first dedupe |
 | `test_models.py` | 59 | job identity — the tracker's primary key |
 | `test_linkedin_email.py` | 52 | leniency under LinkedIn template change |
-| `test_scoring.py` | 52 | a job is never silently lost |
-| `test_llm_openrouter.py` | 50 | provider equivalence — same behaviour either way |
-| `test_config.py` | 62 | env-beats-file, validate-everything-at-once, **duplicate keys refused**, **the shipped file vs `DEFAULTS`** |
+| `test_scoring.py` | 57 | a job is never silently lost; the candidate rules reach the prompt |
+| `test_llm_openrouter.py` | 51 | provider equivalence — same behaviour either way |
+| `test_config.py` | 67 | env-beats-file, validate-everything-at-once, **duplicate keys refused**, **the shipped file vs `DEFAULTS`** |
 | `test_health.py` | 44 | a quiet day vs a broken pipeline |
-| `test_llm.py` | 43 | JSON recovery, retry policy |
-| `test_tailor.py` | 42 | **the anti-fabrication guarantee** |
+| `test_llm.py` | 47 | JSON recovery, retry policy |
+| `test_tailor.py` | 60 | **the anti-fabrication guarantee**, hard-number grounding included |
 | `test_db.py` | 57 | **the double-apply guarantee** |
 | `test_workable.py` | 69 | split description/requirements/benefits; assembled locations |
-| `test_live_contract.py` | 54 | **the live APIs still emit what we parse** (network-only) |
+| `test_live_contract.py` | 70 | **the live APIs still emit what we parse** (network-only) |
 | `test_live_contract_policy.py` | 32 | **that file skips only when it should** — offline, discovery gates included |
 | `test_ashby.py` | 40 | `secondaryLocations`; unlisted drafts stay hidden |
 | `test_smartrecruiters.py` | 48 | the two-call shape — and its cap |
-| `test_digest.py` | 66 | escaping, and legibility of failure |
-| `test_adzuna.py` | 32 | snippets, duplicates, key redaction |
 | `test_personio.py` | 52 | XML, subdomain slugs, no external entities |
+| `test_recruitee.py` | 20 | subdomain slugs; the one public structured salary |
+| `test_teamtailor.py` | 22 | RSS + custom-domain tenants; "hybrid" is not remote |
+| `test_arbeitnow.py` | 13 | the keyless German-market feed; honest pagination |
+| `test_landing_jobs.py` | 25 | the second global feed; its client-side DS/ML gate |
+| `test_justjoin_it.py` | 15 | Tier 2: internal JSON, degrade-not-crash |
+| `test_nofluffjobs.py` | 12 | Tier 2: internal JSON, degrade-not-crash |
+| `test_digest.py` | 72 | escaping, legibility of failure, the source-health rows |
+| `test_adzuna.py` | 32 | snippets, duplicates, key redaction |
 | `test_notify.py` | 31 | no shell injection; one channel's death is contained |
 | `test_pdf.py` | 16 | every half-failure of the user's hook |
 
-The suite runs with **PyYAML, Jinja2 and pytest** installed and nothing else.
-`anthropic`, `playwright`, `googleapiclient`, `requests` and `reportlab` are
-imported lazily inside the functions that need them, so a bare checkout can be
-verified before any of the heavy dependencies are installed.
+The suite runs with **PyYAML, Jinja2, pytest and lingua-language-detector**
+installed and nothing else. `anthropic`, `playwright`, `googleapiclient`,
+`requests` and `reportlab` are imported lazily inside the functions that need
+them, so a bare checkout can be verified before any of the heavy dependencies
+are installed. (`lingua` is imported lazily too — `src` degrades to
+keep-every-language without it — but the language-gate tests exercise the real
+detector, so they need it installed.)
 
 ## The rule that shapes everything
 
@@ -102,7 +111,11 @@ missing its tailored PDF.
 Prompt-level enforcement is not a guarantee, so both layers are tested: the
 anti-fabrication clauses are asserted present in the prompts, *and*
 `validate_tailored_cv` is tested against a tailored CV that grew a job the
-base CV never had.
+base CV never had. The hard-number grounding is pinned in both directions —
+an invented percent or year rejects the document, while a reformatted number
+("10,000" as "10k") and a duration derivable from anchored year pairs do not
+— and the cover-letter gate gets the same treatment, with the posting allowed
+as an anchor there because a letter may quote the ad.
 
 ## Everything else
 
@@ -127,10 +140,11 @@ actually occur in production payloads:
   `updated_at`, Lever's `lists` blocks kept (that is where requirements
   live), and one dead board never costing more than that company.
 - **`test_workable.py` / `test_ashby.py` / `test_smartrecruiters.py` /
-  `test_personio.py`** — the four European boards, one file each. Every file
-  covers the same seven shapes (happy path, null location, null date, titleless
-  posting, junk list entries, a 404, and one dead board not costing the others)
-  plus what is peculiar to that vendor:
+  `test_personio.py`** — the first four European boards, one file each (the
+  later additions `test_recruitee.py` and `test_teamtailor.py` follow the same
+  pattern). Every file covers the same seven shapes (happy path, null
+  location, null date, titleless posting, junk list entries, a 404, and one
+  dead board not costing the others) plus what is peculiar to that vendor:
   - **Workable** assembles `Job.location` from structured parts, so a dropped
     country is an unresolvable job; and `description` / `requirements` /
     `benefits` are three fields, of which the second is the one that decides
@@ -274,7 +288,7 @@ stay green.
 `tests/test_live_contract.py` closes that gap and is the one place that talks
 to the real internet. It asserts the specific things the parsers bet on:
 
-- the fields each parser reads are still present, for all six boards;
+- the fields each parser reads are still present, for all eight boards;
 - Greenhouse `content` is still *double* entity-escaped (we unescape exactly
   once — if they stop, that unescape starts corrupting real text);
 - `first_published` still exists, so freshness does not silently fall back to
@@ -298,7 +312,11 @@ to the real internet. It asserts the specific things the parsers bet on:
 - Personio still serves `<workzag-jobs>` XML with `<jobDescription>` sections,
   its colon-less `+0200` offsets are still parseable, and `?language=` is still
   accepted;
-- a slug **nobody owns is still answered with a 404** on all six boards — the
+- Recruitee offers still carry the fields the parser reads and its salary
+  objects still spell `min`/`max`/`currency`/`period`; Teamtailor's `jobs.rss`
+  still answers both for a hosted tenant and for a full careers URL;
+- a slug **nobody owns is still answered with a 404** on the six original
+  boards — the
   assumption every `--discover` confidence rests on. If any vendor starts
   serving 200 + zero postings for an unknown tenant, discovery can no longer
   rule a board out and will recommend spellings that belong to nobody, and the

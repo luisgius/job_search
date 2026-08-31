@@ -188,12 +188,21 @@ What actually goes wrong:
   the pipeline flags this in `raw["snippet_only"]`, but the model is working
   from less text and its confidence is unwarranted.
 
+Calibration lessons now have a place to live: three **prompt-only** knobs in
+`config.yaml`. `scoring.candidate_context` states what the CV structurally
+cannot (total years, the honest gap), `positive_signals` names the themes
+that should pull a score up, and `score_caps` turns what a real rejection
+taught into a ceiling — a role demanding what you demonstrably lack stops
+costing evenings while still appearing below threshold. None of the three
+move `scoring.threshold` or `scoring.max_jobs`.
+
 **Do this in week one:** open the "Below threshold" section every day and
 look for jobs you would have applied to. If you find them, the threshold is
-too high or the CV is too thin. If "Needs your click" is full of jobs you
-immediately dismiss, raise the threshold to 75. This is a ten-minute-a-day
-habit for five days, and it is the difference between a useful tool and an
-expensive RSS feed.
+too high, the CV is too thin — or a `score_cap` did exactly its job; the
+card's `reasons` say which cap fired. If "Needs your click" is full of jobs
+you immediately dismiss, raise the threshold to 75. This is a
+ten-minute-a-day habit for five days, and it is the difference between a
+useful tool and an expensive RSS feed.
 
 ## 5. Source-specific fragility
 
@@ -201,7 +210,10 @@ expensive RSS feed.
   these endpoints have looked the same for years — but nothing obliges them
   to stay that way. Failures are logged and skipped, never fatal, so a
   format change degrades into "that company returned nothing today". Which
-  is quiet. **Watch the per-source counts in the digest**, not just the total.
+  is quiet. **Watch the per-source health table at the top of the digest**,
+  not just the total — a source that errored, or went silent against its own
+  recent average, is marked `degraded`/`error` there, with when it last
+  delivered.
 - **LinkedIn alert-email parsing is the most brittle code in the repo**, by
   construction: it parses marketing HTML that LinkedIn redesigns on its own
   schedule with no notice and no versioning. The parser is deliberately
@@ -244,8 +256,9 @@ explicit per-run cap, and the tracker prevents re-scoring yesterday's jobs.
   digest is missing.
 - **Silent success is indistinguishable from silent failure.** A run that
   fetches 0 jobs because every board 404'd produces a digest that looks a lot
-  like a quiet Tuesday. The digest's funnel section exists specifically to
-  make this visible — read the numbers, not just the cards.
+  like a quiet Tuesday. The per-source health table the digest opens with and
+  the funnel section exist specifically to make this visible — read the
+  numbers, not just the cards.
 - **The tracker is a single SQLite file** at `output/tracker.sqlite3`, and
   `.gitignore` excludes `output/`. It is the only record that you applied to
   anything. Back it up. Losing it means the double-apply guarantee resets to
@@ -303,7 +316,10 @@ make the tool actively harmful rather than merely unhelpful:
 3. **"It can't invent things about you."** — `tests/test_tailor.py` pins the
    anti-fabrication clauses in the prompts and the post-hoc
    `validate_tailored_cv` guard, since prompt-level enforcement alone is not
-   a guarantee.
+   a guarantee. The guard now includes hard-number grounding: a percent or
+   year the base CV never stated rejects the tailored CV outright (falling
+   back to the base), and the cover letter is gated the same way, with the
+   posting allowed as an extra anchor since a letter may quote the ad.
 
 Everything else — sources, filters, scoring, digest — is tested for
 correctness rather than safety. The full breakdown is in `docs/TESTING.md`.

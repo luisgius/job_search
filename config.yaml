@@ -4,7 +4,7 @@
 # ---------------------------------------------------------------------------
 
 applicant:
-  # Taken from cv/Luis_Gimenez_CV.pdf — the email here matches the one ON the
+  # Taken from cv/Luis_Gimenez_CV_base.pdf — the email here matches the one ON the
   # CV on purpose: the address a recruiter sees on the form and the address on
   # the attached document must be the same person.
   name: "Luis Gimenez"
@@ -161,11 +161,11 @@ freshness:
   repost_min_gap_days: 14
 
 filters:
-  # ISO-3166 alpha-2 — the whole EU27 plus the EEA and the UK.
-  # Trim it to the countries you can actually work in: every country left here
-  # is one you are willing to see in the digest, and a shorter list is the
-  # cheapest way to cut noise. Leaving it wide is fine if you are open to
-  # relocating or the role is remote.
+  # ISO-3166 alpha-2. The shipped default in src/config.py is the whole EU27
+  # plus the EEA and the UK; this list replaces it. Keep it trimmed to the
+  # countries you can actually work in: every country left here is one you are
+  # willing to see in the digest, and a shorter list is the cheapest way to
+  # cut noise. Widen it again if you are open to relocating.
   countries:
     # Trimmed to where this user actually applies (Phase 4): every country
     # here needs no sponsorship for an EU citizen. GB moved out on purpose —

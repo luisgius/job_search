@@ -3,11 +3,12 @@
 A daily job-search pipeline for one person. Every weekday morning it pulls
 fresh postings from the company boards you name plus (optionally) Adzuna and
 your LinkedIn job-alert emails, throws away everything outside your countries,
-your title rules and your freshness window, asks Claude to score what is left
-against your actual CV, writes a tailored CV and cover letter for each match,
-optionally fills simple Greenhouse/Lever forms — and puts everything else in a
-single HTML page with a link per job so your part of the work is one click,
-not an hour of tab management. It never applies to the same job twice.
+your languages, your title rules and your freshness window, asks Claude to
+score what is left against your actual CV, writes a tailored CV and cover
+letter for each match, optionally fills simple Greenhouse/Lever forms — and
+puts everything else in a single HTML page with a link per job so your part
+of the work is one click, not an hour of tab management. It never applies to
+the same job twice.
 
 ```text
 sources ──┬─ Greenhouse boards ────┐
@@ -15,7 +16,7 @@ sources ──┬─ Greenhouse boards ────┐
           ├─ Workable boards       │
           ├─ Ashby boards          │
           ├─ SmartRecruiters       ├──▶ dedupe ──▶ hard filters ──▶ tracker gate
-          ├─ Personio (XML)        │     (title · location · freshness · keywords)
+          ├─ Personio (XML)        │     (title · type · location · freshness · language · keywords)
           ├─ Recruitee boards      │                               │
           ├─ Teamtailor (RSS)      │                               │
           ├─ Arbeitnow (global)    │                               │
@@ -25,7 +26,7 @@ sources ──┬─ Greenhouse boards ────┐
           ├─ Adzuna (optional)     │                               │
           └─ LinkedIn email        ┘                               ▼
    digest.html ◀── auto-apply ◀── PDF ◀── tailor CV + cover ◀── LLM fit score
-   (needs your click · auto-applied · dry-run · below threshold · run stats)
+   (source health · needs your click · auto-applied · dry-run · below threshold · run stats)
 ```
 
 **Greenhouse and Lever are American.** If you are searching in Spain, Germany
@@ -86,14 +87,15 @@ applicant:
   phone: "+49 30 1234567"      # required before you turn dry_run off
 
 keys:
-  anthropic: ""                # or leave blank and export the env var
+  openrouter: ""               # the key for llm.provider — the shipped file
+                               # says openrouter; or leave blank and export
 ```
 
 The API key resolves as **environment > config.yaml**, so this is the safer
-option:
+option (`ANTHROPIC_API_KEY` instead if you switch `llm.provider: anthropic`):
 
 ```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+export OPENROUTER_API_KEY=sk-or-...
 ```
 
 Then trim `filters.countries` to the countries you can actually work in, and
@@ -216,6 +218,8 @@ apply.workable.com/SLUG/j/ABC123/         ->  workable: SLUG
 jobs.ashbyhq.com/SLUG/uuid                ->  ashby: SLUG
 jobs.smartrecruiters.com/SLUG/74399...    ->  smartrecruiters: SLUG
 SLUG.jobs.personio.de/job/12345           ->  personio: SLUG
+SLUG.recruitee.com/o/some-role            ->  recruitee: SLUG
+SLUG.teamtailor.com/jobs (or careers URL) ->  teamtailor: SLUG or the full URL
 ```
 
 Pasting the whole URL works too — it is reduced to the slug for you.
@@ -237,9 +241,10 @@ Two vendor quirks worth knowing: **SmartRecruiters slugs are case-sensitive**
 subdomain** rather than a path segment — a bare name tries
 `{slug}.jobs.personio.de` and falls back to `.personio.com`.
 
-The four European boards ship **switched off** in `config.yaml`, because an
-enabled board with an empty watchlist quietly returns nothing every morning.
-Put your companies in `watchlist.yaml` first, then turn them on:
+The six watchlist boards beyond Greenhouse and Lever ship **switched off** in
+`config.yaml`, because an enabled board with an empty watchlist quietly
+returns nothing every morning. Put your companies in `watchlist.yaml` first,
+then turn them on:
 
 ```yaml
 # config.yaml
@@ -248,6 +253,8 @@ sources:
   ashby: true
   smartrecruiters: true
   personio: true
+  recruitee: true
+  teamtailor: true
 ```
 
 Slugs change and a wrong one fails silently as "0 postings today", so check
@@ -372,7 +379,8 @@ The digest lands at `output/digest_YYYY-MM-DD.html`, with a copy at
 | `--validate-only` | check the config, print every problem, exit 0 (ok) or 1 (invalid) |
 | `-v`, `--verbose` | DEBUG logging |
 
-Exit codes: **0** ok · **1** config invalid · **2** unexpected error · **130**
+Exit codes: **0** ok · **1** config invalid · **2** unexpected error · **4**
+ran but raised health alerts (only with `notify.exit_nonzero: true`) · **130**
 interrupted.
 
 ---
@@ -568,8 +576,10 @@ costs you a job you never hear about, so nothing here ever removes a card.
 
 **The ATS APIs are unofficial-but-public.** They have been stable for years,
 but nothing obliges them to stay that way, and a format change degrades into
-"that company returned nothing today" — which is quiet. Watch the per-source
-counts in the digest, not just the total.
+"that company returned nothing today" — which is quiet. The digest opens with
+a per-source health table for exactly this: a source that errored or that
+went silent against its own recent average is marked `degraded`/`error`
+there, with when it last delivered. Read that table, not just the total.
 
 **The four European boards have never been run against a live API.** Workable,
 Ashby, SmartRecruiters and Personio were written from published vendor
@@ -599,7 +609,12 @@ score on a description-less LinkedIn item with suspicion.
 day one against *your* CV and *your* market. Read the `score_reasons` on the
 digest cards for a week and check them against your own opinion; if it is
 generous, move `scoring.threshold` from 65 towards 75. That number is the
-only real control you have over how much you read each morning.
+main control you have over how much you read each morning; the finer ones are
+`scoring.candidate_context`, `positive_signals` and `score_caps` in
+`config.yaml` — prompt-only, they never move the threshold or the job cap, and
+a cap is where a lesson a real rejection taught you belongs ("requires NLP
+research" → cap 60: the job still shows up below threshold, it just stops
+costing evenings).
 
 **Tailoring cannot invent things about you** — the prompts forbid new
 employers, dates, degrees and metrics, and a tailored CV that drifts too far
@@ -646,8 +661,10 @@ losing it resets the never-apply-twice guarantee to zero.
 5. Skim **Below threshold** once a week. If good jobs keep appearing there,
    your threshold is too high; if the top of "Needs your click" is junk, it is
    too low.
-6. Check the **Run stats** funnel. A board that returned 0 today and 40
-   yesterday is broken, not quiet.
+6. Glance at the **Sources** health table at the top of the page. A board
+   that returned 0 today and 40 yesterday shows as `degraded` there, with
+   when it last delivered — broken, not quiet. The **Run stats** funnel at
+   the bottom has the totals.
 
 ---
 
@@ -673,8 +690,9 @@ job_search/
 │   ├── render_pdf.example.py copy to src/render_pdf.py and edit
 │   ├── digest.py             the HTML page
 │   ├── templates/            digest.html.j2
-│   ├── sources/              ats_boards.py (6 vendors) · adzuna.py
-│   │                         linkedin_email.py
+│   ├── sources/              ats_boards.py (8 vendors) · adzuna.py
+│   │                         arbeitnow.py · landing_jobs.py · justjoin_it.py
+│   │                         nofluffjobs.py · linkedin_email.py
 │   └── apply/autoapply.py    Greenhouse/Lever form filling + the safety core
 ├── tests/                    offline suite — no network, no API key, no browser
 ├── docs/                     ARCHITECTURE.md · TESTING.md · EVALUATION.md
@@ -689,12 +707,14 @@ pytest -q tests/test_autoapply.py  # one module
 pytest -q -k "double_apply or inspect_form"
 ```
 
-The suite runs with **PyYAML, Jinja2 and pytest** installed and nothing else —
-`anthropic`, `playwright`, `requests`, `googleapiclient` and `reportlab` are
-imported lazily inside the functions that need them, so a fresh checkout can be
-verified before the heavy dependencies are. Every boundary (HTTP, the API,
-Gmail, the browser, the clock) has exactly one injectable seam and the tests
-use only that. See `docs/TESTING.md`.
+The suite runs with **PyYAML, Jinja2, pytest and lingua-language-detector**
+installed and nothing else — `anthropic`, `playwright`, `requests`,
+`googleapiclient` and `reportlab` are imported lazily inside the functions
+that need them, so a fresh checkout can be verified before the heavy
+dependencies are. (`lingua` is imported lazily too, but the language-gate
+tests exercise the real detector.) Every boundary (HTTP, the API, Gmail, the
+browser, the clock) has exactly one injectable seam and the tests use only
+that. See `docs/TESTING.md`.
 
 ---
 
@@ -713,8 +733,8 @@ Remember the slug is the path segment, not the company name:
 Two exceptions: **SmartRecruiters** slugs are case-sensitive, and **Personio**
 slugs are the *subdomain* (`acme.jobs.personio.de` is `acme`).
 
-**A company moved off Greenhouse and you cannot find them** — ask all six at
-once instead of guessing:
+**A company moved off Greenhouse and you cannot find them** — ask all eight
+boards at once instead of guessing:
 
 ```bash
 python -m src.sources.ats_boards --discover "Really Acme"
@@ -761,8 +781,10 @@ the downloaded JSON is not at the project root under the name
 `playwright install chromium`. Until then every match goes to the digest,
 which is a fine way to run this tool.
 
-**"No Anthropic API key"** — `export ANTHROPIC_API_KEY=sk-ant-...` or set
-`keys.anthropic` in `config.yaml`. Environment always wins. Under cron, note
+**"No openrouter API key" / "No anthropic API key"** — export the variable
+for your `llm.provider` (`OPENROUTER_API_KEY` for the shipped default,
+`ANTHROPIC_API_KEY` for `provider: anthropic`) or set the matching
+`keys.*` entry in `config.yaml`. Environment always wins. Under cron, note
 that your shell profile is not read.
 
 **No PDFs and every match says "no tailored CV PDF"** — you have not created

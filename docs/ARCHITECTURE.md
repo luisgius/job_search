@@ -7,8 +7,8 @@ exactly the signatures below so the stages compose without surprises.
 
 ```
 sources.*      -> list[Job]          (never raises; logs + skips on failure)
+dedupe                               -> collapse canonical apply URL, then Job.dedupe_key
 filters.apply_filters                -> (kept: list[Job], rejected: list[tuple[Job, str]])
-dedupe                               -> collapse Job.dedupe_key across sources
 db.Tracker                           -> drop already-handled keys
 scoring.score_jobs   -> list[ScoredJob]  (LLM; Score.error set on failure)
 tailor.tailor        -> writes tailored CV + cover letter markdown
@@ -19,10 +19,12 @@ digest.render        -> output/digest_YYYY-MM-DD.html
 ## Ground rules
 
 1. **stdlib-first imports.** `requests`, `anthropic`, `playwright`,
-   `googleapiclient`, `reportlab` and `jinja2` are imported *inside*
+   `googleapiclient`, `reportlab`, `lingua` and `jinja2` are imported *inside*
    functions, never at module top level (except `jinja2` in `digest.py` and
-   `yaml` in `config.py`, which are hard core deps). This keeps the test
-   suite runnable with only PyYAML + Jinja2 + pytest installed.
+   `yaml` in `config.py`, which are hard core deps). This keeps most of the
+   test suite runnable with only PyYAML + Jinja2 + pytest installed — the
+   language-gate tests additionally want `lingua-language-detector`, whose
+   absence in `src` degrades to keep-every-language.
 2. **Nothing network-facing may raise out of a stage.** Wrap with
    `util.safe_call` or an explicit try/except, log a warning, append to
    `RunStats.errors`, continue.
@@ -180,19 +182,31 @@ class FilterResult:
     counts: dict[str, int]            # reason -> n
 
 def apply_filters(jobs, config, *, now=None) -> FilterResult
-def dedupe(jobs: list[Job]) -> list[Job]   # keeps the richest record per dedupe_key
+def dedupe(jobs: list[Job]) -> list[Job]   # URL-first: collapse on util.canonical_url,
+                                           # then on dedupe_key; richest record wins
 def is_fresh(job, max_age_hours, *, skip_undated=True, now=None) -> tuple[bool, str]
 def passes_location(job, config) -> tuple[bool, str]
 def passes_title(job, config) -> tuple[bool, str]
 def passes_keywords(job, config) -> tuple[bool, str]
+def first_title_match(title, terms) -> str | None   # the public whole-word matcher
 ```
 Filter order (cheapest first): title → employment type → location → freshness
-→ keywords → min_description_chars. `apply_filters` also stamps
+→ language → keywords → min_description_chars. `apply_filters` also stamps
 `job.country`.
 Title include/exclude match **whole words, case-insensitively** — `"intern"`
 must not reject `"International Sales"`, but must reject `"Intern - Backend"`.
-The employment-type stage reads only what a source states as structured data
-(Lever `categories.commitment`, Adzuna `contract_type`), never the title.
+The title stage also stamps `raw["level"] = "junior"` when an *included* title
+carries a `filters.title_junior_markers` term — metadata, never a gate, and
+never on a plain title. The employment-type stage reads only what a source
+states as structured data (Lever `categories.commitment`, Adzuna
+`contract_type`), never the title. The location stage honours
+`filters.countries_if_sponsorship`: those countries pass only when the posting
+itself offers visa sponsorship (offer-shaped phrasings; "must have a valid
+work visa" is the opposite sentence). The language stage
+(`filters.languages`, ISO-639-1; empty = off) judges the *description only*
+with lingua, keeps anything under `language_min_chars` or under 0.70
+confidence, logs its drops per source, and degrades to keep-everything when
+lingua is not installed.
 
 ### `src/sources/ats_boards.py`
 ```python
@@ -203,9 +217,12 @@ ASHBY_JOB_BOARD_URL          = "https://api.ashbyhq.com/posting-api/job-board/{s
 SMARTRECRUITERS_POSTINGS_URL = "https://api.smartrecruiters.com/v1/companies/{slug}/postings"
 SMARTRECRUITERS_POSTING_URL  = ".../postings/{posting_id}"
 PERSONIO_XML_URL             = "https://{host}/xml"   # host = {slug}.jobs.personio.de
+RECRUITEE_OFFERS_URL         = "https://{slug}.recruitee.com/api/offers/"
+TEAMTAILOR_FEED_URL          = "https://{slug}.teamtailor.com/jobs.rss"  # or a full careers URL
 
 BOARDS: tuple[str, ...] = ("greenhouse", "lever", "workable", "ashby",
-                           "smartrecruiters", "personio")
+                           "smartrecruiters", "personio", "recruitee",
+                           "teamtailor")
 
 def fetch_greenhouse(slug, *, session=None, content=True, retries=3) -> list[Job]
 def fetch_lever(slug, *, session=None, retries=3) -> list[Job]
@@ -218,6 +235,8 @@ def fetch_smartrecruiters(slug, *, session=None, details=True,
                           max_descriptions=SMARTRECRUITERS_MAX_DESCRIPTIONS,
                           max_pages=SMARTRECRUITERS_MAX_PAGES, retries=3) -> list[Job]
 def fetch_personio(slug, *, session=None, language=None, retries=3) -> list[Job]
+def fetch_recruitee(slug, *, session=None, retries=3) -> list[Job]
+def fetch_teamtailor(slug, *, session=None, retries=3) -> list[Job]  # slug or careers URL
 def fetch(config, *, session=None, errors=None) -> list[Job]
 def check_slug(board: str, slug: str, *, session=None) -> tuple[bool, str]
 def main(argv=None) -> int          # supports: --check greenhouse spotify
@@ -286,10 +305,24 @@ slug so one dead board costs that company and nothing else, and never raises.
   `employmentType`, `createdAt` and titled `<jobDescription>` sections that are
   concatenated. The slug is the **subdomain**, not a path segment; a bare slug
   tries `.jobs.personio.de` then falls back to `.jobs.personio.com` on 404/410.
+- **Recruitee**: JSON at `{slug}.recruitee.com/api/offers/`, addressed by
+  **subdomain** like Personio. `id` is the stable id, `published_at` dates a
+  posting (`created_at` only as fallback), `description` + `requirements` are
+  concatenated, `country_code` is already ISO alpha-2 and is passed through,
+  the one *public* structured salary in this file is kept, and
+  `employment_type` rides `raw` in exactly the vocabulary
+  `filters.employment_type_exclude` matches on.
+- **Teamtailor**: **RSS, not JSON** — `{slug}.teamtailor.com/jobs.rss`, and a
+  watchlist entry may be a full careers URL, because custom domains are the
+  norm for its larger tenants (there a "slug" does not exist at all). The
+  numeric id in `/jobs/<id>-…` is the stable posting id, `pubDate` the date,
+  and `<remote-status>` asserts `remote` only for the fully-remote values —
+  "hybrid" stays anchored to its office city.
 
 **No new board may claim an `ats` value in `autoapply.SUPPORTED_ATS`.** Each
 sets `ats=` to its own vendor name (`"workable"`, `"ashby"`,
-`"smartrecruiters"`, `"personio"`), which keeps `Job.key` stable and unique per
+`"smartrecruiters"`, `"personio"`, `"recruitee"`, `"teamtailor"`), which keeps
+`Job.key` stable and unique per
 vendor while guaranteeing `eligible()` sends the job to the digest — only
 Greenhouse and Lever have been through the screener-bail work.
 `posted_at` is `None` rather than a guess when no publication date exists, so
@@ -309,7 +342,7 @@ is this company on, and under what slug?**
     python -m src.sources.ats_boards --discover "Glovo" "Factorial HR"
 
 This is **the only feature that makes deliberate unsolicited requests**.
-Everything else fetches boards the user chose; discovery guesses, and six
+Everything else fetches boards the user chose; discovery guesses, and eight
 vendors times several spellings times N companies of 404s from one IP is what a
 scanner looks like. Losing access to the boards the daily run needs costs far
 more than the convenience is worth, so the design is shaped by that:
@@ -325,10 +358,11 @@ more than the convenience is worth, so the design is shaped by that:
   tokenisation with the capitals kept, because **SmartRecruiters slugs are
   case-sensitive** and folding them away loses the one board a European company
   may actually be on. Only that vendor pays for both spellings.
-- **The sweep is candidate-major.** Round one asks all six boards about the best
-  spelling, round two about the second-best. Consecutive requests therefore go
-  to six different hosts rather than six in a row to one, and the ordinary case
-  (the company is where you would expect) costs six requests and stops.
+- **The sweep is candidate-major.** Round one asks all eight boards about the
+  best spelling, round two about the second-best. Consecutive requests
+  therefore go to eight different hosts rather than eight in a row to one, and
+  the ordinary case (the company is where you would expect) costs one round of
+  probes and stops.
 - **A board answering with real postings ends the sweep**; later candidates are
   not tried, and the `(board, slug)` pairs that were skipped are reported —
   "we stopped looking" and "there was nothing to find" are different claims. An
@@ -367,7 +401,7 @@ more than the convenience is worth, so the design is shaped by that:
   untried, never held against it. `medium` is one clear answer with a named
   hole in the evidence (a probe nobody answered, or an empty twin of the
   winning slug); it, and everything below it, is printed **commented out** so
-  that pasting the block can never install a guess — one board of six timing
+  that pasting the block can never install a guess — one board of eight timing
   out must never produce an installed slug.
 - **Where the vendor publishes its own name** (Workable per account,
   SmartRecruiters per posting) it is compared against the name asked for,
@@ -437,7 +471,7 @@ recovered. Retry twice on transient API errors. `client=` is the test seam.
 
 ### `src/scoring.py`
 ```python
-def build_prompt(job: Job, cv_markdown: str, applicant: dict) -> str
+def build_prompt(job: Job, cv_markdown: str, applicant: dict, *, rules="") -> str
 def parse_score(payload: dict) -> Score
 def score_job(job, cv_markdown, config, *, client=None) -> Score
 def score_jobs(jobs, cv_markdown, config, *, client=None, errors=None) -> list[ScoredJob]
@@ -448,6 +482,13 @@ numeric strings, tolerates missing lists. A failed call yields
 `Score(value=0, error=...)` and the job goes to the digest with a warning —
 never silently dropped. Respects `scoring.max_jobs`.
 
+`rules` is `_candidate_rules(config)` rendered into the prompt's CANDIDATE
+block: `scoring.candidate_context` (positioning the CV cannot state),
+`scoring.positive_signals` (themes that weigh a score up) and
+`scoring.score_caps` (`{when, cap}` ceilings the model must respect, naming
+the cap that fired in `reasons`). All three are **prompt-only** — they never
+move `scoring.threshold` or `scoring.max_jobs`.
+
 ### `src/tailor.py`
 ```python
 def build_cv_prompt(job, cv_markdown, applicant) -> str
@@ -455,10 +496,24 @@ def build_cover_prompt(job, cv_markdown, applicant) -> str
 def tailor_job(scored, cv_markdown, config, *, client=None, out_dir=None) -> ScoredJob
 def tailor_jobs(scored_jobs, cv_markdown, config, *, client=None, errors=None) -> list[ScoredJob]
 def artifact_dir(job, base_dir) -> Path      # <base>/applications/<slug>-<key>
+def validate_tailored_cv(base_md, tailored_md, applicant=None) -> tuple[bool, str]
+def validate_cover_letter(cover_md, *, base_md, job=None, applicant=None)
+                                       -> tuple[bool, str, list[str]]  # ok, reason, flags
+def unanchored_numbers(base_md, candidate_md, extra_md="") -> list[str]
 ```
 The prompts must forbid inventing employers, dates, degrees, or metrics not
-present in the base CV — reordering/rephrasing/emphasis only. Writes
-`cv.md` + `cover_letter.md` into the artifact dir and fills
+present in the base CV — reordering/rephrasing/emphasis only. Prompt rules are
+a request, not a guarantee, so the output is validated afterwards:
+`validate_tailored_cv` rejects an empty document, a lost applicant name, an
+unfilled placeholder, a document past twice the base CV's length, and —
+hard-number grounding — any percent or year the base CV never stated
+(formatting is normalised first, so "10,000" and "10k" are one fact, and a
+duration derivable from anchored year pairs is arithmetic, not invention); a
+rejected CV falls back to the base. `validate_cover_letter` gates on the same
+mechanically-certain failures — the posting is allowed as an extra number
+anchor there, since a letter may quote the ad — and everything judgement-y
+(overlength, never naming the company) is a flag in `status_detail`, never a
+block. Writes `cv.md` + `cover_letter.md` into the artifact dir and fills
 `ScoredJob.artifacts`. Respects `tailoring.max_per_run`.
 
 ### `src/render_pdf.py` — **user-supplied hook, do not implement**
@@ -545,11 +600,18 @@ Advisory notes render `p.advisory` (amber, `--warn`) and real failures render
 may be old" indistinguishable from "your scorer is down".
 
 Jinja2 template at `src/templates/digest.html.j2`, self-contained (inline
-CSS, no CDN). Sections: **Needs your click** (digest status, sorted by score
-desc), **Auto-applied**, **Dry run — check these**, **Below threshold**,
-**Run stats & errors**. Every item shows score, `score_reasons`, gaps,
-company/title/location/posted, apply link, and links to the tailored files.
-Must escape untrusted text (job titles/descriptions come from the internet).
+CSS, no CDN). The page opens with a per-source **health table** — source ·
+fetched · kept · new today · ok/degraded/error · last OK — because the
+morning a Tier 2 endpoint silently dies, `fetched 0 · degraded` on a source
+that averaged forty is the story, and without it the digest just looks quiet
+(`degraded` = errored-but-delivered, or an unexplained zero against the
+source's own recent average; "last OK" comes from the tracker's run history).
+Then the outcome sections: **Needs your click** (digest status, sorted by
+score desc), **Submitted — unconfirmed**, **Auto-applied**, **Dry run — check
+these**, **Below threshold**, **Run stats & errors**. Every item shows score,
+`score_reasons`, gaps, company/title/location/posted, apply link, and links
+to the tailored files. Must escape untrusted text (job titles/descriptions
+come from the internet).
 
 ### `src/main.py`
 ```python
@@ -558,9 +620,10 @@ def run_pipeline(config, *, tracker=None, now=None, llm_client=None) -> tuple[li
 def main(argv=None) -> int
 ```
 Flags: `--no-browser`, `--dry-run/--no-dry-run`, `--config`, `--watchlist`,
-`--limit N`, `--source NAME` (repeatable), `--skip-apply`, `--verbose`,
-`--validate-only`. Exit codes: 0 ok, 1 config invalid, 2 unexpected error.
-Prints a compact summary and the digest path.
+`--limit N`, `--source NAME` (repeatable), `--skip-apply`, `--no-llm`,
+`--verbose`, `--validate-only`. Exit codes: 0 ok, 1 config invalid, 2
+unexpected error, 4 ran-but-alerted (only with `notify.exit_nonzero`), 130
+interrupted. Prints a compact summary and the digest path.
 
 **Jobs are sorted newest-first before anything truncates them.** Both
 `--limit` and `scoring.max_jobs` slice from the front of the list, and until
