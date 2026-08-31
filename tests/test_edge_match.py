@@ -740,12 +740,11 @@ def test_a_tailored_cv_that_drops_every_job_is_accepted():
     assert reason == ""
 
 
-def test_a_shorter_cv_that_invents_a_certification_is_accepted():
-    """**The known hole, written down.** The length check is a proxy for "new
-    content was written", and it only looks upwards. A CV that drops two real
-    bullets and adds a fabricated AWS certification and an employer the base CV
-    never had is *shorter*, so it sails through. Read `MAX_LENGTH_RATIO` as
-    "catches padding", not "catches fabrication"."""
+def test_an_invented_certification_year_is_now_caught_by_number_grounding():
+    """What used to be the known hole, half closed. The length check only
+    looks upwards, so this *shorter* fabricated CV once sailed through — but
+    the invented certification carries a year (2019) the base CV never
+    states, and the hard-number grounding rejects exactly that class."""
     fabricated = """# Ada Lovelace
 
 ## Certifications
@@ -756,6 +755,26 @@ def test_a_shorter_cv_that_invents_a_certification_is_accepted():
 - Led a team of 40.
 """
     assert len(fabricated) < len(BASE_CV)
+    ok, reason = validate_tailored_cv(BASE_CV, fabricated, APPLICANT)
+    assert ok is False
+    assert "2019" in reason
+
+
+def test_a_numberless_textual_invention_is_still_accepted():
+    """**The remaining hole, written down.** Grounding checks numbers, not
+    semantics: a fabricated certification or employer stated without any
+    figure passes every mechanical check. The guarantee is still "no invented
+    numbers or dates", never "no invented text" — that half belongs to the
+    prompt rules and, one day, to a claim-grounding model."""
+    fabricated = """# Ada Lovelace
+
+## Certifications
+- AWS Certified Solutions Architect — Professional
+
+## Experience
+### Staff Engineer — Google
+- Led checkout latency work, cutting p99 from 840ms to 210ms.
+"""
     ok, reason = validate_tailored_cv(BASE_CV, fabricated, APPLICANT)
     assert ok is True
     assert reason == ""

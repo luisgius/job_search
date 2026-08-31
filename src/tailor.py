@@ -363,6 +363,126 @@ def _strip_fences(text: str) -> str:
     return "\n".join(l for l in lines if not l.strip().startswith("```")).strip()
 
 
+# --------------------------------------------------------------------------
+# hard-number grounding
+# --------------------------------------------------------------------------
+
+#: English number words that count as facts — but only when they quantify a
+#: duration (`three years`). Bare "one"/"two" appear in ordinary prose ("one
+#: of the largest") and would turn this check into a false-positive machine.
+_NUMBER_WORDS: dict[str, int] = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+}
+
+_NUM_TOKEN_RE = re.compile(r"\d[\d.,]*\s*k?\+?%?", re.IGNORECASE)
+_WORD_DURATION_RE = re.compile(
+    r"\b(" + "|".join(_NUMBER_WORDS) + r")[-\s]+(?:years?|yrs?|months?|weeks?)\b",
+    re.IGNORECASE,
+)
+#: Thousands separators only: a `.` or `,` followed by exactly three digits.
+#: "10,000" and "10.000" collapse; the decimal in "99.9" survives.
+_THOUSANDS_RE = re.compile(r"[.,](?=\d{3}(?!\d))")
+_YEAR_RANGE = range(1900, 2101)
+
+
+def _normalize_number(token: str) -> tuple[str, bool]:
+    """Canonical digits for one numeric token: `("10000", had_percent)`.
+
+    "10,000", "10.000" and "10k" are the same fact spelled three ways — the
+    generative model is allowed to reformat a number, never to invent one, so
+    the comparison has to happen after the formatting is gone.
+    """
+    text = token.strip().lower()
+    percent = text.endswith("%")
+    text = text.rstrip("%").rstrip("+").strip()
+    scale = 1
+    if text.endswith("k"):
+        scale = 1000
+        text = text[:-1].strip()
+    text = _THOUSANDS_RE.sub("", text).rstrip(".,")
+    if scale != 1:
+        try:
+            value = float(text) * scale
+            text = f"{value:g}"
+        except ValueError:
+            pass
+    return text, percent
+
+
+def _hard_numbers(text: str) -> set[tuple[str, bool]]:
+    """Every `(normalized_number, is_percent)` fact stated in `text`."""
+    found = {
+        _normalize_number(match.group(0))
+        for match in _NUM_TOKEN_RE.finditer(text or "")
+    }
+    for match in _WORD_DURATION_RE.finditer(text or ""):
+        found.add((str(_NUMBER_WORDS[match.group(1).lower()]), False))
+    return {(number, percent) for number, percent in found if number}
+
+
+def _derived_durations(numbers: set[tuple[str, bool]]) -> set[str]:
+    """Small integers that are the gap between two anchored years.
+
+    "2020 – 2023" in the base CV legitimises "3 years" in the tailored one:
+    that is arithmetic, not invention. Anything the arithmetic cannot reach
+    stays unanchored.
+    """
+    years = set()
+    for number, _ in numbers:
+        try:
+            value = int(number)
+        except ValueError:
+            continue
+        if value in _YEAR_RANGE:
+            years.add(value)
+    return {
+        str(abs(a - b))
+        for a in years for b in years
+        if a != b and abs(a - b) <= 60
+    }
+
+
+def unanchored_numbers(base_md: str, candidate_md: str, extra_md: str = "") -> list[str]:
+    """Numbers the candidate document states that its sources do not.
+
+    `extra_md` widens the anchor set — a cover letter may quote the posting
+    ("your 2+ years requirement"), a CV may not, so callers choose. Returned
+    formatted for a human message ("70%", "10000"), worst first (percents,
+    then years, then the rest).
+    """
+    anchors = _hard_numbers(base_md) | _hard_numbers(extra_md)
+    anchor_values = {number for number, _ in anchors}
+    anchor_values |= _derived_durations(anchors)
+    loose: list[tuple[int, str]] = []
+    for number, percent in _hard_numbers(candidate_md):
+        if number in anchor_values:
+            continue
+        is_year = number.isdigit() and int(number) in _YEAR_RANGE
+        rank = 0 if percent else (1 if is_year else 2)
+        loose.append((rank, f"{number}%" if percent else number))
+    return [text for _, text in sorted(loose)]
+
+
+def _fabricated_facts(base_md: str, candidate_md: str, extra_md: str = "") -> list[str]:
+    """The unanchored numbers serious enough to reject a document over.
+
+    Only percents and years: an invented metric ("improved accuracy by 23%")
+    or an invented date are exactly the embarrassing classes, and both have
+    near-zero false-positive risk once formatting is normalised. Other loose
+    numbers (a rounded team size, a phone digit) are left to the prompt rules
+    — a validator that cries wolf ends up ignored.
+    """
+    serious = []
+    for text in unanchored_numbers(base_md, candidate_md, extra_md):
+        if text.endswith("%"):
+            serious.append(text)
+            continue
+        if text.isdigit() and int(text) in _YEAR_RANGE:
+            serious.append(text)
+    return serious
+
+
 def validate_tailored_cv(
     base_md: str,
     tailored_md: str | None,
@@ -406,7 +526,69 @@ def validate_tailored_cv(
             f"tailored CV is {ratio:.1f}x the length of the base CV "
             f"(limit {MAX_LENGTH_RATIO:g}x) — it invented content"
         )
+
+    fabricated = _fabricated_facts(base, text)
+    if fabricated:
+        # The prompt forbids inventing; this is the mechanical half of that
+        # promise for the two classes worth a hard stop: a percent metric or
+        # a year that exists nowhere in the base CV. Formatting is normalised
+        # first ("10,000" == "10k") and durations derivable from anchored year
+        # pairs are allowed, so legitimate re-wording does not trip it.
+        shown = ", ".join(fabricated[:4])
+        return False, (
+            f"tailored CV states figure(s) the base CV does not ({shown}) — "
+            "an invented metric or date must never go out under a real name"
+        )
     return True, ""
+
+
+def validate_cover_letter(
+    cover_md: str | None,
+    *,
+    base_md: str,
+    job: Job | None = None,
+    applicant: Mapping[str, Any] | None = None,
+) -> tuple[bool, str, list[str]]:
+    """Gate + advisories for a cover letter: `(ok, reject_reason, flags)`.
+
+    Rejections are reserved for the mechanically certain failures (an
+    unfilled placeholder, an invented percent/year); everything judgement-y
+    is a flag, surfaced in the digest via `status_detail`, never a block —
+    the letter still needed a human read before use anyway. Numbers may
+    anchor in the base CV *or* the posting: "your 2+ years requirement" is a
+    letter quoting the ad, which is fine there and not in a CV.
+    """
+    text = (cover_md or "").strip()
+    if not text:
+        return True, "", []  # emptiness is already reported by the caller
+
+    hit = _PLACEHOLDER_RE.search(text)
+    if hit:
+        return False, (
+            f"cover letter still contains an unfilled placeholder ({hit.group(0)!r})"
+        ), []
+
+    description = getattr(job, "description", "") if job is not None else ""
+    fabricated = _fabricated_facts(base_md, text, description or "")
+    if fabricated:
+        shown = ", ".join(fabricated[:4])
+        return False, (
+            f"cover letter states figure(s) neither the base CV nor the "
+            f"posting does ({shown})"
+        ), []
+
+    flags: list[str] = []
+    words = len(text.split())
+    if words > COVER_LETTER_MAX_WORDS * 1.2:
+        flags.append(
+            f"cover letter runs {words} words (asked for ≤{COVER_LETTER_MAX_WORDS})"
+        )
+    company = str(getattr(job, "company", "") or "").strip() if job is not None else ""
+    if company and normalize_text(company) not in normalize_text(text):
+        # The worst letter error is the wrong company; the detectable half of
+        # that is a letter that never names the right one.
+        flags.append(f"cover letter never names {company}")
+    return True, "", flags
 
 
 # --------------------------------------------------------------------------
@@ -563,6 +745,19 @@ def tailor_job(
     if not (cover_md or "").strip():
         cover_md = ""
         detail = (detail + "; " if detail else "") + "cover letter came back empty"
+    else:
+        cover_ok, cover_reason, cover_flags = validate_cover_letter(
+            cover_md, base_md=cv_markdown, job=job, applicant=applicant
+        )
+        if not cover_ok:
+            # No fallback document exists for a letter (the base CV is its own
+            # fallback; a template letter would be worse than none), so a
+            # rejected letter ships as absence plus an explanation.
+            logger.warning("discarding cover letter for %s: %s", job.label, cover_reason)
+            cover_md = ""
+            detail = (detail + "; " if detail else "") + f"cover letter rejected ({cover_reason})"
+        elif cover_flags:
+            detail = (detail + "; " if detail else "") + "; ".join(cover_flags)
 
     base = Path(out_dir) if out_dir is not None else _output_dir(config)
     try:

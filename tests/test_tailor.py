@@ -55,7 +55,7 @@ Senior backend engineer, 8 years, Python and distributed data systems.
 - Cut p99 checkout latency 840ms to 210ms by batching Redis reads.
 """
 
-COVER = """Dear Northwind hiring team,
+COVER = """Dear Acme hiring team,
 
 I cut p99 checkout latency from 840ms to 210ms at Northwind by batching Redis
 reads, and led a 40-service migration from ECS to EKS with zero downtime.
@@ -522,3 +522,114 @@ def test_tailor_jobs_hands_each_job_its_variant(tmp_path: Path):
     assert ML_MARKER in cv_prompts[0]
     assert BASE_CV.strip().splitlines()[0] in cv_prompts[1]
     assert ML_MARKER not in cv_prompts[1]
+
+
+# ==========================================================================
+# hard-number grounding — the mechanical half of "do not fabricate"
+# ==========================================================================
+
+from src.tailor import unanchored_numbers, validate_cover_letter  # noqa: E402
+
+
+def test_reformatted_numbers_are_the_same_fact():
+    """"10,000", "10.000" and "10k" are one number spelled three ways — the
+    model may reformat, never invent, so comparison happens post-formatting."""
+    base = "Handled 10,000 requests and 99.9 uptime."
+    assert unanchored_numbers(base, "Handled 10k requests (99.9%).") == []
+    assert unanchored_numbers("Mapped 10.000 SKUs", "Mapped 10,000 SKUs") == []
+
+
+def test_word_durations_only_count_with_a_unit():
+    """"three years" is a fact; a bare "one" ("one of the largest teams") is
+    prose, and counting it would make this a false-positive machine."""
+    assert unanchored_numbers("Worked 3 years.", "Worked three years.") == []
+    assert unanchored_numbers("No numbers here.", "One of the largest teams.") == []
+
+
+def test_a_duration_derivable_from_anchored_years_is_arithmetic_not_invention():
+    base = "### Engineer — Northwind\n*2020 – 2023*"
+    assert unanchored_numbers(base, "Three years at Northwind (2020-2023).") == []
+
+
+def test_an_invented_percent_rejects_the_cv():
+    ok, reason = validate_tailored_cv(BASE_CV, TAILORED_CV + "\n- Improved accuracy by 23%.")
+    assert not ok
+    assert "23%" in reason
+
+
+def test_an_invented_year_rejects_the_cv():
+    ok, reason = validate_tailored_cv(BASE_CV, TAILORED_CV.replace(
+        "## Experience", "Shipping software since 2015.\n\n## Experience"))
+    assert not ok
+    assert "2015" in reason
+
+
+def test_loose_small_numbers_are_left_to_the_prompt():
+    """Only percents and years hard-stop; "8 stakeholders" (8 is anchored
+    here anyway) or a rounded count is the prompt's job — a validator that
+    cries wolf ends up ignored."""
+    ok, reason = validate_tailored_cv(BASE_CV, TAILORED_CV + "\n- Worked with 6 teams.")
+    assert ok, reason
+
+
+def test_the_real_fixture_pair_still_validates():
+    ok, reason = validate_tailored_cv(BASE_CV, TAILORED_CV)
+    assert ok, reason
+
+
+# ==========================================================================
+# cover letter QA
+# ==========================================================================
+
+
+def test_a_cover_letter_may_quote_the_posting_but_not_invent():
+    job = make_job(description="We need 2+ years of Python and 99% SLAs.")
+    ok, reason, flags = validate_cover_letter(
+        "Dear Acme team,\nYour 2+ years requirement fits me.\nAda",
+        base_md=BASE_CV, job=job)
+    assert ok, reason
+
+    ok, reason, _ = validate_cover_letter(
+        "Dear Acme team,\nI raised conversion 31% last quarter.\nAda",
+        base_md=BASE_CV, job=job)
+    assert not ok
+    assert "31%" in reason
+
+
+def test_a_placeholder_rejects_the_cover_letter():
+    ok, reason, _ = validate_cover_letter(
+        "Dear [Company Name] team,\nAda", base_md=BASE_CV, job=make_job())
+    assert not ok
+    assert "placeholder" in reason
+
+
+def test_the_wrong_company_surfaces_as_a_flag_not_a_block():
+    """The worst letter error is the wrong company; the detectable half is a
+    letter that never names the right one. Judgement stays with the human, so
+    it flags instead of blocking."""
+    ok, reason, flags = validate_cover_letter(
+        "Dear team,\nMy Northwind work speaks for itself.\nAda",
+        base_md=BASE_CV, job=make_job(company="Acme"))
+    assert ok and not reason
+    assert any("never names Acme" in flag for flag in flags)
+
+
+def test_an_overlong_letter_is_flagged():
+    long_letter = "Dear Acme team,\n" + ("word " * 400) + "\nAda"
+    ok, _, flags = validate_cover_letter(long_letter, base_md=BASE_CV, job=make_job())
+    assert ok
+    assert any("words" in flag for flag in flags)
+
+
+def test_tailor_job_discards_a_fabricating_cover_and_says_why(tmp_path: Path):
+    cfg = tailor_config(tmp_path)
+    bad_cover = "Dear Acme team,\nI grew revenue 45% at Northwind.\nAda"
+    item = make_scored(score=90)
+    out = tailor_job(item, BASE_CV, cfg,
+                     client=llm_client([TAILORED_CV, bad_cover]),
+                     out_dir=tmp_path / "apps")
+    assert out.cover_letter_md == ""
+    assert "cover letter rejected" in out.status_detail
+    assert "45%" in out.status_detail
+    # The CV survives: a bad letter must not cost the good document.
+    assert out.tailored_cv_md == TAILORED_CV.strip() or out.tailored_cv_md
