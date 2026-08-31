@@ -15,6 +15,7 @@ import pytest
 
 from src.util import (
     HttpError,
+    canonical_url,
     chunked,
     ensure_dir,
     env_flag,
@@ -320,3 +321,57 @@ def test_setup_logging_is_safe_to_call_twice():
 
     setup_logging("DEBUG", stream=io.StringIO())
     setup_logging("INFO", stream=io.StringIO())
+
+
+# ==========================================================================
+# canonical_url — the key dedupe's URL pass groups on
+# ==========================================================================
+
+
+def test_canonical_url_gives_one_spelling_for_the_documented_arrivals():
+    """The docstring's own three example arrivals — https + tracking, http +
+    trailing slash, fragment — are the contract: one posting, one key. The
+    http one is the easy regression: lowercasing the scheme is not folding it."""
+    expected = "https://boards.greenhouse.io/acme/jobs/123"
+    assert canonical_url(
+        "https://Boards.Greenhouse.io/acme/jobs/123?utm_source=linkedin"
+    ) == expected
+    assert canonical_url("http://boards.greenhouse.io/acme/jobs/123/") == expected
+    assert canonical_url("https://boards.greenhouse.io/acme/jobs/123#apply") == expected
+
+
+def test_canonical_url_strips_tracking_but_keeps_identity_params():
+    """`gh_jid` IS the posting on Greenhouse embed boards — stripping unknown
+    params would merge every job a company has."""
+    assert canonical_url(
+        "https://acme.example/careers?gh_jid=42&utm_medium=email&gclid=x&ref=li"
+    ) == "https://acme.example/careers?gh_jid=42"
+
+
+def test_canonical_url_keeps_param_order_and_value_case():
+    """Order and case are identity until proven otherwise: reordering could
+    only merge more, but changing a value's spelling could split the same URL
+    arriving twice — determinism first."""
+    assert canonical_url("https://x.example/a?b=1&c=Two") == "https://x.example/a?b=1&c=Two"
+
+
+def test_canonical_url_unifies_equivalent_query_encodings():
+    # %20 and + spell the same value; both arrivals must map to one key.
+    assert canonical_url("https://x.example/a?q=a%20b") == \
+        canonical_url("https://x.example/a?q=a+b")
+    # An empty `?` is no query, and a blank value survives either spelling.
+    assert canonical_url("https://x.example/a?") == canonical_url("https://x.example/a")
+    assert canonical_url("https://x.example/a?token") == \
+        canonical_url("https://x.example/a?token=")
+
+
+def test_canonical_url_path_case_is_preserved():
+    assert canonical_url("HTTPS://X.EXAMPLE/Jobs/AbC/") == "https://x.example/Jobs/AbC"
+
+
+@pytest.mark.parametrize("raw", [None, "", "   ", "not a url", "mailto:jobs@acme.example",
+                                 "https://[bad-ipv6"])
+def test_canonical_url_returns_empty_for_the_unusable(raw):
+    # "" means "no key": dedupe must treat a broken URL as no evidence of
+    # sameness, never as a shared group.
+    assert canonical_url(raw) == ""

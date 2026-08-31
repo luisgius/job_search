@@ -494,6 +494,35 @@ def test_demanding_a_visa_is_not_offering_one():
     assert apply_filters([job], cfg, now=NOW).kept == []
 
 
+@pytest.mark.parametrize("refusal", [
+    "Unfortunately we cannot sponsor visas at this time.",
+    "We are unable to sponsor work visas.",
+    "We do not sponsor visas for this position.",
+    "We don't sponsor visas.",
+    "Please note: no visa sponsorship is available.",
+    "Visa sponsorship is not available for this role.",
+    "This position does not offer visa sponsorship.",
+    "Relocation and visa support is not provided.",
+])
+def test_refusing_sponsorship_is_not_offering_it(refusal):
+    """Every refusal contains an offer-shaped substring ("…cannot SPONSOR
+    VISAS…"), and refusals are the most common sponsorship sentence in GB
+    ads — rescuing them would defeat the exception entirely."""
+    cfg = {"filters": {"countries": ["PL"], "countries_if_sponsorship": ["GB"]}}
+    job = make_job(title="Data Scientist", location="London, UK",
+                   description=refusal)
+    assert apply_filters([job], cfg, now=NOW).kept == []
+
+
+def test_an_unrelated_negative_clause_does_not_cancel_the_offer():
+    """The refusal screen is clause-bounded: "No agencies." in one sentence
+    must not turn "Visa sponsorship is available." in the next into a no."""
+    cfg = {"filters": {"countries": ["PL"], "countries_if_sponsorship": ["GB"]}}
+    job = make_job(title="Data Scientist", location="London, UK",
+                   description="No agencies please. Visa sponsorship is available.")
+    assert apply_filters([job], cfg, now=NOW).kept == [job]
+
+
 GERMAN_AD = (
     "Wir suchen einen Data Scientist für unser Team in Berlin. Du entwickelst "
     "Prognosemodelle, arbeitest eng mit dem Produktteam zusammen und "

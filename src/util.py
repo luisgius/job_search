@@ -368,8 +368,13 @@ def canonical_url(url: str | None) -> str:
         if not _TRACKING_PARAM_RE.match(key)
     ]
     path = parts.path.rstrip("/") or "/"
+    # http folds into https: boards redirect one to the other, so the two
+    # schemes are two spellings of the same posting, never two postings.
+    scheme = (parts.scheme or "https").lower()
+    if scheme == "http":
+        scheme = "https"
     return urlunsplit((
-        (parts.scheme or "https").lower(),
+        scheme,
         parts.netloc.lower(),
         path,
         urlencode(kept),

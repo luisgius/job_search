@@ -84,6 +84,22 @@ _SPONSORSHIP_RE = re.compile(
     re.IGNORECASE,
 )
 
+#: The refusal, screened separately: nearly every "we cannot sponsor visas"
+#: contains the offer-shaped substring "sponsor visas", so the offer regex
+#: alone would rescue exactly the ads the exception exists to drop — and
+#: refusals are the most common sponsorship sentence in GB ads. Negator and
+#: target must share a clause (no sentence/comma/dash between), which keeps
+#: "No agencies. Visa sponsorship offered." an offer; one real refusal
+#: outweighs an offer elsewhere in the ad — ambiguity fails the burden of
+#: proof.
+_SPONSORSHIP_NEG_RE = re.compile(
+    r"(?:\b(?:no|not|cannot|never|unable|without)\b|n['’]t\b)"
+    r"[^.!?,;:\n—–-]{0,40}?\b(?:sponsor|visa (?:support|assistance))"
+    r"|\b(?:sponsorship|visa (?:support|assistance))\b"
+    r"[^.!?,;\n—–-]{0,15}?(?:\b(?:not|no|unavailable)\b|n['’]t\b)",
+    re.IGNORECASE,
+)
+
 
 @dataclass
 class FilterResult:
@@ -361,7 +377,8 @@ def _check_location(job: Job, config: Any) -> _Check:
         }
         if country in sponsors:
             statement = f"{job.title}\n{job.description or ''}"
-            if _SPONSORSHIP_RE.search(statement):
+            if (_SPONSORSHIP_RE.search(statement)
+                    and not _SPONSORSHIP_NEG_RE.search(statement)):
                 job.country = country
                 return _Check(True, "")
             return _Check(
