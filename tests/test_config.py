@@ -232,6 +232,8 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         "applicant.website": _APPLICANT,
         "sources.arbeitnow": _GLOBAL_FEEDS,
         "sources.landing_jobs": _GLOBAL_FEEDS,
+        "sources.justjoin_it": _GLOBAL_FEEDS,
+        "sources.nofluffjobs": _GLOBAL_FEEDS,
     }
 
     unknown = sorted(set(shipped) - set(defaults) - set(DELIBERATE))

@@ -1,0 +1,96 @@
+{
+  "postings": [
+    {
+      "id": "DATA1AB2",
+      "name": "Kramerica Labs",
+      "title": "Data Scientist",
+      "technology": "Python",
+      "category": "data",
+      "seniority": ["Mid"],
+      "url": "data-scientist-kramerica-labs-warszawa-data1ab2",
+      "location": {
+        "fullyRemote": false,
+        "places": [
+          {"city": "Warszawa", "country": {"code": "POL", "name": "Poland"}},
+          {"city": "Kraków", "country": {"code": "POL", "name": "Poland"}}
+        ]
+      },
+      "posted": 1787466600000,
+      "renewed": 1787553000000,
+      "salary": {"from": 15000, "to": 21000, "type": "b2b", "currency": "PLN"},
+      "onlineInterviewAvailable": true
+    },
+    {
+      "id": "AI9CD8",
+      "name": "Pendant Publishing",
+      "title": "Machine Learning Engineer",
+      "technology": "PyTorch",
+      "category": "artificial-intelligence",
+      "seniority": ["Junior", "Mid"],
+      "url": "ml-engineer-pendant-publishing-remote-ai9cd8",
+      "location": {
+        "fullyRemote": true,
+        "places": [
+          {"city": "Remote", "country": {"code": "PL", "name": "Poland"}}
+        ]
+      },
+      "posted": 1787551800000,
+      "salary": {"from": 12000, "to": 17000, "type": "permanent", "currency": "PLN"},
+      "onlineInterviewAvailable": true
+    },
+    {
+      "id": "BACK3EF4",
+      "name": "Vandelay Industries",
+      "title": "Java Developer",
+      "technology": "Java",
+      "category": "backend",
+      "seniority": ["Mid"],
+      "url": "java-developer-vandelay-industries-gdansk-back3ef4",
+      "location": {
+        "fullyRemote": false,
+        "places": [{"city": "Gdańsk", "country": {"code": "PL", "name": "Poland"}}]
+      },
+      "posted": 1787545000000,
+      "salary": {"from": 14000, "to": 19000, "type": "b2b", "currency": "PLN"}
+    },
+    {
+      "id": "DATA5GH6",
+      "name": "Monk's Cafe Tech",
+      "title": "Senior Data Engineer",
+      "technology": "Spark",
+      "category": "data",
+      "seniority": ["Senior"],
+      "url": "senior-data-engineer-monks-cafe-wroclaw-data5gh6",
+      "location": {
+        "fullyRemote": false,
+        "places": [{"city": "Wrocław", "country": {"code": "PL", "name": "Poland"}}]
+      },
+      "posted": 1787540000000,
+      "salary": {"from": 25000, "to": 32000, "type": "b2b", "currency": "PLN"}
+    },
+    {
+      "id": "UNCAT7IJ",
+      "name": "Del Boca Vista Analytics",
+      "title": "Analytics Engineer",
+      "technology": "dbt",
+      "seniority": ["Mid"],
+      "url": "analytics-engineer-del-boca-vista-krakow-uncat7ij",
+      "location": {
+        "fullyRemote": false,
+        "places": [{"city": "Kraków", "country": {"code": "PL", "name": "Poland"}}]
+      },
+      "posted": 1787535000000
+    },
+    {
+      "id": "BROKEN",
+      "name": "",
+      "title": "Data Scientist",
+      "category": "data",
+      "seniority": ["Mid"],
+      "url": "",
+      "location": {"places": []},
+      "posted": 1787530000000
+    }
+  ],
+  "totalCount": 6
+}

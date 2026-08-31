@@ -20,6 +20,8 @@ sources ──┬─ Greenhouse boards ────┐
           ├─ Teamtailor (RSS)      │                               │
           ├─ Arbeitnow (global)    │                               │
           ├─ Landing.jobs (global) │                               │
+          ├─ Just Join IT (PL)     │                               │
+          ├─ No Fluff Jobs (PL)    │                               │
           ├─ Adzuna (optional)     │                               │
           └─ LinkedIn email        ┘                               ▼
    digest.html ◀── auto-apply ◀── PDF ◀── tailor CV + cover ◀── LLM fit score
@@ -34,7 +36,12 @@ Teamtailor the Nordic one (watchlist entries there may be whole careers URLs,
 custom domains included). All eight need no key and no scraping. Arbeitnow
 (German market, `visa_sponsorship` flag) and Landing.jobs (Lisbon/Porto +
 remote-EU) are *global feeds* rather than watchlist boards: no companies to
-name, no keys — flip them on in `config.yaml` and they fetch.
+name, no keys — flip them on in `config.yaml` and they fetch. Just Join IT
+and No Fluff Jobs are the same shape but **Tier 2**: no official API exists,
+so they read the internal JSON the sites' own frontends use (data/AI,
+junior+mid only). When one of those endpoints changes shape the source
+degrades — a warning, an error line in the digest, and the health alert when
+a source that used to deliver goes silent — and the run carries on without it.
 
 ---
 

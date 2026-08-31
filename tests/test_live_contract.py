@@ -1439,3 +1439,111 @@ def test_landing_jobs_listings_still_have_the_fields_we_parse():
             "field any more; re-record landing_jobs_page.json from this live "
             "payload"
         )
+
+
+# ==========================================================================
+# Just Join IT — Tier 2 (fixture is spec-derived: these tests validate it)
+# ==========================================================================
+
+JUSTJOIN_REQUIRED = ("slug", "title", "companyName")
+JUSTJOIN_EXPECTED = ("city", "workplaceType", "experienceLevel", "publishedAt",
+                     "requiredSkills", "employmentTypes", "multilocation")
+
+
+def test_justjoin_feed_still_answers_and_parses():
+    from src.sources.justjoin_it import fetch
+
+    jobs = _reachable(fetch, None)
+    if not jobs:
+        pytest.skip("no junior/mid DS-ML offers on the board right now")
+    assert all(j.company and j.url for j in jobs)
+    assert any(j.posted_at for j in jobs)
+
+
+def test_justjoin_offers_still_have_the_fields_we_parse():
+    from src.sources.justjoin_it import API_URL, PER_PAGE
+
+    payload = _raw_payload(API_URL, {"page": 1, "perPage": PER_PAGE})
+    data = payload.get("data")
+    assert isinstance(data, list) and data, (
+        "the payload no longer carries a 'data' list — fetch() reports this "
+        "as shape drift and the source degrades. This is the Tier 2 risk "
+        "arriving; find the new endpoint in the site's devtools"
+    )
+    seen = _union_of_keys(data)
+    missing = [f for f in JUSTJOIN_REQUIRED if f not in seen]
+    assert not missing, f"justjoin.it dropped required field(s): {missing}"
+    absent = [f for f in JUSTJOIN_EXPECTED if f not in seen]
+    assert not absent, (
+        f"justjoin.it no longer sends {absent} — re-record "
+        "justjoin_offers.json from this live payload"
+    )
+
+
+def test_justjoin_still_honours_the_experience_param():
+    """The request narrows to junior/mid. If the param dies the adapter still
+    re-filters client-side, but silently fetching every seniority triples the
+    pages walked for the same yield — worth knowing, not worth failing."""
+    from src.sources.justjoin_it import API_URL
+
+    payload = _raw_payload(
+        API_URL, {"page": 1, "perPage": 50, "experienceLevels[]": ["junior", "mid"]}
+    )
+    levels = {
+        str(entry.get("experienceLevel", "")).lower()
+        for entry in payload.get("data", [])
+        if isinstance(entry, dict)
+    } - {""}
+    if levels and not levels <= {"junior", "mid"}:
+        pytest.skip(
+            f"experienceLevels[] is no longer honoured (saw {sorted(levels)}) "
+            "— the client-side re-check is carrying the spec alone now"
+        )
+
+
+# ==========================================================================
+# No Fluff Jobs — Tier 2 (fixture is spec-derived: these tests validate it)
+# ==========================================================================
+
+NOFLUFF_REQUIRED = ("id", "title", "name", "url")
+NOFLUFF_EXPECTED = ("category", "seniority", "salary", "location", "posted")
+
+
+def test_nofluff_listing_still_answers_and_parses():
+    from src.sources.nofluffjobs import fetch
+
+    jobs = _reachable(fetch, None)
+    if not jobs:
+        pytest.skip("no data/AI junior-mid postings on the board right now")
+    assert all(j.company and j.url for j in jobs)
+    assert any(j.posted_at for j in jobs)
+
+
+def test_nofluff_postings_still_have_the_fields_we_parse():
+    from src.sources.nofluffjobs import API_URL
+
+    payload = _raw_payload(API_URL)
+    postings = payload.get("postings")
+    assert isinstance(postings, list) and postings, (
+        "the payload no longer carries a 'postings' list — fetch() reports "
+        "this as shape drift and the source degrades. This is the Tier 2 "
+        "risk arriving; find the new endpoint in the site's devtools"
+    )
+    seen = _union_of_keys(postings)
+    missing = [f for f in NOFLUFF_REQUIRED if f not in seen]
+    assert not missing, f"nofluffjobs dropped required field(s): {missing}"
+    absent = [f for f in NOFLUFF_EXPECTED if f not in seen]
+    assert not absent, (
+        f"nofluffjobs no longer sends {absent} — re-record "
+        "nofluffjobs_postings.json from this live payload"
+    )
+    categories = {
+        str(p.get("category", "")).lower()
+        for p in postings if isinstance(p, dict)
+    } - {""}
+    if categories and not categories & {"data", "artificial-intelligence"}:
+        pytest.fail(
+            f"no posting on the whole board carries category 'data' or "
+            f"'artificial-intelligence' (saw e.g. {sorted(categories)[:8]}) — "
+            "the category vocabulary moved and DATA_CATEGORIES needs updating"
+        )

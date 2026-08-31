@@ -58,6 +58,13 @@ sources:
   # role arrives twice, dedupe keeps the ATS copy.
   arbeitnow: true          # German market, free API, has a visa_sponsorship flag
   landing_jobs: true       # Lisbon/Porto + remote-EU, salary published often
+  # Tier 2 — no official API: these read the internal JSON the site's own
+  # frontend uses, so they cover the Polish market properly (you live in it)
+  # at the price of an endpoint that owes us nothing. When one breaks it
+  # degrades — warning + digest error + the health "went silent" alert —
+  # and never takes the run down. Both filter to data/AI, junior+mid.
+  justjoin_it: true        # justjoin.it — salary on every ad
+  nofluffjobs: true        # nofluffjobs.com — PL/CEE, salary on every ad
   adzuna: false            # needs free keys from developer.adzuna.com
   linkedin_email: false    # needs gmail_credentials.json (see README)
 

@@ -1,0 +1,89 @@
+{
+  "data": [
+    {
+      "slug": "kramerica-labs-data-scientist-warszawa-1a2b3c",
+      "title": "Data Scientist",
+      "companyName": "Kramerica Labs",
+      "city": "Warszawa",
+      "street": "ul. Prosta 1",
+      "workplaceType": "hybrid",
+      "workingTime": "full_time",
+      "experienceLevel": "mid",
+      "publishedAt": "2026-08-29T06:30:00.000Z",
+      "categoryId": 19,
+      "requiredSkills": ["Python", "SQL", "Machine Learning"],
+      "niceToHaveSkills": ["Airflow"],
+      "multilocation": [
+        {"city": "Warszawa", "slug": "kramerica-labs-data-scientist-warszawa-1a2b3c"},
+        {"city": "Kraków", "slug": "kramerica-labs-data-scientist-krakow-9z8y7x"}
+      ],
+      "employmentTypes": [
+        {"type": "b2b", "from": 16000, "to": 22000, "currency": "pln", "unit": "month", "gross": false},
+        {"type": "permanent", "from": 13000, "to": 18000, "currency": "pln", "unit": "month", "gross": true}
+      ],
+      "remoteInterview": true,
+      "openToHireUkrainians": true
+    },
+    {
+      "slug": "pendant-publishing-ml-engineer-remote-4d5e6f",
+      "title": "Machine Learning Engineer",
+      "companyName": "Pendant Publishing",
+      "city": "",
+      "workplaceType": "remote",
+      "workingTime": "full_time",
+      "experienceLevel": "junior",
+      "publishedAt": "2026-08-30T09:00:00.000Z",
+      "categoryId": 19,
+      "requiredSkills": [{"name": "Python", "level": 3}, {"name": "PyTorch", "level": 2}],
+      "niceToHaveSkills": [],
+      "multilocation": [],
+      "employmentTypes": [
+        {"type": "b2b", "from": 12000, "to": 12000, "currency": "pln", "unit": "month", "gross": false}
+      ],
+      "remoteInterview": true
+    },
+    {
+      "slug": "vandelay-frontend-developer-gdansk-7g8h9i",
+      "title": "Frontend Developer",
+      "companyName": "Vandelay Industries",
+      "city": "Gdańsk",
+      "workplaceType": "office",
+      "experienceLevel": "mid",
+      "publishedAt": "2026-08-30T07:15:00.000Z",
+      "categoryId": 2,
+      "requiredSkills": ["React", "TypeScript"],
+      "employmentTypes": [
+        {"type": "permanent", "from": 11000, "to": 15000, "currency": "pln", "unit": "month", "gross": true}
+      ]
+    },
+    {
+      "slug": "monks-cafe-senior-data-scientist-wroclaw-0j1k2l",
+      "title": "Senior Data Scientist",
+      "companyName": "Monk's Cafe Tech",
+      "city": "Wrocław",
+      "workplaceType": "office",
+      "experienceLevel": "senior",
+      "publishedAt": "2026-08-30T05:00:00.000Z",
+      "categoryId": 19,
+      "requiredSkills": ["Python", "Spark"],
+      "employmentTypes": []
+    },
+    {
+      "slug": "",
+      "title": "Data Analyst",
+      "companyName": "",
+      "city": "Poznań",
+      "workplaceType": "office",
+      "experienceLevel": "mid",
+      "publishedAt": "2026-08-30T04:00:00.000Z",
+      "categoryId": 19,
+      "requiredSkills": ["SQL"]
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "perPage": 100,
+    "totalItems": 5,
+    "totalPages": 1
+  }
+}

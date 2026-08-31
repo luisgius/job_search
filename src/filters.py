@@ -60,6 +60,8 @@ SOURCE_RANK: dict[str, int] = {
     # both arrive — is the one a human should click.
     "arbeitnow": 2,
     "landing_jobs": 2,
+    "justjoin_it": 2,
+    "nofluffjobs": 2,
     "adzuna": 2,
     "linkedin_email": 1,
 }

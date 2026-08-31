@@ -34,7 +34,10 @@ from .apply import autoapply
 from .config import Config, ConfigError
 from .db import Tracker
 from .models import ApplyStatus, Job, RunStats, ScoredJob, ensure_utc, utcnow
-from .sources import adzuna, arbeitnow, ats_boards, landing_jobs, linkedin_email
+from .sources import (
+    adzuna, arbeitnow, ats_boards, justjoin_it, landing_jobs, linkedin_email,
+    nofluffjobs,
+)
 from .util import get_logger, open_in_browser, setup_logging
 
 logger = get_logger(__name__)
@@ -287,6 +290,12 @@ def _fetch_all(config: Any, active: set[str], stats: RunStats) -> list[Job]:
 
     if "landing_jobs" in active:
         jobs.extend(_safe_fetch("landing_jobs", landing_jobs.fetch, config, stats))
+
+    if "justjoin_it" in active:
+        jobs.extend(_safe_fetch("justjoin_it", justjoin_it.fetch, config, stats))
+
+    if "nofluffjobs" in active:
+        jobs.extend(_safe_fetch("nofluffjobs", nofluffjobs.fetch, config, stats))
 
     if "linkedin_email" in active:
         jobs.extend(_safe_fetch("linkedin_email", linkedin_email.fetch, config, stats))

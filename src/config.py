@@ -105,6 +105,12 @@ DEFAULTS: dict[str, Any] = {
         # user reading one comment and flipping one switch.
         "arbeitnow": False,
         "landing_jobs": False,
+        # Tier 2: no official API — these speak the internal JSON the site's
+        # own frontend uses, and may break without notice. Their contract is
+        # that breakage degrades the source (a warning, an errors entry, the
+        # health baseline alert) and never the run.
+        "justjoin_it": False,
+        "nofluffjobs": False,
         "linkedin_email": False,
     },
     "freshness": {
@@ -258,7 +264,8 @@ BOARD_SOURCE_NAMES: tuple[str, ...] = (
 
 #: Every source the config knows about, in fetch order.
 SOURCE_NAMES: tuple[str, ...] = BOARD_SOURCE_NAMES + (
-    "adzuna", "arbeitnow", "landing_jobs", "linkedin_email",
+    "adzuna", "arbeitnow", "landing_jobs", "justjoin_it", "nofluffjobs",
+    "linkedin_email",
 )
 
 WATCHLIST_DEFAULTS: dict[str, Any] = {
