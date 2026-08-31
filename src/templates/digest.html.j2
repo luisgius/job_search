@@ -254,9 +254,11 @@ section {
   font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .05em;
 }
-.health.ok       { background: #e6f4ea; color: #137333; }
-.health.degraded { background: #fef7e0; color: #b06000; }
-.health.error    { background: #fce8e6; color: #c5221f; }
+/* The theme's own good/warn/bad pairs, so the dark-mode block above
+   recolours the chips along with everything else. */
+.health.ok       { background: var(--good-bg); color: var(--good); }
+.health.degraded { background: var(--warn-bg); color: var(--warn); }
+.health.error    { background: var(--bad-bg); color: var(--bad); }
 .badge {
   flex: none;
   min-width: 48px;

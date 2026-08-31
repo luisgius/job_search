@@ -411,6 +411,15 @@ def test_empty_config_renders_no_rules():
     assert _candidate_rules(None) == ""
 
 
+def test_a_bare_string_signal_is_one_signal_not_zero():
+    """`positive_signals: forecasting` (a YAML scalar, not a list) must mean
+    one signal — the same bare-string coercion `_string_list` applies —
+    rather than being dropped without a word."""
+    cfg = {"scoring": {"positive_signals": "time-series forecasting"}}
+    rules = _candidate_rules(cfg)
+    assert "- time-series forecasting" in rules
+
+
 def test_malformed_caps_are_skipped_not_fatal():
     cfg = {"scoring": {"score_caps": [
         "not-a-mapping",

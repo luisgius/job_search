@@ -188,6 +188,10 @@ def _candidate_rules(config: Any) -> str:
         lines.append(f"POSITIONING (from the candidate, not in the CV)\n{context}")
 
     signals = _cfg(config, "scoring.positive_signals", []) or []
+    if isinstance(signals, str):
+        # One signal written as a bare YAML string instead of a one-item
+        # list — the same coercion `_string_list` applies to model output.
+        signals = [signals]
     signal_terms = [str(item).strip() for item in signals if str(item).strip()] \
         if isinstance(signals, list) else []
     if signal_terms:

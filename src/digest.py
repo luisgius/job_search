@@ -539,19 +539,31 @@ def _config_summary(config: Any) -> dict[str, Any]:
 
 
 def _error_source(message: str) -> str:
-    """Best-effort source name out of one error string.
+    """Best-effort source name(s) out of one error string.
 
-    Sources write errors as "greenhouse/spotify: …", "arbeitnow: page 1: …"
-    or "adzuna source failed: …" — the token before the first colon, minus
-    any slug, is the source. Anything unrecognisable maps to "" and simply
-    does not colour a health row; a mis-mapped error must never mark the
-    wrong source red.
+    Sources write errors as "greenhouse/spotify: …", "arbeitnow: page 1: …",
+    "adzuna DE 'python': …" or "adzuna source failed: …" — the first word
+    before the first colon, minus any slug, is the source. Two shapes need
+    more than that word:
+
+    * `_safe_fetch` joins the ATS boards into one label, so "greenhouse/lever
+      source failed: …" means *every* named board failed — the whole
+      "/"-joined list is returned and the caller splits it. (A slug is never
+      confused for a board here: "greenhouse/spotify: …" has no
+      " source failed" suffix and keeps only the vendor.)
+    * adzuna's own errors decorate the name ("adzuna DE: HTTP 401 …") or
+      carry no colon at all ("adzuna is enabled but keys… are missing"), so
+      the first whitespace-delimited word is what identifies it.
+
+    Anything unrecognisable maps to a token that matches no fetched source
+    ("dedupe", "scoring", "") and simply does not colour a health row; a
+    mis-mapped error must never mark the wrong source red.
     """
     head = str(message or "").split(":", 1)[0].strip().lower()
-    head = head.split("/", 1)[0].strip()
     if head.endswith(" source failed"):
-        head = head[: -len(" source failed")].strip()
-    return head
+        return head[: -len(" source failed")].strip()
+    head = head.split("/", 1)[0].strip()
+    return head.split(" ", 1)[0]
 
 
 def _run_rows(tracker: Any) -> list[Mapping[str, Any]]:
@@ -566,7 +578,12 @@ def _run_rows(tracker: Any) -> list[Mapping[str, Any]]:
 
 def _last_ok_labels(rows: list[Mapping[str, Any]], names: Iterable[str],
                     now: datetime) -> dict[str, str]:
-    """Per source, when a run last fetched >0 from it — as relative time."""
+    """Per source, when a run last fetched >0 from it — as relative time.
+
+    Row-by-row tolerant, like `health._run_stats`: `build_context` runs
+    *outside* `write_digest`'s template fallback, so one corrupt
+    `stats_json` in the history must skip that row, not cost the page.
+    """
     import json as json_module
 
     labels: dict[str, str] = {}
@@ -574,18 +591,22 @@ def _last_ok_labels(rows: list[Mapping[str, Any]], names: Iterable[str],
     for row in rows:  # newest first
         if not wanted:
             break
+        if not isinstance(row, Mapping):
+            continue
         try:
             data = json_module.loads(str(row.get("stats_json") or "{}"))
         except ValueError:
             continue
-        counts = data.get("source_counts") or {}
+        counts = data.get("source_counts") if isinstance(data, Mapping) else None
+        if not isinstance(counts, Mapping):
+            continue
         stamp = ensure_utc(
             _parse_stamp(row.get("finished_at") or row.get("started_at"))
         )
         if stamp is None:
             continue
         for name in list(wanted):
-            if int(counts.get(name, 0) or 0) > 0:
+            if _int(counts.get(name, 0), 0) > 0:
                 labels[name] = relative_time(stamp, now)
                 wanted.discard(name)
     return labels
@@ -636,7 +657,12 @@ def _source_health(
         stats_data.get("source_after_filters")
         or getattr(stats, "source_after_filters", None) or {}
     )
-    error_sources = {_error_source(message) for message in errors}
+    error_sources: set[str] = set()
+    for message in errors:
+        # "greenhouse/lever source failed: …" names every board in the label.
+        error_sources.update(
+            part.strip() for part in _error_source(message).split("/")
+        )
     error_sources.discard("")
 
     rows = _run_rows(tracker)
@@ -700,8 +726,6 @@ def build_context(
     for scored in list(scored_jobs or []):
         if scored is None or getattr(scored, "job", None) is None:
             continue
-        source_name = (getattr(scored.job, "source", "") or "unknown").lower()
-        new_by_source[source_name] = new_by_source.get(source_name, 0) + 1
         try:
             item = _item(
                 scored,
@@ -713,6 +737,10 @@ def build_context(
         except Exception as exc:  # one malformed record must not blank the page
             logger.warning("skipping unrenderable digest item: %s", exc)
             continue
+        # Counted only once the card actually rendered, so the health block's
+        # "new today" never exceeds what the page shows.
+        source_name = (item.get("source") or "unknown").lower()
+        new_by_source[source_name] = new_by_source.get(source_name, 0) + 1
         buckets[by_status.get(item["status"], "other")].append(item)
 
     for name in _SCORE_SORTED:

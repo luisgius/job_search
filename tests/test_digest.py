@@ -930,6 +930,20 @@ def test_error_source_reads_the_shapes_sources_actually_write():
     assert _error_source("arbeitnow: page 1: boom") == "arbeitnow"
     assert _error_source("adzuna source failed: no keys") == "adzuna"
     assert _error_source("") == ""
+    # adzuna decorates its own name — "adzuna DE: …", "adzuna DE 'python': …"
+    # — and its misconfiguration messages carry no colon at all. All of them
+    # must still map, or a dead API key renders a green "ok" row.
+    assert _error_source("adzuna DE: HTTP 401 — check keys.adzuna_app_id/app_key") == "adzuna"
+    assert _error_source("adzuna DE 'python': connection reset") == "adzuna"
+    assert _error_source(
+        "adzuna is enabled but keys.adzuna_app_id / keys.adzuna_app_key are "
+        "missing — get free keys at developer.adzuna.com"
+    ) == "adzuna"
+    # `_safe_fetch` joins the boards into one label; every named board failed.
+    assert _error_source("ashby/greenhouse source failed: boom") == "ashby/greenhouse"
+    # Non-source errors resolve to tokens that match no fetched source.
+    assert _error_source("dedupe failed: boom") == "dedupe"
+    assert _error_source("scoring skipped: no API key") == "scoring"
 
 
 def test_health_rows_carry_the_five_columns():
@@ -997,3 +1011,85 @@ def test_the_health_block_reaches_the_rendered_page():
     assert 'id="source-health"' in html
     assert "nofluffjobs" in html
     assert "degraded" in html or "error" in html
+
+
+def test_a_dead_adzuna_reads_error_not_ok():
+    """The exact morning this block exists for: the key expired, adzuna's own
+    error format ("adzuna DE: HTTP 401 …") is not "adzuna: …", and the row
+    used to render a green "ok" over a source that failed outright."""
+    stats = _stats(
+        source_counts={"adzuna": 0},
+        source_after_filters={"adzuna": 0},
+        errors=["adzuna DE: HTTP 401 — check keys.adzuna_app_id/app_key"],
+    )
+    rows = _source_health(stats, stats.to_dict(), stats.errors, {},
+                          tracker=None, now=NOW)
+    assert rows[0]["status"] == "error"
+
+
+def test_a_whole_board_fetch_failure_marks_every_board_it_names():
+    """`_safe_fetch` labels an ATS-boards crash "ashby/greenhouse source
+    failed: …" — one message, every board in it dead. Flagging only the
+    first left the rest reading "ok, fetched 0"."""
+    stats = _stats(
+        source_counts={"ashby": 0, "greenhouse": 0},
+        source_after_filters={"ashby": 0, "greenhouse": 0},
+        errors=["ashby/greenhouse source failed: watchlist exploded"],
+    )
+    rows = {r["name"]: r for r in _source_health(
+        stats, stats.to_dict(), stats.errors, {}, tracker=None, now=NOW)}
+    assert rows["ashby"]["status"] == "error"
+    assert rows["greenhouse"]["status"] == "error"
+
+
+def test_new_today_counts_only_the_cards_the_page_shows():
+    """An unrenderable record is skipped from the cards with a warning; the
+    health row must not keep claiming it, or "new today 2" sits over a page
+    with one card."""
+    broken = make_scored(score=90, ats_job_id="9")
+    broken.score = "not-a-score"            # type: ignore[assignment]
+    good = make_scored(score=80, ats_job_id="8")
+    stats = _stats(source_counts={"greenhouse": 2},
+                   source_after_filters={"greenhouse": 2})
+    context = build_context([broken, good], stats, None, now=NOW)
+    assert context["totals"]["all"] == 1
+    assert [r["new_today"] for r in context["source_health"]] == [1]
+
+
+def test_a_corrupt_run_history_row_does_not_cost_the_page():
+    """`build_context` runs outside `write_digest`'s template fallback, so a
+    bad `stats_json` in one historic row must skip that row — not take the
+    whole digest down with it. The healthy row behind it still supplies
+    "last OK"."""
+    import json as _json
+
+    class Tracker:
+        def recent_runs(self, limit=10):
+            return [
+                "not-a-row-at-all",
+                {"finished_at": "2026-08-04T07:00:00+00:00",
+                 "stats_json": '["valid json", "wrong shape"]'},
+                {"finished_at": "2026-08-04T06:00:00+00:00",
+                 "stats_json": _json.dumps({"source_counts": {"greenhouse": "lots"}})},
+                {"finished_at": "2026-08-03T08:05:00+00:00",
+                 "started_at": "2026-08-03T08:00:00+00:00",
+                 "stats_json": _json.dumps({"source_counts": {"greenhouse": 7}})},
+            ]
+
+    stats = _stats(source_counts={"greenhouse": 0},
+                   source_after_filters={"greenhouse": 0})
+    context = build_context([], stats, None, now=NOW, tracker=Tracker())
+    row = context["source_health"][0]
+    assert row["name"] == "greenhouse"
+    assert row["last_ok"] == "yesterday"    # from the one healthy row
+
+
+def test_health_chips_follow_the_page_theme():
+    """The chips use the theme's good/warn/bad tokens rather than hardcoded
+    light-mode hex, so the existing dark-mode block recolours them with the
+    rest of the page."""
+    from src.digest import render_html
+    html = render_html({})
+    for chip, token in (("ok", "--good"), ("degraded", "--warn"), ("error", "--bad")):
+        rule = html.split(f".health.{chip}", 1)[1].split("}", 1)[0]
+        assert f"var({token}-bg)" in rule and f"var({token})" in rule
