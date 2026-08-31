@@ -105,6 +105,21 @@ personio:
   #     - {slug: acme, language: en}     # de en fr es nl it pt
   - personio
 
+recruitee:
+  # Bare tenant name -> {tenant}.recruitee.com/api/offers/ — the public JSON
+  # every Recruitee careers site serves. This is the vendor to try first for
+  # Dutch and Belgian mid-size companies.
+  #     - acme
+  []
+
+teamtailor:
+  # The Nordic default. Two entry shapes:
+  #     - acme                            # hosted: acme.teamtailor.com
+  #     - https://careers.acme.com/jobs   # custom domain: the careers URL
+  # Custom domains are the norm for this vendor's larger tenants — paste the
+  # jobs page URL and the fetcher appends .rss itself and follows redirects.
+  []
+
 adzuna:
   # Adzuna's European coverage, lowercase: at be ch de es fr gb it nl pl.
   # It does NOT cover Portugal, Ireland or the Nordics — those come from the

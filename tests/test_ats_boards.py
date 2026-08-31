@@ -537,7 +537,7 @@ def test_fetch_does_not_filter_by_date_or_location(tmp_path: Path):
     assert all(j.country is None for j in jobs)   # geo stamps this later
 
 
-def test_all_six_vendors_come_back_from_one_fetch_call(tmp_path: Path):
+def test_all_eight_vendors_come_back_from_one_fetch_call(tmp_path: Path):
     """`main._fetch_all` calls `ats_boards.fetch` exactly once and keeps the
     jobs whose `source` is in `BOARD_SOURCES`. If a vendor stamped a `source`
     string nobody else uses, its postings would be fetched over the network and
@@ -550,10 +550,12 @@ def test_all_six_vendors_come_back_from_one_fetch_call(tmp_path: Path):
     cfg = write_config(
         tmp_path,
         {"sources": {"greenhouse": True, "lever": True, "workable": True,
-                     "ashby": True, "smartrecruiters": True, "personio": True}},
+                     "ashby": True, "smartrecruiters": True, "personio": True,
+                     "recruitee": True, "teamtailor": True}},
         watchlist={"greenhouse": ["acme"], "lever": ["globex"],
                    "workable": ["contoso"], "ashby": ["initech"],
-                   "smartrecruiters": ["Umbrella"], "personio": ["vandelay"]},
+                   "smartrecruiters": ["Umbrella"], "personio": ["vandelay"],
+                   "recruitee": ["dunder"], "teamtailor": ["mifflin"]},
     )
     session = FakeSession([
         ("boards-api.greenhouse.io", json_response(GREENHOUSE)),
@@ -565,6 +567,8 @@ def test_all_six_vendors_come_back_from_one_fetch_call(tmp_path: Path):
         ("api.smartrecruiters.com",
          json_response(load_json_fixture("smartrecruiters_postings.json"))),
         ("jobs.personio.de", xml_response(load_fixture("personio_positions.xml"))),
+        ("recruitee.com", json_response(load_json_fixture("recruitee_offers.json"))),
+        ("teamtailor.com", xml_response(load_fixture("teamtailor_jobs.rss"))),
     ])
     errors: list[str] = []
     jobs = fetch(cfg, session=session, errors=errors)

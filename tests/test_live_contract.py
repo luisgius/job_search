@@ -1226,3 +1226,216 @@ def test_a_discovery_sweep_stays_inside_its_request_budget():
         "eight probes covered two whole companies, so the cap never engaged — "
         "this test is no longer testing anything"
     )
+
+
+# ==========================================================================
+# Recruitee (fixture is spec-derived: these tests are what validates it)
+# ==========================================================================
+
+# UNVERIFIED — chosen while this environment had no network route: long-lived
+# Dutch tech tenants believed to run public Recruitee careers sites. If one
+# 404s on the first `-m network` run, the slug moved (or the guess was wrong):
+# swap in any tenant that `--check recruitee <slug>` passes and re-run.
+RECRUITEE_SLUGS = ["framer", "channable"]
+RECRUITEE_REQUIRED = ("id", "title")
+RECRUITEE_EXPECTED = (
+    "slug", "careers_url", "city", "country", "country_code",
+    "created_at", "description", "requirements", "employment_type_code",
+)
+
+
+@pytest.mark.parametrize("slug", RECRUITEE_SLUGS)
+def test_recruitee_board_still_answers(slug):
+    from src.sources.ats_boards import fetch_recruitee
+
+    jobs = _reachable(fetch_recruitee, slug)
+    assert jobs, f"recruitee/{slug} returned zero offers — has the tenant moved?"
+    assert all(j.ats == "recruitee" and j.url for j in jobs)
+
+
+@pytest.mark.parametrize("slug", RECRUITEE_SLUGS[:1])
+def test_recruitee_offers_still_have_the_fields_we_parse(slug):
+    from src.sources.ats_boards import RECRUITEE_OFFERS_URL
+
+    payload = _raw_payload(RECRUITEE_OFFERS_URL.format(slug=slug))
+    offers = payload.get("offers")
+    assert isinstance(offers, list) and offers, (
+        "the payload no longer carries an 'offers' list — the envelope gate "
+        "in fetch_recruitee will fail every tenant"
+    )
+    seen = _union_of_keys(offers)
+    missing = [f for f in RECRUITEE_REQUIRED if f not in seen]
+    assert not missing, (
+        f"recruitee dropped required field(s): {missing} — `id` is the job "
+        "identity, `title` is the title"
+    )
+    absent = [f for f in RECRUITEE_EXPECTED if f not in seen]
+    assert not absent, (
+        f"recruitee no longer sends {absent} — the offline fixture "
+        "`recruitee_offers.json` was written from the documented shape and "
+        "must be re-recorded from this live payload"
+    )
+
+
+@pytest.mark.parametrize("slug", RECRUITEE_SLUGS[:1])
+def test_recruitee_salary_shape_when_published(slug):
+    """`salary: {min, max, currency, period}` is the one structured salary any
+    board here publishes. Tenants opt in per offer, so an absent block is not
+    drift — but a present block with different keys is."""
+    from src.sources.ats_boards import RECRUITEE_OFFERS_URL
+
+    payload = _raw_payload(RECRUITEE_OFFERS_URL.format(slug=slug))
+    published = [
+        o["salary"] for o in payload.get("offers", [])
+        if isinstance(o.get("salary"), dict) and o["salary"]
+    ]
+    if not published:
+        pytest.skip("no offer on this tenant publishes a salary")
+    keys = set().union(*(s.keys() for s in published))
+    assert {"min", "max"} & keys, (
+        f"recruitee salary objects now carry {sorted(keys)} — "
+        "_recruitee_salary reads min/max/currency/period"
+    )
+
+
+# ==========================================================================
+# Teamtailor (fixture is spec-derived: these tests are what validates it)
+# ==========================================================================
+
+# UNVERIFIED — chosen while this environment had no network route: a hosted
+# tenant believed stable, plus Teamtailor's own careers site as the
+# custom-domain shape. Same rule as Recruitee: a 404 means swap and re-run.
+TEAMTAILOR_ENTRIES = ["mentimeter", "https://career.teamtailor.com/jobs"]
+
+
+@pytest.mark.parametrize("entry", TEAMTAILOR_ENTRIES)
+def test_teamtailor_feed_still_answers(entry):
+    from src.sources.ats_boards import fetch_teamtailor
+
+    jobs = _reachable(fetch_teamtailor, entry)
+    assert jobs, f"teamtailor/{entry} returned zero items — has the site moved?"
+    assert all(j.ats == "teamtailor" and j.url for j in jobs)
+
+
+@pytest.mark.parametrize("entry", TEAMTAILOR_ENTRIES[:1])
+def test_teamtailor_still_serves_rss_with_the_elements_we_parse(entry):
+    import xml.etree.ElementTree as ElementTree
+
+    from src.sources.ats_boards import _teamtailor_feed_url
+
+    body = _raw_text(_teamtailor_feed_url(entry))
+    assert body.strip(), "the feed is empty"
+    root = ElementTree.fromstring(body)
+    assert str(root.tag).rsplit("}", 1)[-1].lower() == "rss", (
+        f"the Teamtailor feed root is now <{root.tag}> — the parser rejects "
+        "anything but <rss> and this board now yields nothing"
+    )
+    items = [el for el in root.iter() if str(el.tag).rsplit("}", 1)[-1] == "item"]
+    assert items, "the feed carries no <item> elements"
+
+    seen: set[str] = set()
+    for item in items[:25]:
+        seen.update(str(child.tag).rsplit("}", 1)[-1] for child in item)
+    missing = [f for f in ("title", "link") if f not in seen]
+    assert not missing, f"teamtailor items dropped {missing}"
+    # The offline fixture assumes items MAY carry these; record what the live
+    # feed actually does, because an item without any location element parses
+    # with location="" and the geo filter drops it.
+    informational = [f for f in ("pubDate", "location", "department") if f not in seen]
+    if informational:
+        pytest.skip(
+            f"live feed omits {informational} — expected for some tenants; "
+            "re-record teamtailor_jobs.rss from this feed if location is "
+            "missing across ALL tenants you watch, and plan on the geo "
+            "filter dropping location-less items"
+        )
+
+
+# ==========================================================================
+# Arbeitnow (fixture is spec-derived: these tests are what validates it)
+# ==========================================================================
+
+ARBEITNOW_REQUIRED = ("title", "company_name", "url", "created_at")
+ARBEITNOW_EXPECTED = ("slug", "remote", "location", "tags", "job_types",
+                      "visa_sponsorship", "description")
+
+
+def test_arbeitnow_feed_still_answers_and_parses():
+    from src.sources.arbeitnow import fetch
+
+    jobs = _reachable(fetch, None)
+    assert jobs, "arbeitnow returned zero postings"
+    assert all(j.company and j.url for j in jobs)
+    assert any(j.posted_at for j in jobs), (
+        "no posting carries a usable created_at — the epoch parsing or the "
+        "field name drifted, and freshness will drop everything"
+    )
+
+
+def test_arbeitnow_entries_still_have_the_fields_we_parse():
+    from src.sources.arbeitnow import API_URL
+
+    payload = _raw_payload(API_URL, {"page": 1})
+    data = payload.get("data")
+    assert isinstance(data, list) and data, (
+        "the payload no longer carries a 'data' list — fetch() reports this "
+        "as shape drift and the source degrades"
+    )
+    seen = _union_of_keys(data)
+    missing = [f for f in ARBEITNOW_REQUIRED if f not in seen]
+    assert not missing, f"arbeitnow dropped required field(s): {missing}"
+    absent = [f for f in ARBEITNOW_EXPECTED if f not in seen]
+    assert not absent, (
+        f"arbeitnow no longer sends {absent} — re-record arbeitnow_page.json "
+        "from this live payload"
+    )
+    assert isinstance(payload.get("links"), dict), (
+        "pagination no longer speaks links.next — fetch() will stop at page 1"
+    )
+
+
+# ==========================================================================
+# Landing.jobs (fixture is spec-derived: these tests are what validates it)
+# ==========================================================================
+
+LANDING_REQUIRED = ("id", "title")
+#: Groups where ANY member satisfies the parser — the API has served several
+#: spellings over time and `parse_job` reads all of them.
+LANDING_EXPECTED_GROUPS = (
+    ("company_name", "company"),
+    ("url", "share_url", "landing_page"),
+    ("published_at", "created_at"),
+    ("city", "location"),
+)
+
+
+def test_landing_jobs_feed_still_answers_and_parses():
+    from src.sources.landing_jobs import fetch
+
+    jobs = _reachable(fetch, None)
+    # The DS/ML gate may legitimately leave few postings; zero *fetched* pages
+    # would surface as shape drift below, so an empty parse here only warrants
+    # a skip, not a fail.
+    if not jobs:
+        pytest.skip("no DS/ML-titled postings on the board today")
+    assert all(j.company and j.url for j in jobs)
+
+
+def test_landing_jobs_listings_still_have_the_fields_we_parse():
+    from src.sources.landing_jobs import API_URL, PAGE_LIMIT
+
+    payload = _raw_payload(API_URL, {"offset": 0, "limit": PAGE_LIMIT})
+    batch = payload if isinstance(payload, list) else payload.get("jobs")
+    assert isinstance(batch, list) and batch, (
+        "the payload is neither a bare list nor a 'jobs' list — fetch() "
+        "reports this as shape drift and the source degrades"
+    )
+    seen = _union_of_keys(batch)
+    missing = [f for f in LANDING_REQUIRED if f not in seen]
+    assert not missing, f"landing.jobs dropped required field(s): {missing}"
+    for group in LANDING_EXPECTED_GROUPS:
+        assert any(f in seen for f in group), (
+            f"landing.jobs sends none of {group} — parse_job cannot fill that "
+            "field any more; re-record landing_jobs_page.json from this live "
+            "payload"
+        )

@@ -37,7 +37,7 @@ keys:
 
 sources:
   # Greenhouse and Lever are where US companies post. If you are searching in
-  # Spain, Germany or Italy, the four below are where the mid-size local
+  # Spain, Germany or Italy, the six below are where the mid-size local
   # employers actually are — turning them on is the single biggest change you
   # can make to how many relevant postings you see each morning.
   greenhouse: true
@@ -50,6 +50,14 @@ sources:
   ashby: false             # modern start-ups
   smartrecruiters: false   # large EU employers (DE/FR/ES)
   personio: false          # the German/Spanish/Italian SMB default
+  recruitee: false         # Dutch-founded — very common for NL/BE mid-size
+  teamtailor: false        # the Nordic default; entries may be full careers URLs
+  # The two below are *global feeds*, not watchlist boards: no companies to
+  # list, no keys to create — flip them on and they fetch. Both point their
+  # apply link at the board rather than the employer's ATS, so when the same
+  # role arrives twice, dedupe keeps the ATS copy.
+  arbeitnow: true          # German market, free API, has a visa_sponsorship flag
+  landing_jobs: true       # Lisbon/Porto + remote-EU, salary published often
   adzuna: false            # needs free keys from developer.adzuna.com
   linkedin_email: false    # needs gmail_credentials.json (see README)
 

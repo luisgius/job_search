@@ -95,7 +95,16 @@ DEFAULTS: dict[str, Any] = {
         "ashby": False,
         "smartrecruiters": False,
         "personio": False,
+        "recruitee": False,
+        "teamtailor": False,
         "adzuna": False,
+        # The two global feeds need no watchlist and no keys, but they ship
+        # OFF like everything else that is not greenhouse/lever: a default
+        # that quietly fetches hundreds of third-party postings on the first
+        # run is a surprise, and turning a source on should always be the
+        # user reading one comment and flipping one switch.
+        "arbeitnow": False,
+        "landing_jobs": False,
         "linkedin_email": False,
     },
     "freshness": {
@@ -244,10 +253,13 @@ DEFAULTS: dict[str, Any] = {
 #: and `validate()` warns about each one that is enabled with nothing to fetch.
 BOARD_SOURCE_NAMES: tuple[str, ...] = (
     "greenhouse", "lever", "workable", "ashby", "smartrecruiters", "personio",
+    "recruitee", "teamtailor",
 )
 
 #: Every source the config knows about, in fetch order.
-SOURCE_NAMES: tuple[str, ...] = BOARD_SOURCE_NAMES + ("adzuna", "linkedin_email")
+SOURCE_NAMES: tuple[str, ...] = BOARD_SOURCE_NAMES + (
+    "adzuna", "arbeitnow", "landing_jobs", "linkedin_email",
+)
 
 WATCHLIST_DEFAULTS: dict[str, Any] = {
     "greenhouse": [],
@@ -256,6 +268,8 @@ WATCHLIST_DEFAULTS: dict[str, Any] = {
     "ashby": [],
     "smartrecruiters": [],
     "personio": [],
+    "recruitee": [],
+    "teamtailor": [],
     "adzuna": {
         "countries": [],
         "queries": [],

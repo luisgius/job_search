@@ -1,6 +1,6 @@
 """Public ATS board APIs — the cheapest, highest-signal source.
 
-Six vendors, one shape: an unauthenticated endpoint per company ("slug"), so
+Eight vendors, one shape: an unauthenticated endpoint per company ("slug"), so
 there are no keys, no scraping and no rate-limit games; better still, every
 posting carries a stable ATS id, which is what keeps `Job.key` from drifting
 when a company edits a title.
@@ -17,7 +17,7 @@ Lever are where American companies post, and a watchlist made only of those
 two answers the question "who is hiring in San Francisco?" rather than "who is
 hiring in Valencia?".
 
-The price of all six is that slugs rot silently: a company renames its board
+The price of all eight is that slugs rot silently: a company renames its board
 and the pipeline just starts returning zero jobs for it forever. That is what
 the `--check` CLI is for::
 
@@ -33,7 +33,7 @@ careers pages looking at where the Apply button points::
 
 **It is the one thing in this tool that makes unsolicited requests to third
 parties.** Everything else fetches boards the user chose; discovery guesses, and
-guessing is six vendors times several slug spellings times N companies of 404s
+guessing is eight vendors times several slug spellings times N companies of 404s
 from a single IP. A tool that looks like a scanner gets its user blocked from
 the boards they actually need, so the sweep is bounded twice
 (`DISCOVER_MAX_SLUGS_PER_COMPANY`, `DISCOVER_MAX_REQUESTS`), says out loud what
@@ -114,6 +114,7 @@ PERSONIO_LANGUAGES: frozenset[str] = frozenset(
 #: Boards this module knows how to talk to, in watchlist order.
 BOARDS: tuple[str, ...] = (
     "greenhouse", "lever", "workable", "ashby", "smartrecruiters", "personio",
+    "recruitee", "teamtailor",
 )
 
 # Project root, so `--check` works from any working directory.
@@ -1771,8 +1772,8 @@ def fetch_personio(
 ) -> list[Job]:
     """Fetch every published position from a Personio tenant's XML feed.
 
-    Personio is the one board here that speaks XML rather than JSON, and the
-    one whose tenants are split across two hosts: most are `.jobs.personio.de`,
+    Personio speaks XML rather than JSON (Teamtailor's RSS is the only other
+    non-JSON board here), and its tenants are split across two hosts: most are `.jobs.personio.de`,
     a minority `.jobs.personio.com`. A 404 on the first is retried on the
     second, so the watchlist entry can stay a bare `acme` — write the full host
     (`acme.jobs.personio.com`) to skip the guess.
@@ -1838,6 +1839,406 @@ def fetch_personio(
 
 
 # --------------------------------------------------------------------------
+# Recruitee
+# --------------------------------------------------------------------------
+
+#: Public offers endpoint of a Recruitee careers site. No auth, no pagination:
+#: the whole board arrives in one `{"offers": [...]}` document, and only
+#: published offers are ever in it — drafts and closed roles are the tenant's
+#: dashboard's business, not this endpoint's.
+RECRUITEE_OFFERS_URL = "https://{slug}.recruitee.com/api/offers/"
+RECRUITEE_JOB_URL = "https://{slug}.recruitee.com/o/{offer}"
+
+#: The tenant label out of a pasted careers URL. Recruitee is subdomain-
+#: addressed like Personio, so the generic rule — drop the host, keep the
+#: first path segment — would turn `vandelay.recruitee.com/o/data-scientist`
+#: into the slug `o`.
+_RECRUITEE_HOST_RE = re.compile(
+    r"(?:^|/)([a-z0-9][a-z0-9-]*)\.recruitee\.com(?:/|$|\?)", re.IGNORECASE
+)
+
+
+def _recruitee_slug(value: Any) -> str:
+    """Tenant identity: a bare slug, or the subdomain of a pasted URL."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    text = re.sub(r"^[a-z][a-z0-9+.-]*://", "", text, flags=re.IGNORECASE)
+    match = _RECRUITEE_HOST_RE.search(text + "/")
+    if match:
+        return match.group(1).lower()
+    # Subdomains are case-insensitive and Recruitee tenant labels are
+    # lowercase by construction, so — unlike SmartRecruiters, whose slugs
+    # really are case-sensitive path segments — casing is normalised away.
+    return _clean_slug(text).lower()
+
+
+def _money(value: Any) -> str:
+    """A salary bound as printable text. Numbers and strings only.
+
+    Recruitee publishes bounds as numbers in the `salary` object and as
+    strings in the legacy `min_salary`/`max_salary` fields — both shapes are
+    live in the wild at once, like Workable's two country-code spellings.
+    """
+    if isinstance(value, bool):
+        return ""
+    if isinstance(value, (int, float)):
+        return f"{value:g}"
+    return _text(value)
+
+
+def _recruitee_salary(offer: Mapping[str, Any]) -> str | None:
+    """Format the salary a tenant chose to publish, or None when it didn't.
+
+    Recruitee is the one board in this file whose *public* payload carries a
+    structured salary (`{"min", "max", "currency", "period"}`), so this is
+    mapped rather than dropped — a published range is a strong filter for the
+    reader and costs nothing to keep.
+    """
+    node = offer.get("salary")
+    node = node if isinstance(node, Mapping) else {}
+    low = _money(node.get("min")) or _money(offer.get("min_salary"))
+    high = _money(node.get("max")) or _money(offer.get("max_salary"))
+    if not low and not high:
+        return None
+    amount = f"{low}–{high}" if low and high and low != high else (low or high)
+    currency = _text(node.get("currency")).upper()
+    period = _text(node.get("period")).lower()
+    text = f"{amount} {currency}".strip()
+    return f"{text}/{period}" if period else text
+
+
+def _recruitee_location(offer: Mapping[str, Any]) -> tuple[str, str | None]:
+    """`(display location, ISO country)` for one offer.
+
+    `country_code` is already ISO-3166 alpha-2 — the one field the geo
+    resolver would otherwise have to reverse out of a spelled-out country
+    name, so it is passed through when it looks like one.
+    """
+    display = _first_text(offer, "location")
+    if not display:
+        display = ", ".join(
+            part for part in (_first_text(offer, "city"), _first_text(offer, "country"))
+            if part
+        )
+    if not display:
+        nodes = offer.get("locations")
+        if isinstance(nodes, Sequence) and not isinstance(nodes, str):
+            display = _join_locations(
+                ", ".join(
+                    part for part in (_first_text(node, "city"), _first_text(node, "country"))
+                    if part
+                )
+                for node in nodes if isinstance(node, Mapping)
+            )
+    code = _first_text(offer, "country_code").strip().upper()
+    country = code if len(code) == 2 and code.isalpha() else None
+    return _clean_location(display), country
+
+
+def _parse_recruitee_offer(
+    offer: Mapping[str, Any], slug: str, company: str
+) -> Job | None:
+    """Convert one offer into a `Job`, or None when it is not usable."""
+    title = _first_text(offer, "title")
+    if not title:
+        return None
+    raw_id = offer.get("id")
+    ats_job_id = str(raw_id) if raw_id not in (None, "") else None
+
+    offer_slug = _first_text(offer, "slug")
+    url = _first_text(offer, "careers_url")
+    if not url and offer_slug:
+        url = RECRUITEE_JOB_URL.format(slug=slug, offer=offer_slug)
+    if not url:
+        return None  # a posting nobody can open is not a posting
+
+    location, country = _recruitee_location(offer)
+    remote = offer.get("remote")
+    if not isinstance(remote, bool):
+        remote = True if _mentions_remote(location, title) else None
+    if remote and not location:
+        location = "Remote"
+
+    return Job(
+        source="recruitee",
+        company=company,
+        title=title,
+        url=url,
+        location=location,
+        description=_joined_sections([
+            ("", offer.get("description")),
+            ("Requirements", offer.get("requirements")),
+        ]),
+        posted_at=parse_datetime(_first_text(offer, "published_at", "created_at") or None),
+        remote=remote,
+        salary=_recruitee_salary(offer),
+        country=country,
+        ats="recruitee",
+        ats_job_id=ats_job_id,
+        raw={
+            "board": "recruitee",
+            "slug": slug,
+            "id": ats_job_id,
+            "department": _first_text(offer, "department") or None,
+            # Recruitee states this as "fulltime" / "parttime" / "internship" /
+            # "traineeship" — the vocabulary `filters.employment_type_exclude`
+            # already matches on, so it is passed through verbatim.
+            "employment_type": _first_text(offer, "employment_type_code", "employment_type") or None,
+            "experience": _first_text(offer, "experience_code") or None,
+            "education": _first_text(offer, "education_code") or None,
+            "category": _first_text(offer, "category_code") or None,
+            "hybrid": offer.get("hybrid") if isinstance(offer.get("hybrid"), bool) else None,
+            "apply_url": _first_text(offer, "careers_apply_url") or None,
+        },
+    )
+
+
+def fetch_recruitee(
+    slug: str, *, session: Any = None, retries: int = DEFAULT_RETRIES
+) -> list[Job]:
+    """Fetch every published offer from a Recruitee careers site.
+
+    Raises on transport/HTTP failure and on a 200 whose body is not a
+    Recruitee offers payload, so `--check` and the daily run can tell "the
+    company is not on Recruitee" from "Recruitee answered with a login wall".
+    """
+    clean = _recruitee_slug(slug)
+    if not clean:
+        raise ValueError("empty recruitee slug")
+    company = company_from_slug(clean)
+    payload = http_get_json(
+        RECRUITEE_OFFERS_URL.format(slug=clean), session=session, retries=retries
+    )
+    _require_board_payload("recruitee", clean, payload, "offers")
+
+    jobs: list[Job] = []
+    for offer in _as_list(payload, "offers"):
+        if not isinstance(offer, Mapping):
+            continue
+        try:
+            job = _parse_recruitee_offer(offer, clean, company)
+        except Exception as exc:  # one bad offer must not kill the board
+            logger.debug("recruitee/%s: skipping malformed offer: %s", clean, exc)
+            continue
+        if job is None:
+            logger.debug("recruitee/%s: skipping offer without title/url", clean)
+            continue
+        jobs.append(job)
+    return jobs
+
+
+# --------------------------------------------------------------------------
+# Teamtailor
+# --------------------------------------------------------------------------
+
+#: A Teamtailor careers site serves RSS by appending `.rss` to its jobs page.
+#: That is the only tenant surface that needs no key: the JSON API is gated by
+#: a per-tenant token, so it is deliberately not used here.
+TEAMTAILOR_FEED_URL = "https://{slug}.teamtailor.com/jobs.rss"
+
+#: Hosted careers sites live under this suffix; anything else in the watchlist
+#: is a custom domain and must be written as the full careers URL.
+_TEAMTAILOR_SUFFIX = ".teamtailor.com"
+
+#: Job links look like `https://host/jobs/4471001-data-scientist`; the number
+#: is the stable posting id, and the slug after it changes when the title does.
+_TEAMTAILOR_JOB_ID_RE = re.compile(r"/jobs/(\d+)")
+
+#: `<remote-status>` values that mean "you do not have to live near an office".
+#: "hybrid" and "temporarily-remote" deliberately do not count: both anchor the
+#: job to the office's city, and the geo filter must keep judging that city.
+_TEAMTAILOR_REMOTE_STATUSES = frozenset({"fully-remote", "fully_remote", "remote"})
+
+
+def _teamtailor_slug(value: Any) -> str:
+    """Tenant identity: a bare slug, or the full careers URL verbatim.
+
+    Teamtailor is the second vendor (after Personio) where the generic
+    host-dropping slug rule is wrong — many tenants run the careers site on
+    their own domain (`careers.acme.com`), where a "slug" does not exist at
+    all. Anything that names a host is kept whole; only a bare label is
+    treated as a `{slug}.teamtailor.com` tenant.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if "." in text or "/" in text or "://" in text:
+        return text
+    return text.lower()
+
+
+def _teamtailor_feed_url(slug: str) -> str:
+    """The RSS URL for a watchlist entry, whatever shape it was written in.
+
+    `acme` -> the hosted site's feed; a URL (with or without scheme, with or
+    without `/jobs` or `.rss`) -> that site's feed. Query and fragment are
+    dropped: filters belong to the browser page, and `?department=…` on the
+    feed silently narrows what the pipeline sees.
+    """
+    text = _teamtailor_slug(slug)
+    if not text:
+        return ""
+    if "." not in text and "/" not in text:
+        return TEAMTAILOR_FEED_URL.format(slug=text)
+    if not re.match(r"^[a-z][a-z0-9+.-]*://", text, flags=re.IGNORECASE):
+        text = "https://" + text
+    base = text.split("#", 1)[0].split("?", 1)[0].rstrip("/")
+    if base.lower().endswith(".rss"):
+        return base
+    if base.lower().endswith("/jobs"):
+        return base + ".rss"
+    return base + "/jobs.rss"
+
+
+def _teamtailor_company(slug: str, channel_title: str) -> str:
+    """Display name: what the feed calls itself, else derived from the host.
+
+    The channel `<title>` is the vendor-published name — the same evidence
+    Workable's envelope name is trusted for. The fallback reads the host: the
+    tenant label for hosted sites, the registrable label for custom domains
+    (`careers.acme.com` -> "Acme" — the first label is "careers", which is
+    nobody's company).
+    """
+    published = _text(channel_title)
+    if published:
+        return published
+    url = _teamtailor_feed_url(slug)
+    host = re.sub(r"^[a-z][a-z0-9+.-]*://", "", url, flags=re.IGNORECASE).split("/")[0]
+    host = host.strip(".").lower()
+    if host.endswith(_TEAMTAILOR_SUFFIX):
+        label = host[: -len(_TEAMTAILOR_SUFFIX)].split(".")[-1]
+    else:
+        parts = [part for part in host.split(".") if part]
+        label = parts[-2] if len(parts) >= 2 else (parts[0] if parts else "")
+    return company_from_slug(label) if label else company_from_slug(str(slug))
+
+
+def _parse_teamtailor_item(item: Any, company: str, feed_url: str) -> Job | None:
+    """Convert one RSS `<item>` into a `Job`, or None when it is not usable."""
+    title = _element_text(item, "title")
+    link = _element_text(item, "link")
+    if not title or not link:
+        return None
+
+    guid = _element_text(item, "guid")
+    match = _TEAMTAILOR_JOB_ID_RE.search(link) or _TEAMTAILOR_JOB_ID_RE.search(guid)
+    ats_job_id = match.group(1) if match else (guid or link)
+
+    # The RSS item is title/link/description/pubDate plus whatever extra
+    # elements the tenant's theme emits. Location is read from the likely
+    # spellings and left empty otherwise — an empty location plus
+    # `remote=None` is an unresolvable job the geo filter will drop, which is
+    # honest: the feed genuinely did not say where the job is.
+    location = _clean_location(
+        _element_text(item, "location")
+        or _element_text(item, "locations")
+        or _element_text(item, "city")
+        or _element_text(item, "office")
+    )
+    department = _element_text(item, "department")
+    remote_status = (
+        _element_text(item, "remote-status") or _element_text(item, "remote_status")
+    ).strip().lower()
+    description = html_to_text(_element_text(item, "description"))
+
+    if remote_status in _TEAMTAILOR_REMOTE_STATUSES:
+        remote: bool | None = True
+    elif _mentions_remote(location, title):
+        remote = True
+    else:
+        remote = None
+    if remote and not location:
+        location = "Remote"
+
+    return Job(
+        source="teamtailor",
+        company=company,
+        title=title,
+        url=link,
+        location=location,
+        description=description,
+        posted_at=parse_datetime(_element_text(item, "pubDate") or None),
+        remote=remote,
+        salary=None,
+        ats="teamtailor",
+        ats_job_id=str(ats_job_id),
+        raw={
+            "board": "teamtailor",
+            "feed": feed_url,
+            "guid": guid or None,
+            "department": department or None,
+            "remote_status": remote_status or None,
+        },
+    )
+
+
+def _parse_teamtailor_rss(text: str, feed_url: str, slug: str) -> list[Job]:
+    """Parse a `jobs.rss` document into jobs. Raises when it is not one.
+
+    Same stdlib `ElementTree`, same reasoning as Personio's parser: no
+    external entities, and a root gate because a well-formed non-feed (a
+    maintenance page, some other XML) must fail loudly rather than read as a
+    company that is not hiring. Namespaced elements are tolerated all the way
+    down via the local-name helpers.
+    """
+    import xml.etree.ElementTree as ElementTree  # stdlib, imported lazily
+
+    root = ElementTree.fromstring(text)
+    tag = _local_name(root.tag).lower()
+    if tag != "rss" and next(_iter_local(root, "item"), None) is None:
+        raise ValueError(
+            f"root element is <{tag}>, not <rss> — this is not a Teamtailor "
+            "job feed (an error page, a redirect target or the wrong URL)"
+        )
+
+    channel = _find_child(root, "channel")
+    company = _teamtailor_company(slug, _element_text(channel, "title") if channel is not None else "")
+
+    jobs: list[Job] = []
+    for item in _iter_local(root, "item"):
+        try:
+            job = _parse_teamtailor_item(item, company, feed_url)
+        except Exception as exc:  # one bad item must not kill the feed
+            logger.debug("teamtailor/%s: skipping malformed item: %s", slug, exc)
+            continue
+        if job is None:
+            logger.debug("teamtailor/%s: skipping item without title/link", slug)
+            continue
+        jobs.append(job)
+    return jobs
+
+
+def fetch_teamtailor(
+    slug: str, *, session: Any = None, retries: int = DEFAULT_RETRIES
+) -> list[Job]:
+    """Fetch every listed job from a Teamtailor careers site's RSS feed.
+
+    The watchlist entry may be a bare tenant slug or a full careers URL —
+    custom domains are the norm for this vendor's larger tenants, and
+    redirects (apex -> www, http -> https, `/jobs` -> localized path) are
+    followed rather than treated as errors for the same reason.
+
+    Raises on transport/HTTP failure and on a body that does not parse as an
+    RSS feed.
+    """
+    url = _teamtailor_feed_url(slug)
+    if not url:
+        raise ValueError("empty teamtailor slug")
+    response = http_get(
+        url,
+        session=session,
+        retries=retries,
+        headers={"Accept": "application/rss+xml, application/xml;q=0.9, */*;q=0.5"},
+    )
+    text = getattr(response, "text", "") or ""
+    try:
+        return _parse_teamtailor_rss(text, url, slug)
+    except Exception as exc:
+        raise ValueError(f"{url} did not return a parseable RSS feed: {exc}") from exc
+
+
+# --------------------------------------------------------------------------
 # dispatch
 # --------------------------------------------------------------------------
 
@@ -1861,6 +2262,10 @@ def _fetch_board(board: str, slug: str, *, session: Any = None, **kwargs: Any) -
         return fetch_smartrecruiters(slug, session=session, **kwargs)
     if board == "personio":
         return fetch_personio(slug, session=session, **kwargs)
+    if board == "recruitee":
+        return fetch_recruitee(slug, session=session, **kwargs)
+    if board == "teamtailor":
+        return fetch_teamtailor(slug, session=session, **kwargs)
     raise ValueError(f"unknown board {board!r}")
 
 
@@ -1883,13 +2288,19 @@ _CHEAP_CHECK_KWARGS: dict[str, dict[str, Any]] = {
 def _slug_for(board: str, value: Any) -> str:
     """Normalise a watchlist value the way `board` identifies its tenants.
 
-    Every board but Personio is `host/SLUG`, so `_clean_slug` (which throws the
-    host away and keeps the first path segment) is right. Personio is
-    `SLUG.jobs.personio.de` — the slug *is* the host — so the same rule would
-    delete the identity entirely.
+    Every board but the last three is `host/SLUG`, so `_clean_slug` (which
+    throws the host away and keeps the first path segment) is right. Personio
+    is `SLUG.jobs.personio.de` — the slug *is* the host — Recruitee is
+    `SLUG.recruitee.com`, and a Teamtailor entry may be a whole careers URL
+    on a custom domain, so for those the same rule would delete the identity
+    entirely.
     """
     if board == "personio":
         return _personio_slug(value)
+    if board == "recruitee":
+        return _recruitee_slug(value)
+    if board == "teamtailor":
+        return _teamtailor_slug(value)
     return _clean_slug(value)
 
 
@@ -1955,7 +2366,7 @@ def _watchlist_entries(
 
 
 def fetch(config: Config, *, session: Any = None, errors: list[str] | None = None) -> list[Job]:
-    """Fetch every enabled board in the watchlist, across all six vendors.
+    """Fetch every enabled board in the watchlist, across all eight vendors.
 
     Each slug is isolated: a renamed board, a 500 or a malformed payload costs
     that company's postings and nothing else. Failures are logged and appended
@@ -2218,8 +2629,8 @@ def check_slug(board: str, slug: str, *, session: Any = None) -> tuple[bool, str
 
 #: How many spellings of one company name may be tried.
 #:
-#: Six boards times this many candidates is the worst case for one company that
-#: is on none of them — 24 requests, spread one per host per round, which is a
+#: Eight boards times this many candidates is the worst case for one company
+#: that is on none of them — 32 requests, spread one per host per round, which is a
 #: sweep rather than a hammering. Four covers every shape the derivation
 #: produces for a real name ("factorialhr", "factorial-hr", "factorial", plus
 #: one expansion) and stops well short of enumerating spellings nobody uses.
@@ -2230,8 +2641,8 @@ DISCOVER_MAX_SLUGS_PER_COMPANY = 4
 #: How many probes one `--discover` invocation may make in total.
 #:
 #: The per-company cap bounds one name; this bounds the run, which is what the
-#: boards actually see. 120 is five companies' worth of complete misses, or
-#: roughly twenty companies at the ~6 probes a company that *is* found costs.
+#: boards actually see. 160 is five companies' worth of complete misses, or
+#: roughly eighteen companies at the ~9 probes a company that *is* found costs.
 #: Past that the traffic stops looking like someone filling in a watchlist and
 #: starts looking like someone enumerating a vendor's tenants, and the cost of
 #: being wrong about that is losing access to the boards the daily run needs.
@@ -2241,7 +2652,7 @@ DISCOVER_MAX_SLUGS_PER_COMPANY = 4
 #: a bare Personio slug that 404s on `.jobs.personio.de` is retried once on
 #: `.jobs.personio.com`, so a Personio miss is two requests against this
 #: budget's one. The bound understates nothing else.
-DISCOVER_MAX_REQUESTS = 120
+DISCOVER_MAX_REQUESTS = 160
 
 #: Discovery only needs to know whether a board answers and roughly how big it
 #: is, so every expensive half of a fetch is off. `max_pages: 1` is on top of
@@ -2302,7 +2713,7 @@ CONFIDENCE_LOW = "low"        #: answered, and something is wrong with the answe
 CONFIDENCE_NONE = "none"      #: nothing answered anywhere
 
 #: Only `high` is pasteable. `medium` means the evidence has a named hole —
-#: one board of six timing out in the deciding round is enough to mint it, and
+#: one board of eight timing out in the deciding round is enough to mint it, and
 #: a transient blip must never be able to produce an *installed* guess: a
 #: wrong slug is worse than no slug, because it returns an empty board every
 #: morning that reads as a quiet market. The reason for every downgrade is
@@ -2322,7 +2733,7 @@ _GERMAN_EXPANSIONS = {
     "ä": "ae", "ö": "oe", "ü": "ue", "Ä": "Ae", "Ö": "Oe", "Ü": "Ue", "ß": "ss",
 }
 
-#: A slug this short is never right and costs a whole round of six probes to
+#: A slug this short is never right and costs a whole round of eight probes to
 #: prove it: "H&M" would otherwise contribute the first-token candidate "h".
 _MIN_SLUG_CHARS = 2
 
@@ -2669,7 +3080,7 @@ def _grade(result: DiscoveryResult) -> None:
     if unknown:
         # Short form on purpose: a transport failure's message is a paragraph of
         # urllib3, it is already printed in full against its own probe line
-        # above, and repeating six of them here would bury the sentence that
+        # above, and repeating all of them here would bury the sentence that
         # matters — that these boards were not ruled out.
         result.notes.append(
             "no answer either way from: "
@@ -2705,12 +3116,12 @@ def discover_company(
 ) -> DiscoveryResult:
     """Work out which board — if any — publishes `name`, and how sure we are.
 
-    The sweep is **candidate-major**: round one asks all six boards about the
+    The sweep is **candidate-major**: round one asks all eight boards about the
     best slug spelling, round two asks about the second-best, and so on. Two
     reasons, both about not looking like a scanner. Consecutive requests go to
-    six different hosts rather than six in a row to one, and the round that
+    eight different hosts rather than eight in a row to one, and the round that
     matters — the first — is the one that answers in the ordinary case, so a
-    company that is where you would expect costs six requests and stops.
+    company that is where you would expect costs eight requests and stops.
 
     **A board answering with real postings ends the sweep.** Later candidates
     are not tried; the ones that were skipped are recorded and reported, because
@@ -2720,7 +3131,7 @@ def discover_company(
     in. Stopping at the first hit mid-round would make the result depend on the
     order of `BOARDS`, which is arbitrary, and would hide the case this whole
     module reports rather than resolves: two vendors answering for one name,
-    where one of them is a different company sharing a slug. Six requests, one
+    where one of them is a different company sharing a slug. Eight requests, one
     per host, is the price of being able to see that at all.
     """
     cap = max(1, int(max_slugs))
@@ -2953,7 +3364,7 @@ def _commented_block(result: DiscoveryResult) -> list[str]:
             f"# {result.company} — no board answered for "
             f"{', '.join(tried) if tried else 'any candidate'}."
         )
-        lines.append("# Either they are not on one of the six public boards this "
+        lines.append("# Either they are not on one of the eight public boards this "
                      "tool reads,")
         lines.append("# or the slug is spelled differently: open their careers page, "
                      "copy the")

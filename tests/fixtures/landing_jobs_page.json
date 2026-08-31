@@ -1,0 +1,49 @@
+[
+  {
+    "id": 88231,
+    "title": "Data Scientist",
+    "company_name": "Del Boca Vista Analytics",
+    "city": "Lisbon",
+    "country_code": "PT",
+    "remote": true,
+    "url": "https://landing.jobs/jobs/88231",
+    "published_at": "2026-08-29T10:00:00Z",
+    "salary_low": 35000,
+    "salary_high": 48000,
+    "currency": "EUR",
+    "role_description": "<p>Churn and LTV modelling for subscription products.</p>",
+    "main_requirements": "<p>Python, SQL, experimentation.</p>",
+    "nice_to_have": "<p>Airflow.</p>",
+    "type": "Full-time",
+    "experience_level": "Intermediate"
+  },
+  {
+    "id": 88232,
+    "title": "Account Executive",
+    "company_name": "Vandelay Industries",
+    "city": "Porto",
+    "country_code": "PT",
+    "remote": false,
+    "url": "https://landing.jobs/jobs/88232",
+    "published_at": "2026-08-29T09:00:00Z",
+    "role_description": "<p>Enterprise sales. Not a data role: the client-side gate must drop it.</p>"
+  },
+  {
+    "id": 88233,
+    "title": "Machine Learning Engineer",
+    "company": {"name": "Monk's Cafe Tech"},
+    "city": "",
+    "country_code": "",
+    "remote": true,
+    "share_url": "https://landing.jobs/jobs/88233",
+    "created_at": "2026-08-30T08:30:00Z",
+    "main_requirements": "<p>PyTorch models in production.</p>"
+  },
+  {
+    "id": 88234,
+    "title": "AI Engineer",
+    "company_name": "",
+    "city": "Braga",
+    "role_description": "<p>Malformed on purpose: no company and no URL anywhere.</p>"
+  }
+]

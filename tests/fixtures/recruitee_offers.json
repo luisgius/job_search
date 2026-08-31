@@ -1,0 +1,67 @@
+{
+  "offers": [
+    {
+      "id": 1200001,
+      "slug": "data-scientist-marketplace",
+      "title": "Data Scientist, Marketplace",
+      "status": "published",
+      "department": "Data",
+      "location": "Amsterdam, Netherlands",
+      "city": "Amsterdam",
+      "country": "Netherlands",
+      "country_code": "NL",
+      "remote": false,
+      "hybrid": true,
+      "careers_url": "https://vandelay.recruitee.com/o/data-scientist-marketplace",
+      "careers_apply_url": "https://vandelay.recruitee.com/o/data-scientist-marketplace/c/new",
+      "published_at": "2026-08-28 09:15:00 UTC",
+      "created_at": "2026-08-20 08:00:00 UTC",
+      "employment_type_code": "fulltime",
+      "category_code": "data_analytics",
+      "experience_code": "experienced",
+      "education_code": "bachelor",
+      "tags": ["python", "sql"],
+      "salary": {"min": 4200, "max": 5300, "currency": "eur", "period": "month"},
+      "description": "<p>Forecasting demand for the marketplace.</p>",
+      "requirements": "<p>2+ years with Python and SQL.</p>"
+    },
+    {
+      "id": 1200002,
+      "slug": "ml-engineer-remote",
+      "title": "Machine Learning Engineer",
+      "department": "Platform",
+      "location": "",
+      "city": "",
+      "country": "",
+      "country_code": "",
+      "remote": true,
+      "careers_url": "",
+      "published_at": "",
+      "created_at": "2026-08-29 11:30:00 UTC",
+      "employment_type_code": "fulltime",
+      "min_salary": "60000",
+      "max_salary": null,
+      "salary": {"min": "", "max": "", "currency": "", "period": ""},
+      "description": "<p>Ship models to production.</p>",
+      "requirements": ""
+    },
+    {
+      "id": 1200003,
+      "slug": "data-science-intern",
+      "title": "Data Science Intern",
+      "city": "Rotterdam",
+      "country": "Netherlands",
+      "country_code": "NL",
+      "employment_type_code": "internship",
+      "created_at": "2026-08-30 07:00:00 UTC",
+      "careers_url": "https://vandelay.recruitee.com/o/data-science-intern",
+      "description": "<p>Six-month internship.</p>"
+    },
+    {
+      "id": 1200004,
+      "slug": "untitled-draft",
+      "title": "",
+      "description": "<p>A draft the API should never have shown.</p>"
+    }
+  ]
+}

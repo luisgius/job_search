@@ -217,6 +217,11 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
     #: the user's own config fills it in. That is divergence by design — the
     #: one kind this list exists to record.
     _APPLICANT = "per-user identity; DEFAULTS stays empty so a fresh clone fails validation"
+    _GLOBAL_FEEDS = (
+        "keyless global feed the user opted into; DEFAULTS ships every "
+        "source that is not greenhouse/lever off, so first runs never fetch "
+        "hundreds of third-party postings by surprise"
+    )
     DELIBERATE: dict[str, str] = {
         "applicant.name": _APPLICANT,
         "applicant.email": _APPLICANT,
@@ -225,6 +230,8 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         "applicant.linkedin": _APPLICANT,
         "applicant.github": _APPLICANT,
         "applicant.website": _APPLICANT,
+        "sources.arbeitnow": _GLOBAL_FEEDS,
+        "sources.landing_jobs": _GLOBAL_FEEDS,
     }
 
     unknown = sorted(set(shipped) - set(defaults) - set(DELIBERATE))

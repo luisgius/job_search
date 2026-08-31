@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Vandelay Industries</title>
+    <link>https://career.vandelay.example</link>
+    <description>Current job openings at Vandelay Industries</description>
+    <item>
+      <title>Data Scientist</title>
+      <link>https://career.vandelay.example/jobs/4471001-data-scientist</link>
+      <guid isPermaLink="true">https://career.vandelay.example/jobs/4471001-data-scientist</guid>
+      <pubDate>Fri, 28 Aug 2026 10:12:00 +0000</pubDate>
+      <department>Analytics</department>
+      <location>Stockholm</location>
+      <description><![CDATA[<p>Own experimentation and forecasting.</p><p>SQL and Python required.</p>]]></description>
+    </item>
+    <item>
+      <title>Machine Learning Engineer</title>
+      <link>https://career.vandelay.example/jobs/4471002-machine-learning-engineer</link>
+      <guid isPermaLink="true">https://career.vandelay.example/jobs/4471002-machine-learning-engineer</guid>
+      <pubDate>Sat, 29 Aug 2026 08:00:00 +0000</pubDate>
+      <remote-status>fully-remote</remote-status>
+      <description><![CDATA[<p>Remote within the EU.</p>]]></description>
+    </item>
+    <item>
+      <title>Analytics Engineer</title>
+      <link>https://career.vandelay.example/jobs/4471003-analytics-engineer</link>
+      <guid isPermaLink="false">teamtailor-4471003</guid>
+      <description><![CDATA[<p>dbt and BigQuery, on-site.</p>]]></description>
+    </item>
+    <item>
+      <title>Ghost entry with no link</title>
+      <description><![CDATA[<p>Malformed on purpose: an item without a link is not applyable.</p>]]></description>
+    </item>
+  </channel>
+</rss>

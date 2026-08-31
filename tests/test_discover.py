@@ -359,7 +359,7 @@ def test_a_company_on_exactly_one_board():
     assert [p.board for p in result.matches] == ["workable"]
 
 
-def test_the_other_five_boards_are_still_asked_and_reported():
+def test_the_other_seven_boards_are_still_asked_and_reported():
     """The round is the unit of work: every board is asked about the best
     spelling before any of them is asked about the second-best. Stopping
     mid-round would make the answer depend on the order of `BOARDS`, which is
@@ -376,6 +376,8 @@ def test_the_other_five_boards_are_still_asked_and_reported():
         # is round two's business, and round two never happened.
         ("smartrecruiters", "Glovo"): PROBE_ABSENT,
         ("personio", "glovo"): PROBE_ABSENT,
+        ("recruitee", "glovo"): PROBE_ABSENT,
+        ("teamtailor", "glovo"): PROBE_ABSENT,
     }
 
 
@@ -450,7 +452,7 @@ def test_a_404_is_the_answer_and_is_not_retried():
 
     # One request per board, plus Personio's documented .de -> .com fallback,
     # plus SmartRecruiters' second (case-folded) spelling.
-    assert len(session.calls) == 8
+    assert len(session.calls) == 10
     assert sum(1 for url in session.urls() if "greenhouse" in url) == 1
 
 
@@ -1075,10 +1077,10 @@ def test_a_capped_hit_is_downgraded_rather_than_trusted():
 def test_a_cap_plus_hit_round_still_counts_every_probe_it_prevented():
     """The sweep deliberately keeps walking the remaining rounds after the cap
     bites — even when that round also produced a hit — because the walk is
-    what turns "the cap stopped us" into a *number*. "Factorial HR" has 19
-    (board, slug) pairs (three spellings on five boards, four on the
+    what turns "the cap stopped us" into a *number*. "Factorial HR" has 25
+    (board, slug) pairs (three spellings on seven boards, four on the
     case-sensitive one); a budget of 4 probes the first four and must record
-    the other 15 as prevented. Breaking on the hit alone under-reports them as
+    the other 21 as prevented. Breaking on the hit alone under-reports them as
     2, and the printed "N probe(s) were NOT made" — the user's only view of
     the damage — shrinks with it."""
     session = discovery_session(answers("workable", "factorialhr", 6))
@@ -1088,9 +1090,9 @@ def test_a_cap_plus_hit_round_still_counts_every_probe_it_prevented():
     assert result.capped is True
     assert [p.board for p in result.matches] == ["workable"]
     assert budget.spent == 4
-    assert len(budget.skipped) == 15
+    assert len(budget.skipped) == 21
     report = format_discovery(results, budget)
-    assert "15 probe(s) were NOT made" in report
+    assert "21 probe(s) were NOT made" in report
 
 
 def test_the_budget_is_shared_across_companies():
@@ -1098,13 +1100,13 @@ def test_the_budget_is_shared_across_companies():
     _results, budget = discover(
         ["Glovo", "TravelPerk"], session=session, max_requests=100
     )
-    # Seven probes each (six boards, plus SmartRecruiters' folded spelling).
-    assert budget.spent == 14
+    # Nine probes each (eight boards, plus SmartRecruiters' folded spelling).
+    assert budget.spent == 18
 
 
 def test_the_shipped_request_cap_is_a_bound_a_real_run_stays_under():
-    """Six boards times four spellings is the worst case for one company, so the
-    shipped cap has to be worth several of those or it fires on ordinary use."""
+    """Eight boards times four spellings is the worst case for one company, so
+    the shipped cap has to be worth several of those or it fires on ordinary use."""
     worst_case_per_company = len(ats_boards.BOARDS) * DISCOVER_MAX_SLUGS_PER_COMPANY
     assert DISCOVER_MAX_REQUESTS >= 4 * worst_case_per_company
 
@@ -1317,7 +1319,7 @@ def test_the_report_states_the_cap_even_when_it_did_not_bite():
     report = format_discovery(results, budget)
 
     assert f"DISCOVER_MAX_REQUESTS={DISCOVER_MAX_REQUESTS}" in report
-    assert "7 probe(s)" in report
+    assert "9 probe(s)" in report
 
 
 def test_confidence_is_reported_rather_than_a_verdict():

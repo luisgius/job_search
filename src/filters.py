@@ -53,6 +53,13 @@ SOURCE_RANK: dict[str, int] = {
     "workable": 3,
     "smartrecruiters": 3,
     "personio": 3,
+    "recruitee": 3,
+    "teamtailor": 3,
+    # Job boards, not ATSs: real listings with full descriptions, but the
+    # apply URL points at the board and the company's own ATS record — when
+    # both arrive — is the one a human should click.
+    "arbeitnow": 2,
+    "landing_jobs": 2,
     "adzuna": 2,
     "linkedin_email": 1,
 }

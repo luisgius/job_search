@@ -34,7 +34,7 @@ from .apply import autoapply
 from .config import Config, ConfigError
 from .db import Tracker
 from .models import ApplyStatus, Job, RunStats, ScoredJob, ensure_utc, utcnow
-from .sources import adzuna, ats_boards, linkedin_email
+from .sources import adzuna, arbeitnow, ats_boards, landing_jobs, linkedin_email
 from .util import get_logger, open_in_browser, setup_logging
 
 logger = get_logger(__name__)
@@ -44,7 +44,7 @@ logger = get_logger(__name__)
 #: about which sources exist.
 SOURCE_NAMES: tuple[str, ...] = config_module.SOURCE_NAMES
 
-#: The six board sources `ats_boards.fetch` serves in a single call.
+#: The board sources `ats_boards.fetch` serves in a single call.
 BOARD_SOURCES: frozenset[str] = frozenset(config_module.BOARD_SOURCE_NAMES)
 
 #: A CV shorter than this cannot produce a meaningful score or a tailored
@@ -281,6 +281,12 @@ def _fetch_all(config: Any, active: set[str], stats: RunStats) -> list[Job]:
 
     if "adzuna" in active:
         jobs.extend(_safe_fetch("adzuna", adzuna.fetch, config, stats))
+
+    if "arbeitnow" in active:
+        jobs.extend(_safe_fetch("arbeitnow", arbeitnow.fetch, config, stats))
+
+    if "landing_jobs" in active:
+        jobs.extend(_safe_fetch("landing_jobs", landing_jobs.fetch, config, stats))
 
     if "linkedin_email" in active:
         jobs.extend(_safe_fetch("linkedin_email", linkedin_email.fetch, config, stats))

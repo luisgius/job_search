@@ -13,9 +13,13 @@ not an hour of tab management. It never applies to the same job twice.
 sources ──┬─ Greenhouse boards ────┐
           ├─ Lever boards          │
           ├─ Workable boards       │
-          ├─ Ashby boards          ├──▶ dedupe ──▶ hard filters ──▶ tracker gate
-          ├─ SmartRecruiters       │     (title · location · freshness · keywords)
-          ├─ Personio (XML)        │                               │
+          ├─ Ashby boards          │
+          ├─ SmartRecruiters       ├──▶ dedupe ──▶ hard filters ──▶ tracker gate
+          ├─ Personio (XML)        │     (title · location · freshness · keywords)
+          ├─ Recruitee boards      │                               │
+          ├─ Teamtailor (RSS)      │                               │
+          ├─ Arbeitnow (global)    │                               │
+          ├─ Landing.jobs (global) │                               │
           ├─ Adzuna (optional)     │                               │
           └─ LinkedIn email        ┘                               ▼
    digest.html ◀── auto-apply ◀── PDF ◀── tailor CV + cover ◀── LLM fit score
@@ -25,7 +29,12 @@ sources ──┬─ Greenhouse boards ────┐
 **Greenhouse and Lever are American.** If you are searching in Spain, Germany
 or Italy, Workable, Ashby, SmartRecruiters and Personio are where the mid-size
 local employers actually post — Personio in particular is the default ATS for
-German, Spanish and Italian SMBs. All six need no key and no scraping.
+German, Spanish and Italian SMBs, Recruitee its Dutch/Belgian counterpart, and
+Teamtailor the Nordic one (watchlist entries there may be whole careers URLs,
+custom domains included). All eight need no key and no scraping. Arbeitnow
+(German market, `visa_sponsorship` flag) and Landing.jobs (Lisbon/Porto +
+remote-EU) are *global feeds* rather than watchlist boards: no companies to
+name, no keys — flip them on in `config.yaml` and they fetch.
 
 ---
 
@@ -138,7 +147,7 @@ Start from the company names and let the tool find the boards:
 python -m src.sources.ats_boards --discover "Glovo" "Factorial HR" "TravelPerk"
 ```
 
-It derives the plausible slug spellings from each name, asks the six boards,
+It derives the plausible slug spellings from each name, asks the eight boards,
 and prints the YAML to paste — along with what it asked and what answered:
 
 ```text

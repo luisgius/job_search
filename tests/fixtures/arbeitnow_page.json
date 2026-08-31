@@ -1,0 +1,63 @@
+{
+  "data": [
+    {
+      "slug": "data-scientist-forecasting-berlin-1043",
+      "company_name": "Kramerica Labs",
+      "title": "Data Scientist - Forecasting",
+      "description": "<p>Demand forecasting for logistics.</p><p>Python, SQL, LightGBM.</p>",
+      "remote": false,
+      "url": "https://www.arbeitnow.com/jobs/companies/kramerica-labs/data-scientist-forecasting-berlin-1043",
+      "tags": ["Data Science", "Python"],
+      "job_types": ["professional / experienced"],
+      "location": "Berlin",
+      "created_at": 1787471100,
+      "visa_sponsorship": true
+    },
+    {
+      "slug": "machine-learning-engineer-remote-2210",
+      "company_name": "Pendant Publishing",
+      "title": "Machine Learning Engineer (Remote)",
+      "description": "<p>Remote within the EU, Munich HQ.</p>",
+      "remote": true,
+      "url": "https://www.arbeitnow.com/jobs/companies/pendant-publishing/machine-learning-engineer-remote-2210",
+      "tags": [],
+      "job_types": ["full_time"],
+      "location": "Munich",
+      "created_at": 1787551200,
+      "visa_sponsorship": false
+    },
+    {
+      "slug": "werkstudent-data-analytics-3301",
+      "company_name": "Vandelay Industries",
+      "title": "Werkstudent Data Analytics",
+      "description": "<p>20 hours a week alongside your studies.</p>",
+      "remote": false,
+      "url": "https://www.arbeitnow.com/jobs/companies/vandelay-industries/werkstudent-data-analytics-3301",
+      "tags": ["Students"],
+      "job_types": ["internship"],
+      "location": "Hamburg",
+      "created_at": 1787637600,
+      "visa_sponsorship": false
+    },
+    {
+      "slug": "",
+      "company_name": "",
+      "title": "Nameless posting",
+      "description": "<p>Malformed on purpose: no company and no URL.</p>",
+      "url": "",
+      "created_at": null
+    }
+  ],
+  "links": {
+    "first": "https://www.arbeitnow.com/api/job-board-api?page=1",
+    "prev": null,
+    "next": null
+  },
+  "meta": {
+    "current_page": 1,
+    "path": "https://www.arbeitnow.com/api/job-board-api",
+    "per_page": 100,
+    "terms": "https://www.arbeitnow.com/terms-of-service",
+    "info": "https://documenter.getpostman.com/view/18545278/UVJbJdKh"
+  }
+}
