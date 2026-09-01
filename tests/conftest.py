@@ -533,6 +533,27 @@ def _no_accidental_network(request, monkeypatch):
         monkeypatch.setenv(var, "")
 
 
+@pytest.fixture(autouse=True)
+def _no_ambient_credentials(request, monkeypatch):
+    """The developer's real environment must not leak into the suite.
+
+    On the user's machine OPENROUTER_API_KEY is exported — that is exactly
+    how live runs are supposed to get it — and with env-wins that quietly
+    SOLVED every missing-key scenario the validation tests construct: the
+    suite passed in a bare container and failed... no, worse, *changed
+    meaning* on the machine it exists to protect. Every `ENV_OVERRIDES`
+    variable is stripped; a test that wants one injects `env=` explicitly.
+    Network-marked tests keep the real environment — a live contract run
+    needs the real key.
+    """
+    if request.node.get_closest_marker("network"):
+        return
+    from src.config import ENV_OVERRIDES
+
+    for _path, var in ENV_OVERRIDES.items():
+        monkeypatch.delenv(var, raising=False)
+
+
 @pytest.fixture
 def fake_anthropic() -> Callable[..., FakeAnthropic]:
     return FakeAnthropic

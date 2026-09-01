@@ -133,9 +133,22 @@ def test_failures_are_logged_with_a_reason(tmp_path: Path, caplog):
 
 def test_render_pdf_is_not_shipped():
     """If this ever fails, someone committed a personal PDF generator — and
-    the "no PDF -> digest" path silently stops being exercised in the wild."""
+    the "no PDF -> digest" path silently stops being exercised in the wild.
+
+    "Shipped" means TRACKED, not present: the user's machine is supposed to
+    have src/render_pdf.py (they wrote it, git ignores it), and the suite
+    must pass there too."""
+    import subprocess
+
     root = Path(__file__).resolve().parent.parent
-    assert not (root / "src" / "render_pdf.py").exists()
+    try:
+        tracked = subprocess.run(
+            ["git", "ls-files", "src/render_pdf.py"], cwd=root,
+            capture_output=True, check=True, timeout=30,
+        ).stdout.decode().strip()
+    except Exception:
+        pytest.skip("not a git checkout — nothing is 'shipped' here")
+    assert not tracked, "src/render_pdf.py is committed — it must stay personal"
     assert (root / "src" / "render_pdf.example.py").exists()
 
 
@@ -174,7 +187,14 @@ def test_the_missing_hook_message_tells_the_user_what_to_do():
 
 
 def test_importing_the_absent_hook_is_not_an_error(tmp_path: Path):
-    """With no `module=` given, the real import is attempted — and in this
-    repo it is absent, which must resolve to None rather than ImportError."""
+    """With no `module=` given, the real import is attempted — and on a
+    checkout without the hook that must resolve to None rather than
+    ImportError. On the user's machine the hook legitimately exists, and
+    then this absent-state path simply cannot be exercised for real."""
+    import importlib.util
+
+    if importlib.util.find_spec("src.render_pdf") is not None:
+        pytest.skip("a local src/render_pdf.py is installed — the absent "
+                    "state is covered by the module=None tests instead")
     assert render_if_available(MARKDOWN, tmp_path / "cv.pdf") is None
     assert pdf_module.available() is False

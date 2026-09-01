@@ -71,13 +71,23 @@ def _import_hook() -> tuple[Any | None, str]:
         return None, f"{HOOK_PATH} failed to import: {exc}"
 
 
-def _resolve(module: Any | None) -> tuple[Any | None, str]:
+#: Default for `module=`: "nothing injected, import the real hook". Distinct
+#: from None on purpose — the user's machine legitimately HAS a hook
+#: installed (src/render_pdf.py is theirs to write, git-ignored), so tests
+#: need a way to say "behave as if there were none" that does not depend on
+#: what this particular machine carries. `module=None` is that way.
+_UNSET: Any = object()
+
+
+def _resolve(module: Any) -> tuple[Any | None, str]:
     """Return `(render_callable, reason)` for an injected or imported hook."""
     hook = module
-    if hook is None:
+    if hook is _UNSET:
         hook, reason = _import_hook()
         if hook is None:
             return None, reason
+    elif hook is None:
+        return None, MISSING_HOOK_MESSAGE
 
     render = getattr(hook, "render", None)
     if not callable(render):
@@ -88,11 +98,13 @@ def _resolve(module: Any | None) -> tuple[Any | None, str]:
     return render, ""
 
 
-def available(*, module: Any = None) -> bool:
+def available(*, module: Any = _UNSET) -> bool:
     """True when a usable PDF hook is importable and exposes `render`.
 
     Cheap enough to call before tailoring, so the run can say once, up front,
     that PDFs (and therefore auto-apply) are off. Never raises.
+    `module=None` means "there is no hook" regardless of what this machine
+    has installed; anything else is injected as the hook itself.
     """
     render, reason = _resolve(module)
     if render is None:
@@ -104,7 +116,7 @@ def render_if_available(
     markdown: str,
     out_path: str | Path,
     *,
-    module: Any = None,
+    module: Any = _UNSET,
 ) -> str | None:
     """Render `markdown` to `out_path` via the user's hook.
 
@@ -113,7 +125,8 @@ def render_if_available(
     not touch this application", so every ambiguous outcome (no hook, no
     `render`, an exception, a missing or empty output file) must return None.
 
-    `module=` injects a hook object directly and is the test seam.
+    `module=` injects a hook object directly and is the test seam;
+    `module=None` forces the no-hook state, whatever this machine carries.
     """
     out = Path(out_path)
 
