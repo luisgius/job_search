@@ -252,6 +252,11 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         "scoring.candidate_context": _APPLICANT,
         "scoring.positive_signals": _APPLICANT,
         "scoring.score_caps": _APPLICANT,
+        # Validation period: a $0 OpenRouter model until the pipeline proves
+        # itself on the user's machine; DEFAULTS keeps the real recommendation.
+        "scoring.model": "free-tier validation period",
+        "scoring.concurrency": "free-tier validation period (20 req/min cap)",
+        "tailoring.model": "free-tier validation period",
     }
 
     unknown = sorted(set(shipped) - set(defaults) - set(DELIBERATE))

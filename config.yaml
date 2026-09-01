@@ -341,12 +341,25 @@ scoring:
   # With provider: openrouter, model ids are vendor-qualified —
   # "anthropic/claude-sonnet-5", "openai/gpt-5", "google/gemini-2.5-pro".
   # A bare name is a 404 from OpenRouter; --validate-only catches that.
-  model: anthropic/claude-sonnet-5   # anthropic/claude-haiku-4.5 is ~10x cheaper, blunter
+  #
+  # VALIDATION PERIOD — a $0 model until the machinery proves itself.
+  # Three things to know about :free models:
+  #   * OpenRouter free tier: 20 req/min always, 50 req/day until $10 of
+  #     lifetime credits (then 1,000/day). A full run (40 scorings + the
+  #     tailorings) BLOWS the 50/day cap — validate with --limit 10.
+  #   * :free routing requires the "allow training on prompts" toggle in
+  #     your OpenRouter privacy settings: your CV goes into those prompts.
+  #   * Free ids rotate. If this one 404s, pick any current :free chat
+  #     model at openrouter.ai/models. Avoid reasoning models (DeepSeek R1)
+  #     here: their thinking eats max_tokens before the JSON.
+  # When validated, the upgrade back is one line:
+  #     model: anthropic/claude-sonnet-5   (or claude-haiku-4.5, ~10x cheaper)
+  model: meta-llama/llama-3.3-70b-instruct:free
   threshold: 65            # 65 medium · 75 strict
   max_jobs: 40             # hard cap on LLM calls per run — your cost ceiling
   max_tokens: 1500
   temperature: 0.0
-  concurrency: 4
+  concurrency: 1           # free tier is 20 req/min — bursts get 429s
 
   # --- Phase 5: who is being scored, beyond what the CV says ---------------
   # All three are PROMPT-ONLY: they shape the model's judgement and never
@@ -379,7 +392,10 @@ scoring:
 
 tailoring:
   enabled: true
-  model: anthropic/claude-sonnet-5
+  # Same validation-period model as scoring — fine for proving the plumbing,
+  # NOT for documents you would actually send. Before a real application:
+  #     model: anthropic/claude-sonnet-5
+  model: meta-llama/llama-3.3-70b-instruct:free
   max_per_run: 10
   max_tokens: 4000
   temperature: 0.2
