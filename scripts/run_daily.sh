@@ -9,7 +9,10 @@
 #     one place OPENROUTER_API_KEY etc. live for scheduled runs;
 #   * the venv's python is used by absolute path;
 #   * a lock directory stops two runs overlapping (the pipeline is
-#     single-run by design; macOS has no flock(1), mkdir is the portable lock);
+#     single-run by design; macOS has no flock(1), mkdir is the portable lock).
+#     A lock older than six hours counts as left behind by a killed run and
+#     is reclaimed — SIGKILL and power loss skip the EXIT trap, and a lock
+#     nobody will ever remove must not cost every morning after;
 #   * stdout/stderr land in output/logs/daily-YYYY-MM-DD.log, pruned with the
 #     same retention spirit as the tracker backups;
 #   * if HEALTHCHECKS_URL is set (a free check at healthchecks.io), the run
@@ -50,10 +53,24 @@ fi
 ping_hc() {
     # Best-effort by construction: monitoring must never fail the run.
     [ -n "${HEALTHCHECKS_URL:-}" ] || return 0
-    curl -fsS -m 10 --retry 3 "${HEALTHCHECKS_URL}${1:-}" >/dev/null 2>&1 || true
+    # ${..%/}: healthchecks routes are <uuid>, <uuid>/start, <uuid>/fail —
+    # a trailing slash pasted into .env would turn every ping into a 404'd
+    # <uuid>//start, silently, which is the one failure mode monitoring
+    # cannot be allowed to share with the thing it monitors.
+    curl -fsS -m 10 --retry 3 "${HEALTHCHECKS_URL%/}${1:-}" >/dev/null 2>&1 || true
 }
 
 LOCK="$REPO/output/.daily-run.lock"
+# SIGKILL, power loss and kernel panics never reach the EXIT trap, so a lock
+# can outlive its run — and an immortal lock would skip every future morning
+# with exit 0, which looks exactly like health. The run takes minutes: a lock
+# older than six hours is a corpse, and reclaiming it beats deadlock even in
+# the worst case (a six-hour-hung run losing its lock to the next fire).
+# find -mmin/-maxdepth are BSD and GNU alike.
+if [ -d "$LOCK" ] && [ -n "$(find "$LOCK" -maxdepth 0 -mmin +360 2>/dev/null)" ]; then
+    echo "$(date -u +%FT%TZ) reclaiming stale lock $LOCK (>6h old — a killed run left it)" >>"$LOG"
+    rmdir "$LOCK" 2>/dev/null || true
+fi
 if ! mkdir "$LOCK" 2>/dev/null; then
     echo "$(date -u +%FT%TZ) another daily run holds $LOCK — skipping" >>"$LOG"
     exit 0

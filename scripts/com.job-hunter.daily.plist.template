@@ -31,7 +31,11 @@
     </array>
 
     <!-- The wrapper writes the real per-day log; this catches launchd's own
-         complaints (bad path, permission) that happen before the wrapper. -->
+         complaints (bad path, permission) that happen before the wrapper.
+         launchd creates these FILES itself but never their directory: the
+         installer mkdirs output/logs, and if output/ is ever deleted (git
+         clean -fdx), recreate it or rerun the installer — a missing parent
+         breaks the spawn with nothing logged anywhere. -->
     <key>StandardOutPath</key>
     <string>__REPO__/output/logs/launchd.log</string>
     <key>StandardErrorPath</key>

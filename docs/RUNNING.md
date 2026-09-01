@@ -43,13 +43,23 @@ The pieces, all in `scripts/`:
 
 | File | Job |
 |---|---|
-| `run_daily.sh` | what the scheduler runs: sources `.env`, uses the venv's python, takes a lock so runs never overlap, logs to `output/logs/daily-YYYY-MM-DD.log` (14-day retention), pings healthchecks |
+| `run_daily.sh` | what the scheduler runs: sources `.env`, uses the venv's python, takes a lock so runs never overlap (a lock older than 6 h counts as left by a killed run and is reclaimed — SIGKILL and power loss skip cleanup), logs to `output/logs/daily-YYYY-MM-DD.log` (14-day retention), pings healthchecks |
 | `com.job-hunter.daily.plist.template` | the schedule; `install_launchd.sh` fills in the repo path |
 | `install_launchd.sh` | substitutes, installs to `~/Library/LaunchAgents`, loads, prints how to test-fire |
 
 Logs: `output/logs/daily-YYYY-MM-DD.log` per run, `launchd.log` for anything
-that breaks before the wrapper starts. Undo it all with
-`launchctl bootout "gui/$(id -u)/com.job-hunter.daily"`.
+that breaks before the wrapper starts. launchd creates its log *files* but
+never their directory — the installer creates `output/logs`, so if you ever
+delete `output/`, `mkdir -p output/logs` (or rerun the installer) before the
+next 08:00, or the agent fails to spawn with nothing logged anywhere. Undo it
+all with `launchctl bootout "gui/$(id -u)/com.job-hunter.daily"`.
+
+Two macOS notes: installing raises a one-time "Background Items Added"
+notification, and the agent appears (and can be toggled) under **System
+Settings → General → Login Items** — leave it enabled. And LaunchAgents run
+inside your login session: a Mac sitting at the login window (say, after a
+FileVault reboot) skips the same way a powered-off one does; the heartbeat
+below is the net under both.
 
 ## 2. Heartbeat (optional, free, two minutes)
 
