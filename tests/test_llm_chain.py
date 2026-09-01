@@ -127,6 +127,30 @@ def test_an_entry_that_cannot_even_build_is_skipped_not_fatal():
     assert chain.last_model == "backup/model"
 
 
+def test_resolving_an_already_built_chain_returns_it_untouched():
+    """`score_jobs`/`tailor_jobs` resolve once and their per-job helpers
+    resolve again with the result. Wrapping that chain in a second chain
+    attributed every fallback answer to the primary model, retried the
+    fallbacks after the inner chain had already exhausted them — and built
+    fresh REAL clients around an injected fake, the seam-routing failure the
+    provider/seam cross-check exists to prevent."""
+    dead, ok = DeadClient(), OkClient({"score": 88})
+    chain = chain_from_config(cfg(["backup/model"]), "scoring",
+                              clients=[dead, ok])
+    assert chain_from_config(cfg(["backup/model"]), "scoring",
+                             client=chain) is chain
+
+    from src.scoring import score_jobs
+    from tests.conftest import make_job
+
+    scored = score_jobs([make_job()], "cv " * 200, cfg(["backup/model"]),
+                        client=chain)
+    assert scored[0].score.value == 88
+    # Attributed to the model that answered, not the one the config hoped for.
+    assert scored[0].score.model == "backup/model"
+    assert dead.calls == 1
+
+
 # ==========================================================================
 # the usage meter
 # ==========================================================================

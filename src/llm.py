@@ -1138,7 +1138,17 @@ def chain_from_config(
     a missing key still fails once and loudly rather than once per job. With
     fallbacks it returns a `ModelChain`. `clients` (a test seam) overrides
     construction entry-by-entry; a None slot builds normally.
+
+    An injected `ModelChain` is already the resolved thing and passes through
+    untouched. `score_jobs`/`tailor_jobs` resolve once and their per-job
+    helpers resolve again with the result; wrapping it in a second chain made
+    every fallback answer report the primary model's name, retried the
+    fallback entries a second time after the inner chain had already failed —
+    and, because the wrapper's outer entries were freshly built real clients,
+    let a failing injected fake route around its seam to the live network.
     """
+    if isinstance(client, ModelChain):
+        return client
     entries = model_entries(config, role)
     overrides = list(clients or [])
     if len(entries) <= 1 and not overrides:

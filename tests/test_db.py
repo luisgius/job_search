@@ -747,3 +747,72 @@ def test_an_in_memory_tracker_never_tries_to_back_itself_up():
     tracker = Tracker()
     assert tracker.backup(keep=5) is None
     tracker.close()
+
+
+def test_a_failed_backup_never_claims_the_day(tmp_path):
+    """A copy that dies mid-write must leave nothing behind: the torn file
+    would satisfy the target-exists early return, and a same-day retry would
+    then keep unreadable garbage as the backup of the one unregenerable file."""
+    import sqlite3
+    from datetime import datetime, timezone
+
+    tracker = Tracker(tmp_path / "tracker.sqlite3")
+    day = datetime(2026, 9, 1, 8, 0, tzinfo=timezone.utc)
+
+    class BrokenSource:
+        def __init__(self, wrapped):
+            self._wrapped = wrapped
+
+        def backup(self, *_a, **_k):
+            raise sqlite3.OperationalError("disk I/O error")
+
+        def __getattr__(self, name):
+            return getattr(self._wrapped, name)
+
+    real = tracker.conn
+    tracker.conn = BrokenSource(real)
+    with pytest.raises(sqlite3.OperationalError):
+        tracker.backup(keep=5, now=day)
+    tracker.conn = real
+
+    target = tmp_path / "backups" / "tracker-2026-09-01.sqlite3"
+    assert not target.exists()
+
+    made = tracker.backup(keep=5, now=day)  # the same-day retry succeeds
+    assert made == target
+    copy = sqlite3.connect(made)
+    assert copy.execute("PRAGMA user_version").fetchone()[0] == 3
+    copy.close()
+    tracker.close()
+
+
+def test_backup_completes_despite_a_dangling_implicit_transaction(tmp_path):
+    """A failed statement leaves its implicit transaction open on the
+    connection, and `Connection.backup` retries BUSY forever against that
+    lock — the nightly run would hang at the backup step, not fail. The
+    backup commits first (every Tracker write commits on success, so nothing
+    a caller meant to keep is ever rolled back by that)."""
+    import threading
+    from datetime import datetime, timezone
+
+    made: list = []
+
+    def work() -> None:
+        # The whole tracker lives on this thread: sqlite connections are
+        # bound to their creating thread, and the main thread only holds
+        # the deadline.
+        tracker = Tracker(tmp_path / "tracker.sqlite3")
+        tracker.record_job(make_job())
+        tracker.conn.execute(
+            "INSERT INTO jobs (key, first_seen_at, last_seen_at) "
+            "VALUES ('p','x','x')"
+        )
+        made.append(tracker.backup(
+            keep=5, now=datetime(2026, 9, 1, tzinfo=timezone.utc)))
+        tracker.close()
+
+    worker = threading.Thread(target=work, daemon=True)
+    worker.start()
+    worker.join(timeout=30.0)
+    assert not worker.is_alive(), "backup hung on the open transaction"
+    assert made and made[0] is not None

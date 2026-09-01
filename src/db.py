@@ -186,8 +186,26 @@ class Tracker:
         target = directory / f"tracker-{stamp}.sqlite3"
         if target.exists():
             return None
-        with sqlite3.connect(target) as copy:
+        # `Connection.backup` retries BUSY in an unbounded loop, and this
+        # connection's own open write transaction (a failed statement leaves
+        # its implicit one dangling) holds that lock forever — the copy would
+        # hang the run, not fail it. Every Tracker write commits on success,
+        # so there is nothing here a caller meant to roll back.
+        self.conn.commit()
+        # No context manager: `with` on a sqlite3 connection commits but does
+        # not close, and a torn file left behind by a failed copy would claim
+        # the day (`target.exists()` above) — a same-day retry would then keep
+        # unreadable garbage as the backup of the one unregenerable file.
+        copy = sqlite3.connect(target)
+        try:
             self.conn.backup(copy)
+        except BaseException:
+            copy.close()
+            try:
+                target.unlink()
+            except OSError:
+                pass  # the caller still hears the original failure
+            raise
         copy.close()
         backups = sorted(directory.glob("tracker-*.sqlite3"))
         for stale in backups[:-max(1, int(keep))]:
