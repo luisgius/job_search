@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Weekdays at 08:00, via launchd rather than cron, for one load-bearing
+  reason: a StartCalendarInterval the Mac slept through fires ONCE on wake,
+  so a lid shut at 08:00 costs minutes, not the day. (A Mac powered OFF at
+  08:00 still skips — the digest's missed_run alert is the net under that.)
+
+  __REPO__ is substituted by scripts/install_launchd.sh; do not install this
+  template verbatim.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.job-hunter.daily</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__REPO__/scripts/run_daily.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+    </array>
+
+    <!-- The wrapper writes the real per-day log; this catches launchd's own
+         complaints (bad path, permission) that happen before the wrapper. -->
+    <key>StandardOutPath</key>
+    <string>__REPO__/output/logs/launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>__REPO__/output/logs/launchd.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO__</string>
+</dict>
+</plist>

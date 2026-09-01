@@ -385,21 +385,25 @@ interrupted.
 
 ---
 
-## Cron
+## Running it every day
 
-```cron
-0 8 * * 1-5 cd /path/to/job_search && .venv/bin/python -m src.main --no-browser >> output/cron.log 2>&1
+The full setup — launchd on macOS (fires on wake when the lid was shut at
+08:00, which cron never does), secrets via `.env`, per-day logs, and an
+optional healthchecks.io dead-man's switch for the morning where *nothing*
+ran — is three commands, documented in **[docs/RUNNING.md](docs/RUNNING.md)**:
+
+```bash
+cp .env.example .env && ${EDITOR:-nano} .env && chmod 600 .env
+bash scripts/install_launchd.sh
+launchctl kickstart "gui/$(id -u)/com.job-hunter.daily"   # prove it now
 ```
 
-Weekdays at 08:00, into a log you can `tail`. Use the venv's Python by
-absolute path — cron does not run your shell profile, so `python` alone will
-be the wrong interpreter and `ANTHROPIC_API_KEY` will not be set (put it in
-the crontab or a sourced file).
+On Linux, the classic line still works — pointed at the wrapper so the lock,
+`.env` and heartbeat come along:
 
-**macOS caveat:** cron does not run while the laptop is asleep and does not
-catch up afterwards. If the lid is shut at 08:00 the run simply never happens.
-`launchd` (or a systemd timer on Linux) at least fires on wake — and the next
-run that *does* happen will tell you it missed one (see below).
+```cron
+0 8 * * 1-5 /bin/bash /path/to/job_search/scripts/run_daily.sh
+```
 
 ---
 
