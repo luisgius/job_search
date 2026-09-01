@@ -2,7 +2,6 @@
   {
     "id": 88231,
     "title": "Data Scientist",
-    "company_name": "Del Boca Vista Analytics",
     "city": "Lisbon",
     "country_code": "PT",
     "remote": true,
@@ -15,23 +14,26 @@
     "main_requirements": "<p>Python, SQL, experimentation.</p>",
     "nice_to_have": "<p>Airflow.</p>",
     "type": "Full-time",
-    "experience_level": "Intermediate"
+    "experience_level": "Intermediate",
+    "company_id": 4401
   },
   {
     "id": 88232,
     "title": "Account Executive",
-    "company_name": "Vandelay Industries",
     "city": "Porto",
     "country_code": "PT",
     "remote": false,
     "url": "https://landing.jobs/jobs/88232",
     "published_at": "2026-08-29T09:00:00Z",
-    "role_description": "<p>Enterprise sales. Not a data role: the client-side gate must drop it.</p>"
+    "role_description": "<p>Enterprise sales. Not a data role: the client-side gate must drop it.</p>",
+    "company_id": 4402
   },
   {
     "id": 88233,
     "title": "Machine Learning Engineer",
-    "company": {"name": "Monk's Cafe Tech"},
+    "company": {
+      "name": "Monk's Cafe Tech"
+    },
     "city": "",
     "country_code": "",
     "remote": true,
@@ -42,7 +44,6 @@
   {
     "id": 88234,
     "title": "AI Engineer",
-    "company_name": "",
     "city": "Braga",
     "role_description": "<p>Malformed on purpose: no company and no URL anywhere.</p>"
   }

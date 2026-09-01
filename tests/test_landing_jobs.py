@@ -30,15 +30,36 @@ from src.sources.landing_jobs import (
     fetch,
 )
 from src.util import HttpError
-from tests.conftest import FakeSession, json_response, load_json_fixture
+from tests.conftest import (
+    FakeResponse,
+    FakeSession,
+    json_response,
+    load_json_fixture,
+)
 
 UTC = timezone.utc
 PAYLOAD = load_json_fixture("landing_jobs_page.json")
 
 
-def lj_session(body=None, **kwargs):
+#: What the companies endpoint knows — the listing itself names employers
+#: only by id (live shape, 2026-09-01).
+COMPANIES = {4401: "Del Boca Vista Analytics", 4402: "Vandelay Industries"}
+
+
+def lj_session(body=None, companies=None, **kwargs):
+    table = COMPANIES if companies is None else companies
+    def company_route(url, params):
+        cid = url.rsplit("/", 1)[-1].removesuffix(".json")
+        name = table.get(int(cid)) if cid.isdigit() else None
+        if name is None:
+            return FakeResponse(status_code=404)
+        return json_response({"id": int(cid), "name": name})
     return FakeSession(
-        [("landing.jobs", json_response(PAYLOAD if body is None else body))],
+        [
+            # Ordered: the companies URL also contains "landing.jobs".
+            ("/api/v1/companies/", company_route),
+            ("landing.jobs", json_response(PAYLOAD if body is None else body)),
+        ],
         **kwargs,
     )
 
@@ -85,6 +106,8 @@ def test_the_gate_is_word_bounded(title):
 
 
 def test_the_full_listing_maps_every_field():
+    """The employer's name is no longer in the listing — it arrives through
+    the companies endpoint, resolved by company_id (live shape 2026-09-01)."""
     job = by_title(fetch(None, session=lj_session()))["Data Scientist"]
     assert job.company == "Del Boca Vista Analytics"
     assert job.url == "https://landing.jobs/jobs/88231"
@@ -113,7 +136,24 @@ def test_the_company_object_shape_is_read_too():
 
 def test_a_listing_without_company_or_url_is_skipped():
     jobs = fetch(None, session=lj_session())
-    assert "AI Engineer" not in {j.title for j in jobs}  # id 88234: no company
+    assert "AI Engineer" not in {j.title for j in jobs}  # 88234: no company_id
+
+
+def test_company_lookups_run_after_the_gate_and_are_cached():
+    """Resolution is the expensive half now, so it must be (a) skipped for
+    postings the DS gate already dropped — the Account Executive's employer
+    is never asked about — and (b) cached per id."""
+    session = lj_session()
+    fetch(None, session=session)
+    lookups = [u for u in session.urls() if "/api/v1/companies/" in u]
+    assert lookups == ["https://landing.jobs/api/v1/companies/4401.json"]
+
+
+def test_a_failed_company_lookup_skips_the_job_never_invents():
+    jobs = fetch(None, session=lj_session(companies={}))
+    assert "Data Scientist" not in {j.title for j in jobs}
+    # The inline-company posting is untouched by the lookup path.
+    assert "Machine Learning Engineer" in {j.title for j in jobs}
 
 
 def test_a_jobs_envelope_is_accepted_alongside_the_bare_list():
@@ -126,20 +166,27 @@ def test_a_jobs_envelope_is_accepted_alongside_the_bare_list():
 # ==========================================================================
 
 
+def _listing_calls(session):
+    return [c for c in session.calls if "jobs.json" in c["url"]]
+
+
 def test_offset_and_limit_are_sent_and_a_short_page_stops():
     session = lj_session()
     fetch(None, session=session)
-    assert len(session.calls) == 1  # 4 < PAGE_LIMIT: no second request
-    assert session.calls[0]["params"] == {"offset": 0, "limit": PAGE_LIMIT}
+    listing = _listing_calls(session)
+    assert len(listing) == 1  # 4 < PAGE_LIMIT: no second listing request
+    assert listing[0]["params"] == {"offset": 0, "limit": PAGE_LIMIT}
 
 
 def test_full_pages_advance_the_offset_up_to_the_budget():
     full_page = [dict(PAYLOAD[0], id=n) for n in range(PAGE_LIMIT)]
-    session = FakeSession([("landing.jobs", json_response(full_page))])
+    session = lj_session(full_page)
     fetch(None, session=session)
-    assert [c["params"]["offset"] for c in session.calls] == [
+    assert [c["params"]["offset"] for c in _listing_calls(session)] == [
         n * PAGE_LIMIT for n in range(MAX_PAGES)
     ]
+    # One employer, one lookup — the cache holds across every page.
+    assert len([u for u in session.urls() if "/api/v1/companies/" in u]) == 1
 
 
 # ==========================================================================

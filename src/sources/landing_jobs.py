@@ -32,6 +32,11 @@ logger = get_logger(__name__)
 
 API_URL = "https://landing.jobs/api/v1/jobs.json"
 
+#: One company's public record; the listing names companies only by id
+#: (verified live 2026-09-01, matching the official docs), so names are
+#: resolved here and cached for the run. Unauthenticated, like the listing.
+COMPANY_URL = "https://landing.jobs/api/v1/companies/{company_id}.json"
+
 #: Page size asked for. The server may serve fewer; a short page ends the run.
 PAGE_LIMIT = 100
 #: How many pages one run reads — the freshness window makes deeper pages
@@ -122,10 +127,18 @@ def _sections(payload: Mapping[str, Any]) -> str:
     return "\n\n".join(parts).strip()
 
 
-def parse_job(payload: Mapping[str, Any]) -> Job | None:
-    """One listing -> `Job`, or None when it is not usable."""
+def parse_job(
+    payload: Mapping[str, Any], *, company_fallback: str = ""
+) -> Job | None:
+    """One listing -> `Job`, or None when it is not usable.
+
+    `company_fallback` is the name `fetch()` resolved from the companies
+    endpoint for this listing's `company_id`; inline names (the API's older
+    shapes) still win when present, and a job that ends with neither is
+    unusable — this pipeline never invents an employer.
+    """
     title = _text(payload.get("title"))
-    company = _company(payload)
+    company = _company(payload) or _text(company_fallback)
     url = _first_text(payload, "url", "share_url", "landing_page")
     if not url:
         raw_id = payload.get("id")
@@ -167,15 +180,48 @@ def parse_job(payload: Mapping[str, Any]) -> Job | None:
             "employment_type": _first_text(payload, "type", "contract_type") or None,
             "experience": _first_text(payload, "experience_level") or None,
             "citizenship": _first_text(payload, "citizenship") or None,
+            "company_id": payload.get("company_id"),
         },
     )
+
+
+def _company_name(
+    company_id: Any, cache: dict[Any, str], session: Any
+) -> str:
+    """The employer's name for one `company_id`, cached for the run.
+
+    A failed lookup caches "" so one dead id costs one request, not one per
+    listing — and the affected jobs are skipped rather than shipped with an
+    invented employer.
+    """
+    if company_id in cache:
+        return cache[company_id]
+    name = ""
+    if isinstance(company_id, int):
+        try:
+            payload = http_get_json(
+                COMPANY_URL.format(company_id=company_id), session=session
+            )
+            if isinstance(payload, Mapping):
+                name = _first_text(payload, "name", "company_name", "trade_name")
+        except Exception as exc:
+            logger.warning("landing_jobs: company %s lookup failed: %s",
+                           company_id, exc)
+    cache[company_id] = name
+    return name
 
 
 def fetch(
     config: Any, *, session: Any = None, errors: list[str] | None = None
 ) -> list[Job]:
-    """Fetch up to `MAX_PAGES` of DS/ML listings. Never raises."""
+    """Fetch up to `MAX_PAGES` of DS/ML listings. Never raises.
+
+    The DS/ML title gate runs BEFORE company resolution on purpose: the
+    board is all of tech, and resolving employers for postings the gate is
+    about to drop would multiply the request count for nothing.
+    """
     jobs: list[Job] = []
+    companies: dict[Any, str] = {}
     skipped_titles = 0
     for page in range(MAX_PAGES):
         offset = page * PAGE_LIMIT
@@ -209,8 +255,12 @@ def fetch(
             if title and not DS_TITLE_RE.search(title):
                 skipped_titles += 1
                 continue
+            fallback = ""
+            if not _company(entry):
+                fallback = _company_name(entry.get("company_id"), companies,
+                                         session)
             try:
-                job = parse_job(entry)
+                job = parse_job(entry, company_fallback=fallback)
             except Exception as exc:  # one bad entry must not kill the page
                 logger.debug("landing_jobs: skipping malformed entry: %s", exc)
                 continue

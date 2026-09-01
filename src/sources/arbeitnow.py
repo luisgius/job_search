@@ -5,8 +5,9 @@ JSON document per page, `links.next` for pagination, no auth of any kind. Two
 properties make it worth a slot next to the watchlist boards:
 
   * it is Germany-heavy in exactly the segment the watchlist misses — the
-    SMBs and startups nobody thought to list — and every posting carries a
-    `visa_sponsorship` boolean, which no ATS in this pipeline publishes;
+    SMBs and startups nobody thought to list (postings historically carried
+    a `visa_sponsorship` boolean; the live feed dropped it in 2026, and the
+    parser still reads it defensively for the day it returns);
   * `created_at` is a plain unix timestamp set when the posting appeared on
     the board, so freshness filtering has a real date to work with (unlike
     Adzuna's ingest-time `created`).

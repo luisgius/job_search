@@ -7,7 +7,7 @@
 # START FROM A COMPANY NAME instead, and let the tool find the board:
 #     python -m src.sources.ats_boards --discover "Glovo" "Factorial HR"
 #
-# It derives the plausible slug spellings from each name, asks the six boards,
+# It derives the plausible slug spellings from each name, asks the eight boards,
 # and prints the lines to paste here — plus what it asked and what answered, so
 # you can disagree with it. It never edits this file: this is the one you
 # curate by hand, and a tool that rewrites it will eventually eat something.
@@ -53,13 +53,18 @@
 
 greenhouse:
   # Replace with the companies you actually want. These are only examples and
-  # slugs do change — run --check-all after editing.
-  - spotify
+  # slugs do change — run --check-all after editing. spotify was here until
+  # 2026-09-01, when the first live run answered 404: they left Greenhouse.
+  # datadog (455 postings) and gitlab (221) verified live the same day.
   - datadog
   - gitlab
 
 lever:
-  - plaid
+  # plaid 404'd on the first live run (2026-09-01) — they left Lever. Empty
+  # until Phase 3 verifies real tenants; sources.lever is off in config.yaml
+  # for the same reason (an enabled board over an empty list reads as a
+  # quiet market).
+  []
 
 # ---------------------------------------------------------------------------
 # The four European boards.
@@ -69,16 +74,18 @@ lever:
 # and an enabled board with an empty watchlist returns nothing every morning
 # while looking exactly like a quiet market. `--validate-only` says so.
 #
-# The examples below are each vendor's own careers board — the likeliest slug
-# to still exist, and something to prove the plumbing against — but they were
-# written without network access and NONE of them has been verified. Check
-# before you trust them, and replace them with companies you would work for:
+# The examples below are each vendor's own careers board. The first live run
+# (2026-09-01) verified ashby (68 postings), smartrecruiters (2) and personio
+# (1); workable's own board is NOT at apply.workable.com/workable and its
+# placeholder is gone. Replace them all with companies you would work for:
 #
 #     python -m src.sources.ats_boards --check-all
 # ---------------------------------------------------------------------------
 
 workable:
-  - workable
+  # The vendor's own slug 404'd on the first live run — add real tenants
+  # before enabling this board (Greek mid-size tech is its home turf).
+  []
 
 ashby:
   - ashby

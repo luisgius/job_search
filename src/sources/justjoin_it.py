@@ -44,6 +44,22 @@ logger = get_logger(__name__)
 
 API_URL = "https://api.justjoin.it/v2/user-panel/offers"
 
+#: The request shape the site's own frontend uses. The first live run
+#: answered 503 to this pipeline's default client identity; an internal API
+#: fronted by a CDN often admits only browser-shaped traffic, and matching
+#: the frontend's own headers is part of the Tier 2 bargain. If 503 persists
+#: even so, the block is TLS-fingerprint-level and this source stays
+#: degraded until the endpoint is re-scouted in the site's devtools.
+_BROWSER_HEADERS: dict[str, str] = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json",
+    "Origin": "https://justjoin.it",
+    "Referer": "https://justjoin.it/",
+}
+
 #: The job page for one offer slug.
 JOB_URL = "https://justjoin.it/job-offer/{slug}"
 
@@ -228,7 +244,8 @@ def fetch(
             "experienceLevels[]": list(EXPERIENCE_LEVELS),
         }
         try:
-            payload = http_get_json(API_URL, params=params, session=session)
+            payload = http_get_json(API_URL, params=params, session=session,
+                                    headers=dict(_BROWSER_HEADERS))
         except Exception as exc:
             _report(f"justjoin_it: page {page}: {exc}", errors)
             break

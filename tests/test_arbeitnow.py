@@ -3,8 +3,7 @@
 Arbeitnow is a *global feed*, not a watchlist board: no slug, no key, one
 paginated JSON document for the whole (Germany-heavy) board. What
 correctness means here is therefore different from the ATS adapters — the
-tests pin the aggregator concerns: epoch dates, the visa_sponsorship flag
-that no ATS publishes, the employment-type passthrough that catches
+tests pin the aggregator concerns: epoch dates, the employment-type passthrough that catches
 neutrally-titled internships, pagination that stops when `links.next` says
 so, and above all the hard rule that nothing raises out of `fetch()`.
 
@@ -67,11 +66,14 @@ def test_created_at_is_a_unix_epoch():
     assert job.posted_at == datetime.fromtimestamp(1787471100, tz=UTC)
 
 
-def test_visa_sponsorship_survives_into_raw():
-    """No ATS in this pipeline publishes this bit; it must not be lost."""
-    jobs = by_company(fetch(None, session=an_session()))
-    assert jobs["Kramerica Labs"].raw["visa_sponsorship"] is True
-    assert jobs["Pendant Publishing"].raw["visa_sponsorship"] is False
+def test_visa_sponsorship_is_read_when_the_feed_sends_it():
+    """The live feed dropped this field in 2026 (so the fixture no longer
+    carries it), but the parser still reads it defensively for the day it
+    returns — no ATS in this pipeline publishes that bit."""
+    entry = dict(PAYLOAD["data"][0], visa_sponsorship=True)
+    assert parse_job(entry).raw["visa_sponsorship"] is True
+    assert by_company(fetch(None, session=an_session()))[
+        "Kramerica Labs"].raw["visa_sponsorship"] is None
 
 
 def test_job_types_land_where_the_employment_filter_reads():

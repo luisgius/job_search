@@ -78,7 +78,11 @@ sources:
   # employers actually are — turning them on is the single biggest change you
   # can make to how many relevant postings you see each morning.
   greenhouse: true
-  lever: true
+  # Off since 2026-09-01: the demo Lever tenant (plaid) left Lever and the
+  # watchlist has no verified replacement yet — Phase 3 brings them, then
+  # this flips back. An enabled board over an empty list reads as a quiet
+  # market, which is the silent failure this file keeps refusing.
+  lever: false
   # Each needs companies in watchlist.yaml first; an enabled board with an
   # empty watchlist fetches nothing and looks exactly like a quiet market
   # (--validate-only will tell you). Prove your slugs, then flip these:
@@ -93,7 +97,7 @@ sources:
   # list, no keys to create — flip them on and they fetch. Both point their
   # apply link at the board rather than the employer's ATS, so when the same
   # role arrives twice, dedupe keeps the ATS copy.
-  arbeitnow: true          # German market, free API, has a visa_sponsorship flag
+  arbeitnow: true          # German market, free API (its visa flag left the feed in 2026)
   landing_jobs: true       # Lisbon/Porto + remote-EU, salary published often
   # Tier 2 — no official API: these read the internal JSON the site's own
   # frontend uses, so they cover the Polish market properly (you live in it)
