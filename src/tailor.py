@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any
 
 from .filters import first_title_match
-from .llm import LLMError, client_from_config
+from .llm import LLMError, chain_from_config
 from .models import ApplyStatus, Artifacts, Job, ScoredJob, normalize_text
 from .util import ensure_dir, get_logger, slugify, truncate
 
@@ -597,10 +597,9 @@ def validate_cover_letter(
 
 
 def _resolve_client(config: Any, client: Any) -> Any:
-    """Return the injected client, or build the one `llm.provider` asks for."""
-    if client is not None:
-        return client
-    return client_from_config(config)
+    """The injected client, or what the config asks for — a plain client, or
+    a `ModelChain` when `tailoring.fallback_models` names fallbacks."""
+    return chain_from_config(config, "tailoring", client=client)
 
 
 def _write_job_json(path: Path, scored: ScoredJob) -> None:
@@ -686,6 +685,39 @@ def select_cv(
     return base_markdown, ""
 
 
+def _repair(
+    llm: Any, *, model: str, system: str, prompt: str, draft: str,
+    reason: str, max_tokens: int, temperature: float,
+) -> str:
+    """One corrective retry: hand the validator's verdict back to the model.
+
+    The evaluator half of this loop (`validate_tailored_cv`,
+    `validate_cover_letter`) has always existed; this is the optimizer half.
+    Without it a single unanchored number cost the whole output of the most
+    expensive stage. Bounded by construction — one extra call per rejected
+    document, never a loop — and a failed retry returns "", after which the
+    caller falls back exactly as it always did.
+    """
+    correction = (
+        f"{prompt}\n\n"
+        "A previous draft was REJECTED by a mechanical validator.\n"
+        f"Rejection reason: {reason}\n"
+        "<<<REJECTED_DRAFT\n"
+        f"{draft}\n"
+        "REJECTED_DRAFT>>>\n\n"
+        "Produce a corrected version that fixes exactly this problem and "
+        "changes nothing else. Every rule above still applies."
+    )
+    try:
+        return _strip_fences(llm.complete(
+            model=model, system=system, prompt=correction,
+            max_tokens=max_tokens, temperature=temperature,
+        ))
+    except Exception as exc:  # the fallback path must stay reachable
+        logger.warning("corrective retry failed: %s", exc)
+        return ""
+
+
 def tailor_job(
     scored: ScoredJob,
     cv_markdown: str,
@@ -734,13 +766,25 @@ def tailor_job(
         return scored
 
     detail = ""
+    cover_flags: list[str] = []
     ok, reason = validate_tailored_cv(cv_markdown, cv_md, applicant)
     if not ok:
-        # Falling back to the base CV is always safe: it is the document the
-        # user wrote about themselves.
-        logger.warning("discarding tailored CV for %s: %s", job.label, reason)
-        cv_md = cv_markdown
-        detail = f"tailored CV rejected ({reason}); using the base CV"
+        repaired = _repair(
+            llm, model=model, system=CV_SYSTEM_PROMPT,
+            prompt=build_cv_prompt(job, cv_markdown, applicant),
+            draft=cv_md, reason=reason,
+            max_tokens=max_tokens, temperature=temperature,
+        )
+        if repaired and validate_tailored_cv(cv_markdown, repaired, applicant)[0]:
+            cv_md = repaired
+            detail = f"retailored after: {reason}"
+            logger.info("corrective retry recovered the CV for %s", job.label)
+        else:
+            # Falling back to the base CV is always safe: it is the document
+            # the user wrote about themselves.
+            logger.warning("discarding tailored CV for %s: %s", job.label, reason)
+            cv_md = cv_markdown
+            detail = f"tailored CV rejected ({reason}); using the base CV"
 
     if not (cover_md or "").strip():
         cover_md = ""
@@ -750,9 +794,28 @@ def tailor_job(
             cover_md, base_md=cv_markdown, job=job, applicant=applicant
         )
         if not cover_ok:
+            repaired = _repair(
+                llm, model=model, system=COVER_SYSTEM_PROMPT,
+                prompt=build_cover_prompt(job, cv_markdown, applicant),
+                draft=cover_md, reason=cover_reason,
+                max_tokens=max_tokens, temperature=temperature,
+            )
+            if repaired:
+                r_ok, _r_reason, r_flags = validate_cover_letter(
+                    repaired, base_md=cv_markdown, job=job, applicant=applicant
+                )
+                if r_ok:
+                    cover_md = repaired
+                    cover_ok, cover_flags = True, r_flags
+                    detail = (detail + "; " if detail else "") + \
+                        f"cover letter rewritten after: {cover_reason}"
+                    logger.info("corrective retry recovered the letter for %s",
+                                job.label)
+        if not cover_ok:
             # No fallback document exists for a letter (the base CV is its own
             # fallback; a template letter would be worse than none), so a
-            # rejected letter ships as absence plus an explanation.
+            # rejected letter ships as absence plus an explanation. The
+            # rejection reported is the FIRST one — the honest diagnosis.
             logger.warning("discarding cover letter for %s: %s", job.label, cover_reason)
             cover_md = ""
             detail = (detail + "; " if detail else "") + f"cover letter rejected ({cover_reason})"
@@ -774,6 +837,8 @@ def tailor_job(
 
     scored.tailored_cv_md = cv_md
     scored.cover_letter_md = cover_md
+    # The apply stage refuses to type a flagged letter into a live form.
+    scored.cover_flags = [str(f) for f in cover_flags] if cover_md else []
     if scored.artifacts is None:  # defensive: the dataclass default is never None
         scored.artifacts = Artifacts()
     scored.artifacts.dir = str(directory)

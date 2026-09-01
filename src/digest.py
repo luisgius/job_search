@@ -37,6 +37,8 @@ from urllib.parse import quote
 from jinja2 import Environment, FileSystemLoader
 
 from . import config as config_module
+from urllib.parse import urlsplit
+
 from . import health as health_module
 from .models import ApplyStatus, ScoredJob, ensure_utc, utcnow
 from .util import ensure_dir, get_logger, html_to_text, truncate
@@ -48,8 +50,6 @@ TEMPLATE_NAME = "digest.html.j2"
 
 #: Enough of the posting to recognise it without opening the tab.
 DESCRIPTION_EXCERPT_CHARS = 400
-#: Enough of the cover letter to judge its tone — roughly the opening paragraph.
-COVER_PREVIEW_CHARS = 250
 
 DEFAULT_THRESHOLD = 65
 #: Imported rather than repeated: a source the page does not know about is a
@@ -386,6 +386,28 @@ def _ghost_flags(
     return flags, gap
 
 
+def _safe_url(url: Any) -> tuple[str, str]:
+    """(href, host) for the apply button — plain http(s) only.
+
+    Autoescape stops a URL from breaking out of its attribute; it does not
+    neutralise a `javascript:` or `data:` scheme, and this page opens as
+    file://. A posting whose URL is anything but http(s) gets no button at
+    all, and the host rides along so the template can print the destination
+    beside the button — visible before the click, not after.
+    """
+    text = str(url or "").strip()
+    if not text:
+        return "", ""
+    try:
+        parts = urlsplit(text)
+    except ValueError:
+        return "", ""
+    if parts.scheme.lower() not in ("http", "https"):
+        logger.warning("digest: dropping non-http(s) job URL %r", text[:80])
+        return "", ""
+    return text, parts.netloc
+
+
 def _item(
     scored: ScoredJob,
     *,
@@ -426,9 +448,10 @@ def _item(
     # Descriptions arrive as HTML from Greenhouse and as plain text elsewhere;
     # flatten first so the excerpt is prose rather than escaped markup.
     excerpt = truncate(html_to_text(job.description), DESCRIPTION_EXCERPT_CHARS, suffix=" …")
-    cover_preview = truncate(
-        (scored.cover_letter_md or "").strip(), COVER_PREVIEW_CHARS, suffix=" …"
-    )
+    # The FULL letter, deliberately: it goes out under the user's real name,
+    # and a 250-char teaser is how a servile or absurd sentence in paragraph
+    # three ships unread. The details block collapses, so length is free.
+    cover_preview = (scored.cover_letter_md or "").strip()
 
     relative = relative_time(job.posted_at, now)
     age_days = posting_age_days(job.posted_at, now)
@@ -459,6 +482,7 @@ def _item(
     else:
         posted_label = f"posted {relative}"
 
+    safe_url, url_host = _safe_url(job.url)
     return {
         "key": job.key,
         "company": job.company or "Unknown company",
@@ -467,7 +491,8 @@ def _item(
         "country": job.country or "",
         "remote": job.remote,
         "salary": job.salary or "",
-        "url": job.url,
+        "url": safe_url,
+        "url_host": url_host,
         "source": job.source or "",
         "ats": job.ats or "",
         "posted_at": _format_datetime(job.posted_at),
@@ -692,6 +717,33 @@ def _source_health(
     return table
 
 
+def _llm_usage(stats_data: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The run's LLM spend, print-ready. None hides the line entirely —
+    offline and `--no-llm` runs made no calls, and zeros would read as
+    "today was free" rather than "today was silent"."""
+    data = stats_data.get("llm_usage")
+    if not isinstance(data, Mapping):
+        return None
+    calls = _int(data.get("calls"), 0)
+    if not calls:
+        return None
+    cost = data.get("cost")
+    cost_num = float(cost) if isinstance(cost, (int, float)) \
+        and not isinstance(cost, bool) else 0.0
+    by_model = data.get("by_model")
+    models = ", ".join(sorted(by_model)) if isinstance(by_model, Mapping) else ""
+    return {
+        "calls": calls,
+        "tokens_in": f"{_int(data.get('input_tokens'), 0):,}",
+        "tokens_out": f"{_int(data.get('output_tokens'), 0):,}",
+        # 0.0 is what a :free model — and any provider that reports no
+        # per-response charge — produces; "no cost reported" is the honest
+        # print for both, where "$0.00" would claim knowledge nobody has.
+        "cost": f"${cost_num:.4f}" if cost_num else "no cost reported",
+        "models": models,
+    }
+
+
 def build_context(
     scored_jobs: Iterable[ScoredJob] | None = None,
     stats: Any = None,
@@ -780,6 +832,7 @@ def build_context(
         "source_health": _source_health(
             stats, stats_data, errors, new_by_source, tracker, moment
         ),
+        "llm_usage": _llm_usage(stats_data),
         "filter_counts": filter_counts,
         "errors": errors,
         "totals": totals,
@@ -843,6 +896,7 @@ def _skeleton() -> dict[str, Any]:
         "funnel": [],
         "source_counts": {},
         "source_health": [],
+        "llm_usage": None,
         "filter_counts": {},
         "errors": [],
         "totals": {name: 0 for name in list(sections) + ["all"]},

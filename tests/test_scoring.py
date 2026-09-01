@@ -441,7 +441,8 @@ def test_the_rules_reach_the_model(tmp_path):
 
     class Client:
         def complete_json(self, *, model, system, require_keys, forbid_verbatim,
-                          prompt, max_tokens, temperature):
+                          prompt, max_tokens, temperature, schema=None,
+                          structured="auto"):
             captured["prompt"] = prompt
             return {"score": 70, "reasons": ["ok"], "strengths": [],
                     "gaps": [], "verdict": "fine"}

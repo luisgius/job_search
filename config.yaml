@@ -10,8 +10,9 @@ applicant:
   name: "Luis Gimenez"
   email: "lgimenezuso@gmail.com"
   # Kept OUT of this file on purpose: the repo is public and a phone number
-  # in a public repo gets scraped. Set it here on your own machine — apply
-  # only requires it before you turn dry_run off.
+  # in a public repo gets scraped — and the suite now FAILS if one appears
+  # here (tests/test_no_secrets.py). Export JOB_HUNTER_PHONE instead: env
+  # always wins, live runs get the number, git history never does.
   phone: ""
   location: "Kraków, Poland"
   linkedin: "https://linkedin.com/in/luis-gimenez-uso"   # as printed on the CVs
@@ -25,6 +26,11 @@ llm:
   # vLLM, a corporate proxy) by setting base_url below.
   provider: openrouter
   base_url: ""             # only for a non-OpenRouter compatible gateway
+  # How the scorer's JSON travels: auto = grammar-constrained where it is a
+  # first-party feature (the Anthropic SDK), prompt+recovery elsewhere —
+  # most :free ids reject the OpenAI dialect's response_format, so auto is
+  # already right for this file. Change only to force one side everywhere.
+  # structured_output: auto
 
 keys:
   # Environment variables ALWAYS win over anything written here, so you can
@@ -83,16 +89,16 @@ sources:
   # this flips back. An enabled board over an empty list reads as a quiet
   # market, which is the silent failure this file keeps refusing.
   lever: false
-  # Each needs companies in watchlist.yaml first; an enabled board with an
-  # empty watchlist fetches nothing and looks exactly like a quiet market
-  # (--validate-only will tell you). Prove your slugs, then flip these:
-  #     python -m src.sources.ats_boards --check-all
-  workable: false          # EU/Greek-founded — very common for mid-size
-  ashby: false             # modern start-ups
-  smartrecruiters: false   # large EU employers (DE/FR/ES)
-  personio: false          # the German/Spanish/Italian SMB default
-  recruitee: false         # Dutch-founded — very common for NL/BE mid-size
-  teamtailor: false        # the Nordic default; entries may be full careers URLs
+  # ON since Phase 3 (2026-09-01): each of the six now has at least one
+  # LIVE-VERIFIED tenant in watchlist.yaml, plus candidates awaiting your
+  # one `--check-all` run — a candidate that 404s degrades visibly in the
+  # digest's health table and gets pruned, it never takes the run down.
+  workable: true           # EU/Greek-founded — very common for mid-size
+  ashby: true              # modern start-ups
+  smartrecruiters: true    # large EU employers (DE/FR/ES)
+  personio: true           # the German/Spanish/Italian SMB default
+  recruitee: true          # Dutch-founded — very common for NL/BE mid-size
+  teamtailor: true         # the Nordic default; entries may be full careers URLs
   # The two below are *global feeds*, not watchlist boards: no companies to
   # list, no keys to create — flip them on and they fetch. Both point their
   # apply link at the board rather than the employer's ATS, so when the same
@@ -359,6 +365,14 @@ scoring:
   # When validated, the upgrade back is one line:
   #     model: anthropic/claude-sonnet-5   (or claude-haiku-4.5, ~10x cheaper)
   model: meta-llama/llama-3.3-70b-instruct:free
+  # Tried in order when the model above cannot answer (spent 50/day cap,
+  # rotated id, outage) — a second :free id also DOUBLES the daily budget,
+  # since the caps are per model. Verify it on your first run; if it 404s,
+  # swap it for any current :free chat model. A mapping entry points the
+  # same chain at a local gateway, no key needed:
+  #   - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1"}
+  fallback_models:
+    - mistralai/mistral-small-3.1-24b-instruct:free
   threshold: 65            # 65 medium · 75 strict
   max_jobs: 40             # hard cap on LLM calls per run — your cost ceiling
   max_tokens: 1500
@@ -421,6 +435,10 @@ output:
 
 db:
   path: output/tracker.sqlite3
+  # Daily dated copies in output/backups/ — the tracker is the one file in
+  # output/ that cannot be regenerated (it is the record of what you applied
+  # to). 0 turns backups off.
+  backups_keep: 14
   # Don't re-surface a job you've already been shown within this many days.
   # Jobs you actually applied to are never surfaced again, window or not.
   skip_seen_days: 30

@@ -359,6 +359,10 @@ class ScoredJob:
     status_detail: str = ""
     cover_letter_md: str | None = None
     tailored_cv_md: str | None = None
+    #: Advisory findings `validate_cover_letter` attached to a letter it
+    #: KEPT (overlong, never names the company). Auto-apply reads this: a
+    #: flagged letter is typed into no live form — a human reads it first.
+    cover_flags: list[str] = field(default_factory=list)
 
     @property
     def score_value(self) -> int:
@@ -389,6 +393,10 @@ class RunStats:
     #: Jobs still standing after the hard filters, by source — what the
     #: digest's health block reads to say "fetched 40, kept 3" per source.
     source_after_filters: dict[str, int] = field(default_factory=dict)
+    #: `llm.usage_snapshot()` at the end of the run: calls, tokens, and the
+    #: charge OpenRouter reports per response. What turns "the free tier is
+    #: probably fine" into a number the digest can print.
+    llm_usage: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -406,4 +414,5 @@ class RunStats:
             "errors": list(self.errors),
             "source_counts": dict(self.source_counts),
             "source_after_filters": dict(self.source_after_filters),
+            "llm_usage": dict(self.llm_usage),
         }

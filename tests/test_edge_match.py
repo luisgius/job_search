@@ -468,7 +468,10 @@ def test_a_surname_first_rewrite_is_rejected_and_the_base_cv_is_used(tmp_path: P
     cfg = tailor_config(tmp_path)
     scored = make_scored()
     surname_first = GOOD_CV.replace("# Ada Lovelace", "# LOVELACE, Ada")
-    tailor_job(scored, BASE_CV, cfg, client=llm_client([surname_first, GOOD_COVER]))
+    # The third response feeds the corrective retry the same spelling, so the
+    # rejection (and this test's point) survives the one repair attempt.
+    tailor_job(scored, BASE_CV, cfg,
+               client=llm_client([surname_first, GOOD_COVER, surname_first]))
     assert scored.tailored_cv_md == BASE_CV
     assert "rejected" in scored.status_detail
 
@@ -892,7 +895,10 @@ def test_a_rejected_cv_still_leaves_a_cover_letter_and_a_job_json(tmp_path: Path
     cfg = tailor_config(tmp_path)
     scored = make_scored(score=91)
     bloated = GOOD_CV + ("\n- padded line" * 500)
-    tailor_job(scored, BASE_CV, cfg, client=llm_client([bloated, GOOD_COVER]))
+    # Third response: the corrective retry gets an equally bloated draft, so
+    # the fallback this test is about still happens.
+    tailor_job(scored, BASE_CV, cfg,
+               client=llm_client([bloated, GOOD_COVER, bloated]))
 
     directory = Path(scored.artifacts.dir)
     assert (directory / "cover_letter.md").read_text(encoding="utf-8").strip()

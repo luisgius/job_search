@@ -342,6 +342,14 @@ section {
   align-items: center;
   margin-top: 14px;
 }
+/* The apply button hides its destination; the host printed beside it is the
+   anti-phishing measure — a reader who expects greenhouse.io and sees
+   grëenhouse.io has been warned by the page itself. */
+.links .host {
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  color: var(--muted, #667);
+}
 .btn {
   background: var(--accent);
   color: var(--accent-ink);
@@ -626,6 +634,7 @@ footer code {
 <div class="links">
   {% if item.url %}
   <a class="btn" href="{{ item.url }}" target="_blank" rel="noopener">{{ primary }}</a>
+  {% if item.url_host %}<span class="host">{{ item.url_host }}</span>{% endif %}
   {% endif %}
   {% if item.cv_md %}<a class="file" href="{{ item.cv_md }}">Tailored CV (md)</a>{% endif %}
   {% if item.cover_md %}<a class="file" href="{{ item.cover_md }}">Cover letter (md)</a>{% endif %}
@@ -667,7 +676,7 @@ footer code {
 {% macro previews(item) %}
 {% if item.cover_preview %}
 <details>
-  <summary>Cover letter preview</summary>
+  <summary>Cover letter — full text (read it before it is sent anywhere)</summary>
   <pre>{{ item.cover_preview }}</pre>
 </details>
 {% endif %}
@@ -735,6 +744,11 @@ footer code {
       </tbody>
     </table>
   </div>
+  {% if llm_usage %}
+  <p class="hint">LLM this run: {{ llm_usage.calls }} call{{ "s" if llm_usage.calls != 1 }}
+    · {{ llm_usage.tokens_in }} in / {{ llm_usage.tokens_out }} out tokens
+    · {{ llm_usage.cost }}{% if llm_usage.models %} · {{ llm_usage.models }}{% endif %}</p>
+  {% endif %}
 </section>
 {% endif %}
 

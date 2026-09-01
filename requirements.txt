@@ -1,25 +1,35 @@
+# Every range is CEILINGED (<next major): a bare `>=` adopts whatever was
+# published last night, which is how a compromised release walks in on its
+# own. The ceiling blocks silent major jumps on every install; the true pin
+# is a lockfile you freeze from a venv where the suite passes:
+#
+#     pip freeze > requirements.lock       # then install with:
+#     pip install -r requirements.lock
+#
+# Upgrading is deliberate: raise a ceiling, run the suite, re-freeze, commit.
+
 # --- core (always required) ---
-PyYAML>=6.0
-requests>=2.31
-Jinja2>=3.1
-python-dateutil>=2.8
+PyYAML>=6.0,<7
+requests>=2.31,<3
+Jinja2>=3.1,<4
+python-dateutil>=2.8,<3
 # language gate (filters.languages); the pipeline degrades gracefully
 # without it, but it is part of the standard install
-lingua-language-detector>=2.0
+lingua-language-detector>=2.0,<3
 
 # --- LLM scoring + tailoring ---
-anthropic>=0.40
+anthropic>=0.40,<2
 
 # --- auto-apply (Greenhouse / Lever forms) ---
-playwright>=1.44
+playwright>=1.44,<2
 
 # --- tailored CV -> PDF (used by your src/render_pdf.py hook) ---
-reportlab>=4.0
+reportlab>=4.0,<6
 
 # --- optional: LinkedIn job alerts via Gmail ---
-google-api-python-client>=2.120
-google-auth-httplib2>=0.2
-google-auth-oauthlib>=1.2
+google-api-python-client>=2.120,<3
+google-auth-httplib2>=0.2,<1
+google-auth-oauthlib>=1.2,<2
 
 # --- dev / tests ---
-pytest>=8.0
+pytest>=8.0,<10

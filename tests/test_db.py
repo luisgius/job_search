@@ -673,3 +673,77 @@ def test_transaction_rolls_back_on_error(memory_tracker):
             conn.execute("DELETE FROM jobs WHERE key = ?", (job.key,))
             raise RuntimeError("boom")
     assert memory_tracker.has_job(job.key) is True
+
+
+def test_migration_v3_upgrades_a_v2_tracker_in_place(tmp_path):
+    """An existing tracker gains the score_reasons column without losing a
+    row — the same in-place contract every migration before it honoured."""
+    import sqlite3
+
+    from src.db import MIGRATIONS
+
+    path = tmp_path / "old.sqlite3"
+    conn = sqlite3.connect(path)
+    conn.executescript(MIGRATIONS[0])
+    conn.executescript(MIGRATIONS[1])
+    conn.execute("PRAGMA user_version = 2")
+    conn.commit()
+    conn.close()
+
+    tracker = Tracker(path)
+    assert tracker.conn.execute("PRAGMA user_version").fetchone()[0] == 3
+    columns = {row[1] for row in
+               tracker.conn.execute("PRAGMA table_info(applications)")}
+    assert "score_reasons" in columns
+    tracker.close()
+
+
+def test_score_reasons_persist_and_survive_a_reasonless_rerecording():
+    """The calibration data: kept as JSON, and COALESCE-protected so a later
+    recording without reasons (statuses get re-recorded all the time) never
+    erases what the scorer once said."""
+    import json as json_lib
+
+    from tests.conftest import make_job
+
+    tracker = Tracker()
+    job = make_job()
+    tracker.record_job(job)
+    tracker.record_status(job.key, "digest", score=81,
+                          score_reasons=["title match", "forecasting overlap"])
+    stored = tracker.get_application(job.key)["score_reasons"]
+    assert json_lib.loads(stored) == ["title match", "forecasting overlap"]
+
+    tracker.record_status(job.key, "digest", score=81)
+    stored = tracker.get_application(job.key)["score_reasons"]
+    assert json_lib.loads(stored) == ["title match", "forecasting overlap"]
+    tracker.close()
+
+
+def test_backup_writes_one_dated_consistent_copy_and_prunes(tmp_path):
+    import sqlite3
+    from datetime import datetime, timezone
+
+    tracker = Tracker(tmp_path / "tracker.sqlite3")
+    day1 = datetime(2026, 9, 1, 8, 0, tzinfo=timezone.utc)
+    made = tracker.backup(keep=2, now=day1)
+    assert made is not None and made.name == "tracker-2026-09-01.sqlite3"
+    # The copy is a real snapshot, not a torn file copy of a WAL database.
+    copy = sqlite3.connect(made)
+    assert copy.execute("PRAGMA user_version").fetchone()[0] == 3
+    copy.close()
+
+    assert tracker.backup(keep=2, now=day1) is None  # same day: no second copy
+
+    for stamp in ("2026-08-20", "2026-08-21", "2026-08-22"):
+        (tmp_path / "backups" / f"tracker-{stamp}.sqlite3").write_bytes(b"x")
+    tracker.backup(keep=2, now=datetime(2026, 9, 2, 8, 0, tzinfo=timezone.utc))
+    left = sorted(p.name for p in (tmp_path / "backups").glob("tracker-*.sqlite3"))
+    assert left == ["tracker-2026-09-01.sqlite3", "tracker-2026-09-02.sqlite3"]
+    tracker.close()
+
+
+def test_an_in_memory_tracker_never_tries_to_back_itself_up():
+    tracker = Tracker()
+    assert tracker.backup(keep=5) is None
+    tracker.close()

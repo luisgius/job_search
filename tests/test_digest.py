@@ -1093,3 +1093,37 @@ def test_health_chips_follow_the_page_theme():
     for chip, token in (("ok", "--good"), ("degraded", "--warn"), ("error", "--bad")):
         rule = html.split(f".health.{chip}", 1)[1].split("}", 1)[0]
         assert f"var({token}-bg)" in rule and f"var({token})" in rule
+
+
+def test_the_apply_button_never_carries_a_non_http_scheme():
+    """Autoescape keeps a URL inside its attribute; it does not neutralise a
+    javascript: scheme, and this page opens as file://. No scheme, no button."""
+    from src.digest import _safe_url
+
+    assert _safe_url("javascript:alert(1)") == ("", "")
+    assert _safe_url("data:text/html,<script>1</script>") == ("", "")
+    assert _safe_url("") == ("", "")
+    assert _safe_url(None) == ("", "")
+    href, host = _safe_url("https://boards.greenhouse.io/acme/jobs/1")
+    assert href == "https://boards.greenhouse.io/acme/jobs/1"
+    assert host == "boards.greenhouse.io"
+
+
+def test_llm_usage_line_hides_zero_call_runs_and_formats_spend():
+    from src.digest import _llm_usage
+
+    assert _llm_usage({}) is None
+    assert _llm_usage({"llm_usage": {"calls": 0}}) is None
+
+    line = _llm_usage({"llm_usage": {
+        "calls": 42, "input_tokens": 187000, "output_tokens": 9000,
+        "cost": 0.0, "by_model": {"m1": {}, "m0": {}},
+    }})
+    assert line["calls"] == 42
+    assert line["tokens_in"] == "187,000"
+    # 0.0 is what a :free model reports; never print it as a price.
+    assert line["cost"] == "no cost reported"
+    assert line["models"] == "m0, m1"
+
+    paid = _llm_usage({"llm_usage": {"calls": 1, "cost": 0.0123}})
+    assert paid["cost"] == "$0.0123"

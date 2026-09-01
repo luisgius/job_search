@@ -51,20 +51,90 @@
 # particular is the default for German, Spanish and Italian SMBs.
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# PHASE 3 (2026-09-01): the list below is the ~60-company Europe watchlist —
+# DS/ML-hiring employers across NL/ES/IE/PT/PL/DE/Nordics/CH plus remote-EU.
+# Verification state is per line:
+#
+#   VERIFIED   answered a live probe with that slug on the date noted
+#   CANDIDATE  best-known slug, NOT yet probed from your machine
+#
+# The candidates are exactly what `--check-all` exists for. One run:
+#
+#     python -m src.sources.ats_boards --check-all --json
+#
+# paste the output back, and the 404s get pruned / re-discovered. Until that
+# run, expect some rows of the digest's health table to show errors — that is
+# the verification working, not the market going quiet. A company here is a
+# search commitment, not an endorsement: it costs one request a day.
+# ---------------------------------------------------------------------------
+
 greenhouse:
-  # Replace with the companies you actually want. These are only examples and
-  # slugs do change — run --check-all after editing. spotify was here until
-  # 2026-09-01, when the first live run answered 404: they left Greenhouse.
-  # datadog (455 postings) and gitlab (221) verified live the same day.
-  - datadog
-  - gitlab
+  # spotify left Greenhouse (live 404, 2026-09-01); datadog (455 postings)
+  # and gitlab (221) VERIFIED live the same day.
+  - datadog          # VERIFIED 2026-09-01 · US/remote-EU · heavy DS org
+  - gitlab           # VERIFIED 2026-09-01 · all-remote, EMEA-friendly
+  # --- remote-EU first ---
+  - elastic          # CANDIDATE · distributed, ML search/obs
+  - canonical        # CANDIDATE · all-remote, hires DS/MLE in EU broadly
+  - grafanalabs      # CANDIDATE · remote EMEA observability, ML features
+  - docker           # CANDIDATE · remote EU
+  - remotecom        # CANDIDATE · Remote.com, EOR — remote-EU DS roles
+  # --- Netherlands ---
+  - adyen            # CANDIDATE · Amsterdam · payments DS/risk ML
+  - mollie           # CANDIDATE · Amsterdam · payments
+  - messagebird      # CANDIDATE · Amsterdam (rebranded Bird — slug may lag)
+  # --- Spain ---
+  - glovo            # CANDIDATE · Barcelona · marketplace ops = your profile
+  - cabify           # CANDIDATE · Madrid · rideshare marketplace
+  - typeform         # CANDIDATE · Barcelona
+  - travelperk       # CANDIDATE · Barcelona
+  - jobandtalent     # CANDIDATE · Madrid · marketplace ML
+  - preply           # CANDIDATE · Barcelona hub · marketplace/edtech
+  # --- Ireland ---
+  - intercom         # CANDIDATE · Dublin · applied-ML products
+  - stripe           # CANDIDATE · Dublin hub · payments DS
+  - hubspot          # CANDIDATE · Dublin hub
+  - wayflyer         # CANDIDATE · Dublin · revenue analytics/forecasting
+  # --- Portugal ---
+  - farfetch         # CANDIDATE · Porto/Lisbon · recsys, forecasting
+  # --- Poland ---
+  - brainly          # CANDIDATE · Kraków · your city, ML products
+  - snowflake        # CANDIDATE · Warsaw hub
+  # --- Germany ---
+  - hellofresh       # CANDIDATE · Berlin · demand forecasting at scale
+  - deliveryhero     # CANDIDATE · Berlin · marketplace/logistics DS
+  - n26              # CANDIDATE · Berlin · fintech risk ML
+  - getyourguide     # CANDIDATE · Berlin · marketplace, ranking
+  - celonis          # CANDIDATE · Munich · process mining ML
+  - traderepublic    # CANDIDATE · Berlin · fintech
+  - contentful       # CANDIDATE · Berlin
+  - deepl            # CANDIDATE · Cologne · NLP-heavy (note your cap 60 zone)
+  - sennder          # CANDIDATE · Berlin · logistics forecasting
+  - babbel           # CANDIDATE · Berlin
+  # --- Nordics + Denmark ---
+  - pleo             # CANDIDATE · Copenhagen · fintech
+  - trustpilot       # CANDIDATE · Copenhagen · review ML
+  - aiven            # CANDIDATE · Helsinki · data infra
+  - supermetrics     # CANDIDATE · Helsinki · marketing data
+  - smartlyio        # CANDIDATE · Helsinki · ad-optimisation ML
+  # --- Switzerland ---
+  - proton           # CANDIDATE · Geneva
+  - dfinity          # CANDIDATE · Zürich
 
 lever:
-  # plaid 404'd on the first live run (2026-09-01) — they left Lever. Empty
-  # until Phase 3 verifies real tenants; sources.lever is off in config.yaml
-  # for the same reason (an enabled board over an empty list reads as a
-  # quiet market).
-  []
+  # plaid 404'd on the first live run (2026-09-01) — they left Lever.
+  # sources.lever stays OFF in config.yaml until this list verifies:
+  # --check-all probes these regardless of that toggle, so verify first,
+  # then flip sources.lever on.
+  - feverup          # CANDIDATE · Fever, Madrid · demand prediction
+  - seedtag          # CANDIDATE · Madrid · contextual-ads ML
+  - clarityai        # CANDIDATE · Madrid · sustainability DS
+  - wallbox          # CANDIDATE · Barcelona · energy ML
+  - unbabel          # CANDIDATE · Lisbon · MT/NLP (cap-60 zone, still worth seeing)
+  - swordhealth      # CANDIDATE · Porto · health ML
+  - scandit          # CANDIDATE · Zürich · computer vision
+  - factorial        # CANDIDATE · Barcelona · Factorial HR
 
 # ---------------------------------------------------------------------------
 # The four European boards.
@@ -83,17 +153,33 @@ lever:
 # ---------------------------------------------------------------------------
 
 workable:
-  # The vendor's own slug 404'd on the first live run — add real tenants
-  # before enabling this board (Greek mid-size tech is its home turf).
-  []
+  # The vendor's own slug 404'd on the first live run. blueground answered a
+  # live probe (the anchor the network tests use). Verify, then flip
+  # sources.workable on in config.yaml.
+  - blueground       # VERIFIED 2026-09-01 · Athens/remote · ops analytics
+  - netdata          # CANDIDATE · Athens/remote · observability
+  - hotjar           # CANDIDATE · Malta/remote-EU · product analytics
+  - toggl            # CANDIDATE · remote-EU
+  - marfeel          # CANDIDATE · Barcelona · editorial analytics
 
 ashby:
-  - ashby
+  - ashby            # VERIFIED 2026-09-01 (68 postings) · the vendor itself
+  - posthog          # CANDIDATE · remote EU · product analytics, ships fast
+  - linear           # CANDIDATE · remote EU
+  - supabase         # CANDIDATE · remote EU
+  - deel             # CANDIDATE · remote EU · payroll DS
 
 smartrecruiters:
   # Case-sensitive on this vendor: the slug is spelled exactly as it appears in
-  # the jobs.smartrecruiters.com URL, capitals and all.
-  - smartrecruiters
+  # the jobs.smartrecruiters.com URL, capitals and all. NOTE: this vendor
+  # answers 200-with-empty-list for slugs that do not exist (verified live
+  # 2026-09-01), so a wrong slug here is INVISIBLE to --check-all — it reads
+  # as "exists, nothing open". Treat persistent zeros with suspicion and
+  # confirm the spelling on the company's own careers URL.
+  - smartrecruiters  # VERIFIED 2026-09-01 (2 postings) · the vendor itself
+  - allegro          # CANDIDATE · Warsaw/Poznań · biggest PL DS org
+  - SonarSource      # CANDIDATE · Geneva · case-sensitive spelling
+  - Visma            # CANDIDATE · Nordics · case-sensitive spelling
 
 personio:
   # Bare tenant name -> {tenant}.jobs.personio.de, with an automatic retry on
@@ -110,14 +196,19 @@ personio:
   #
   # Ask for one per tenant only when you know they publish it:
   #     - {slug: acme, language: en}     # de en fr es nl it pt
-  - personio
+  #
+  # German/Spanish SMBs are this vendor's home turf and exactly where
+  # --discover earns its keep: run it with company names from your LinkedIn
+  # alerts and paste what answers with postings.
+  - personio         # VERIFIED 2026-09-01 (1 posting) · the vendor itself
 
 recruitee:
   # Bare tenant name -> {tenant}.recruitee.com/api/offers/ — the public JSON
   # every Recruitee careers site serves. This is the vendor to try first for
   # Dutch and Belgian mid-size companies.
-  #     - acme
-  []
+  - channable        # VERIFIED 2026-09-01 · Utrecht · feed-optimisation ML
+  - bunq             # CANDIDATE · Amsterdam · fintech
+  - deptagency       # CANDIDATE · Amsterdam · data consultancy
 
 teamtailor:
   # The Nordic default. Two entry shapes:
@@ -125,7 +216,11 @@ teamtailor:
   #     - https://careers.acme.com/jobs   # custom domain: the careers URL
   # Custom domains are the norm for this vendor's larger tenants — paste the
   # jobs page URL and the fetcher appends .rss itself and follows redirects.
-  []
+  - https://career.teamtailor.com/jobs   # VERIFIED 2026-09-01 · the vendor
+  - einride          # CANDIDATE · Stockholm · autonomous freight ML
+  - voi              # CANDIDATE · Stockholm · micromobility ops DS
+  - epidemicsound    # CANDIDATE · Stockholm · music recsys
+  - oda              # CANDIDATE · Oslo · grocery forecasting
 
 adzuna:
   # Adzuna's European coverage, lowercase: at be ch de es fr gb it nl pl.

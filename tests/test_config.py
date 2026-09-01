@@ -261,7 +261,24 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         ),
         "scoring.concurrency": "free-tier validation period (20 req/min cap)",
         "tailoring.model": "free-tier validation period",
+        "scoring.fallback_models": (
+            "free-tier validation period: a second :free id doubles the "
+            "per-model daily budget and covers a rotated primary"
+        ),
     }
+    _PHASE3 = (
+        "Phase 3 (2026-09-01): the watchlist now carries a live-verified "
+        "tenant for this board; DEFAULTS ships it off because a fresh clone "
+        "has no watchlist to serve it"
+    )
+    DELIBERATE.update({
+        "sources.workable": _PHASE3,
+        "sources.ashby": _PHASE3,
+        "sources.smartrecruiters": _PHASE3,
+        "sources.personio": _PHASE3,
+        "sources.recruitee": _PHASE3,
+        "sources.teamtailor": _PHASE3,
+    })
 
     unknown = sorted(set(shipped) - set(defaults) - set(DELIBERATE))
     assert not unknown, (
@@ -656,3 +673,32 @@ def test_variants_are_not_required_by_no_llm_runs(tmp_path: Path):
     """`--no-llm` needs neither CV nor variants — same terms as the API key."""
     cfg = _variants_config(tmp_path, [{"path": "cv/nope.md", "title_terms": ["ml"]}])
     assert [p for p in cfg.validate(require_llm=False) if "not found" in p] == []
+
+
+def test_the_phone_rides_in_from_the_environment_never_the_file(tmp_path: Path):
+    """The standing decision: the number stays out of the public history.
+    JOB_HUNTER_PHONE is how a live run still gets one."""
+    cfg = Config.load(tmp_path / "c.yaml", tmp_path / "w.yaml", root=tmp_path,
+                      env={"JOB_HUNTER_PHONE": "+34 600 000 000"})
+    assert cfg.get("applicant.phone") == "+34 600 000 000"
+
+
+def test_llm_structured_output_is_validated(tmp_path: Path):
+    (tmp_path / "config.yaml").write_text(
+        yaml.safe_dump({"llm": {"structured_output": "grammar"}}),
+        encoding="utf-8")
+    cfg = Config.load(tmp_path / "config.yaml", tmp_path / "w.yaml",
+                      root=tmp_path, env={})
+    assert any("structured_output" in p for p in cfg.validate())
+
+
+def test_fallback_model_entries_are_validated(tmp_path: Path):
+    (tmp_path / "config.yaml").write_text(
+        yaml.safe_dump({"scoring": {"fallback_models": [
+            123, {"provider": "openrouter"}, "fine/model",
+        ]}}),
+        encoding="utf-8")
+    cfg = Config.load(tmp_path / "config.yaml", tmp_path / "w.yaml",
+                      root=tmp_path, env={})
+    complaints = [p for p in cfg.validate() if "fallback_models" in p]
+    assert len(complaints) == 2  # the int and the model-less mapping

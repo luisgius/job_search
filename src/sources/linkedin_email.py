@@ -541,6 +541,9 @@ def build_service(config: Config) -> Any:
         try:
             token_path.parent.mkdir(parents=True, exist_ok=True)
             token_path.write_text(creds.to_json(), encoding="utf-8")
+            # A plaintext credential that reads the whole mailbox: owner-only,
+            # so a shared machine or a lax backup tool never widens it.
+            token_path.chmod(0o600)
         except Exception as exc:
             # Losing the token only costs another consent prompt tomorrow.
             logger.warning("could not save Gmail token to %s: %s", token_path, exc)

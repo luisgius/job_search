@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 from . import config as config_module
-from . import digest, filters, health, notify, pdf, scoring, tailor
+from . import digest, filters, health, llm as llm_module, notify, pdf, scoring, tailor
 from .apply import autoapply
 from .config import Config, ConfigError
 from .db import Tracker
@@ -519,12 +519,32 @@ def _persist(scored_jobs: list[ScoredJob], tracker: Any, now: datetime) -> None:
                 item.status,
                 detail=item.status_detail or "",
                 score=item.score_value,
+                score_reasons=(list(item.score.reasons)
+                               if item.score and item.score.reasons else None),
                 artifacts_dir=(item.artifacts.dir if item.artifacts else None),
                 now=now,
             )
         except Exception as exc:
             logger.warning("could not record %s for %s: %s",
                            _status_of(item), item.job.label, exc)
+
+
+def _backup_tracker(tracker: Any, config: Any, now: datetime,
+                    stats: RunStats) -> None:
+    """One dated copy of the tracker per day, pruned to `db.backups_keep`.
+
+    The tracker is the only record of what was applied to; everything else in
+    `output/` can be regenerated. A failed backup is a digest-visible error
+    precisely because nothing else would ever mention it.
+    """
+    keep = _int(_cfg(config, "db.backups_keep", 14), 14)
+    if tracker is None or keep <= 0 or not hasattr(tracker, "backup"):
+        return
+    try:
+        tracker.backup(keep=keep, now=now)
+    except Exception as exc:
+        logger.warning("tracker backup failed: %s", exc)
+        stats.errors.append(f"tracker backup failed: {exc}")
 
 
 # --------------------------------------------------------------------------
@@ -568,6 +588,9 @@ def run_pipeline(
     # Set before anything can fail, so the digest never meets a missing attribute.
     stats.filter_counts = {}       # type: ignore[attr-defined]
     stats.digest_path = None       # type: ignore[attr-defined]
+    # One run, one bill: the meter is process-wide, so a fresh run starts it
+    # at zero rather than inheriting a previous in-process run's numbers.
+    llm_module.reset_usage()
 
     # -- 1. fetch ---------------------------------------------------------
     active = _active_sources(config, sources)
@@ -699,7 +722,11 @@ def run_pipeline(
 
     # -- 10. persist ------------------------------------------------------
     _count_outcomes(scored_jobs, stats)
+    # What this run actually spent — injected test clients never touch the
+    # meter, so offline runs report honest zeros and the digest stays quiet.
+    stats.llm_usage = llm_module.usage_snapshot()
     _persist(scored_jobs, tracker, moment)
+    _backup_tracker(tracker, config, moment, stats)
 
     # -- 11. digest -------------------------------------------------------
     try:

@@ -302,15 +302,46 @@ def test_tailor_job_strips_stray_code_fences(tmp_path: Path):
 
 def test_a_rejected_tailored_cv_falls_back_to_the_base_cv(tmp_path: Path):
     """The safe fallback: the base CV is the document the user wrote about
-    themselves, so it can never be a fabrication."""
+    themselves, so it can never be a fabrication. The third response feeds
+    the corrective retry an equally bad draft — the fallback must hold even
+    when the repair fails too."""
     cfg = tailor_config(tmp_path)
     scored = make_scored()
     bloated = TAILORED_CV + ("\n- fabricated line" * 500)
-    tailor_job(scored, BASE_CV, cfg, client=llm_client([bloated, COVER]))
+    tailor_job(scored, BASE_CV, cfg, client=llm_client([bloated, COVER, bloated]))
 
     assert scored.tailored_cv_md == BASE_CV
     assert "rejected" in scored.status_detail
     assert Path(scored.artifacts.cv_md).read_text(encoding="utf-8") == BASE_CV
+
+
+def test_a_rejected_cv_is_repaired_once_and_the_repair_is_validated(tmp_path: Path):
+    """The optimizer half of the evaluator's loop: the rejection reason goes
+    back to the model exactly once, and the second draft only ships because
+    the SAME validator passed it."""
+    from src.llm import LLMClient
+
+    cfg = tailor_config(tmp_path)
+    scored = make_scored()
+    bloated = TAILORED_CV + ("\n- fabricated line" * 500)
+    fake = FakeAnthropic([bloated, COVER, TAILORED_CV])
+    tailor_job(scored, BASE_CV, cfg, client=LLMClient("k", client=fake))
+
+    assert scored.tailored_cv_md == TAILORED_CV.strip()
+    assert "retailored after:" in scored.status_detail
+    assert len(fake.calls) == 3  # cv + cover + ONE correction, never a loop
+    correction = fake.calls[2]["messages"][0]["content"]
+    assert "REJECTED" in correction
+    assert "Rejection reason:" in correction
+
+
+def test_a_rejected_cover_letter_is_repaired_once_before_absence(tmp_path: Path):
+    cfg = tailor_config(tmp_path)
+    scored = make_scored()
+    tailor_job(scored, BASE_CV, cfg,
+               client=llm_client([TAILORED_CV, "Dear [Company Name],\nAda", COVER]))
+    assert scored.cover_letter_md == COVER.strip()
+    assert "cover letter rewritten after" in scored.status_detail
 
 
 def test_a_model_failure_leaves_the_job_without_documents_but_in_the_digest(tmp_path: Path):

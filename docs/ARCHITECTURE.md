@@ -90,13 +90,16 @@ shipped alert list did nothing; and `filters.description_exclude` had lost
 ## Tracker (`src/db.py`) — already implemented
 
 `Tracker(path)`, `record_job(job, now=)`, `has_job(key)`,
-`record_status(key, status, detail=, score=, method=, artifacts_dir=, now=)`,
-`get_status(key)`, `has_applied(key)`, `has_applied_similar(dedupe_key)`,
+`record_status(key, status, detail=, score=, score_reasons=, method=,
+artifacts_dir=, now=)`, `get_status(key)`, `has_applied(key)`,
+`has_applied_similar(dedupe_key)`,
 `repost_gap_days(dedupe_key, key=, source=, posted_at=, now=)`,
 `record_submit_attempt(key, url=, method=, now=)` /
 `clear_submit_attempt(key)` / `submit_attempted(key)`,
 `should_surface(key, within_days=, now=)`, `start_run` / `finish_run`,
-`counts_by_status()`.
+`counts_by_status()`, `backup(keep=, now=)` — a dated daily sqlite-backup-API
+copy under `output/backups/` (schema v3 added `applications.score_reasons`,
+JSON, the threshold-calibration data).
 
 `has_applied` is True only for `applied`. A dry run must leave the job
 eligible for a real application later.
@@ -461,13 +464,29 @@ email-only info — never fatal.
 ```python
 class LLMError(RuntimeError): ...
 class LLMClient:
-    def __init__(self, api_key: str, *, client=None): ...
-    def complete(self, *, model, system, prompt, max_tokens, temperature=0.0) -> str
-    def complete_json(self, *, ..., schema_hint: str = "") -> dict
+    def __init__(self, api_key: str, *, client=None, meter=None): ...
+    def complete(self, *, model, system, prompt, max_tokens, temperature=0.0,
+                 schema_native=None) -> str
+    def complete_json(self, *, ..., schema_hint: str = "",
+                      schema=None, structured="auto") -> dict
+def model_entries(config, role) -> list[dict]        # <role>.model + fallbacks
+def chain_from_config(config, role, *, client=None, clients=None)  # ModelChain
+def reset_usage() / usage_snapshot()                 # run-wide UsageMeter
 ```
 Lazy `import anthropic`. `complete_json` must survive fenced ```json blocks
 and prose around the object; raise `LLMError` when no object can be
 recovered. Retry twice on transient API errors. `client=` is the test seam.
+Three additions, all invisible until configured: `<role>.fallback_models`
+turns the client into a `ModelChain` that hops to the next entry on ANY
+`LLMError` (rotated `:free` id, spent quota, an entry that cannot build) and
+reports `last_model` for honest attribution; every transport feeds a
+run-wide `UsageMeter` (tokens both dialects, plus the per-response cost
+OpenRouter returns when asked) that `main` snapshots into
+`RunStats.llm_usage` for the digest; and `schema=` requests
+grammar-constrained JSON where `llm.structured_output` allows it ("auto" =
+the Anthropic SDK only), with the prompt path as the permanent fallback and
+`forbid_verbatim` staying on as a validator — grammar guarantees shape,
+never provenance.
 
 ### `src/scoring.py`
 ```python

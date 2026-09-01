@@ -702,3 +702,26 @@ def test_run_never_raises(tmp_path: Path, memory_tracker):
 def test_run_on_an_empty_list(tmp_path: Path, memory_tracker):
     assert run([], apply_config(tmp_path), tracker=memory_tracker,
                browser=FakeBrowser()) == []
+
+
+def test_a_flagged_cover_letter_blocks_live_but_not_dry_run():
+    """A letter the validator kept-but-flagged may fill a dry-run form (that
+    is what dry runs are for) and must never be typed into a live one: it
+    ships under the user's real name and nobody has read it yet."""
+    from src.models import Score, ScoredJob
+    from tests.conftest import make_job
+
+    job = make_job(url="https://boards.greenhouse.io/acme/jobs/1")
+    scored = ScoredJob(job=job, score=Score(value=95),
+                       cover_flags=["letter never names Acme"])
+
+    live = {"apply": {"enabled": True, "dry_run": False,
+                      "min_score": 0, "require_pdf": False}}
+    ok, reason = eligible(scored, live)
+    assert not ok
+    assert "validator flags" in reason and "never names Acme" in reason
+
+    dry = {"apply": {"enabled": True, "dry_run": True,
+                     "min_score": 0, "require_pdf": False}}
+    ok, reason = eligible(scored, dry)
+    assert ok, reason

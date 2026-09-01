@@ -82,6 +82,13 @@ DEFAULTS: dict[str, Any] = {
         # other OpenAI-compatible gateway via `base_url`.
         "provider": "openrouter",
         "base_url": "",
+        # How the scorer's JSON is obtained. "auto": grammar-constrained
+        # decoding where it is a first-party feature (the Anthropic SDK) and
+        # the prompt + extract_json path everywhere else — many :free ids
+        # reject the OpenAI dialect's response_format. "native"/"prompt"
+        # force one side. Grammar guarantees shape, not provenance: the
+        # verbatim-plant validator stays on either way.
+        "structured_output": "auto",
     },
     "sources": {
         "greenhouse": True,
@@ -211,6 +218,13 @@ DEFAULTS: dict[str, Any] = {
     },
     "scoring": {
         "model": "anthropic/claude-sonnet-5",
+        # Tried in order when `model` cannot answer (spent daily quota,
+        # rotated :free id, outage). A string inherits llm.provider/base_url;
+        # a mapping may override them — which is how a local gateway joins:
+        #   fallback_models:
+        #     - mistralai/mistral-small-3.1-24b-instruct:free
+        #     - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1"}
+        "fallback_models": [],
         "threshold": 65,
         "max_jobs": 40,
         "max_tokens": 1500,
@@ -225,6 +239,8 @@ DEFAULTS: dict[str, Any] = {
     "tailoring": {
         "enabled": True,
         "model": "anthropic/claude-sonnet-5",
+        # Same shape and semantics as scoring.fallback_models.
+        "fallback_models": [],
         "max_per_run": 10,
         "max_tokens": 4000,
         "temperature": 0.2,
@@ -244,6 +260,9 @@ DEFAULTS: dict[str, Any] = {
     },
     "db": {
         "path": "output/tracker.sqlite3",
+        # Dated daily copies of the tracker in output/backups/ — the one file
+        # in output/ that cannot be regenerated. 0 turns backups off.
+        "backups_keep": 14,
         # A job already seen within this window is not re-surfaced in the
         # digest. Applications are blocked forever regardless.
         "skip_seen_days": 30,
@@ -327,6 +346,9 @@ ENV_OVERRIDES: dict[tuple[str, ...], str] = {
     ("keys", "openrouter"): "OPENROUTER_API_KEY",
     ("keys", "adzuna_app_id"): "ADZUNA_APP_ID",
     ("keys", "adzuna_app_key"): "ADZUNA_APP_KEY",
+    # Not a key, but the same rule: PII the tracked file must never carry.
+    # Live auto-apply needs a phone; the phone stays out of git history.
+    ("applicant", "phone"): "JOB_HUNTER_PHONE",
 }
 
 
@@ -634,6 +656,29 @@ class Config:
             if self.source_enabled(name) and not self.watchlist.get(name):
                 problems.append(
                     f"sources.{name} is on but watchlist.{name} is empty"
+                )
+
+        mode = str(self.get("llm.structured_output", "auto") or "auto")
+        if mode.strip().lower() not in ("auto", "native", "prompt"):
+            problems.append(
+                f"llm.structured_output must be auto, native or prompt — got {mode!r}"
+            )
+
+        for role in ("scoring", "tailoring"):
+            chain = self.get(f"{role}.fallback_models", [])
+            if chain in (None, ""):
+                continue
+            if not isinstance(chain, list):
+                problems.append(f"{role}.fallback_models must be a list")
+                continue
+            for index, entry in enumerate(chain):
+                if isinstance(entry, str) and entry.strip():
+                    continue
+                if isinstance(entry, dict) and str(entry.get("model") or "").strip():
+                    continue
+                problems.append(
+                    f"{role}.fallback_models[{index}] must be a model id or a "
+                    "mapping with `model` (and optional provider/base_url)"
                 )
 
         # Loud about the one setting that can send email on the user's behalf.

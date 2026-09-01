@@ -24,7 +24,7 @@ from collections.abc import Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from .llm import LLMError, client_from_config
+from .llm import LLMError, chain_from_config, structured_mode
 from .models import ApplyStatus, Job, Score, ScoredJob
 from .util import get_logger, truncate
 
@@ -43,6 +43,23 @@ DEFAULT_CONCURRENCY = 4
 
 #: The exact key set `parse_score` reads. Part of the prompt, not decoration.
 RESPONSE_KEYS: tuple[str, ...] = ("score", "verdict", "reasons", "strengths", "gaps")
+
+#: The same contract as a JSON Schema, for providers that can enforce it by
+#: grammar (`llm.structured_output`). The schema absorbs `require_keys`; it
+#: cannot absorb `forbid_verbatim`, which stays on as a validator — grammar
+#: guarantees shape, not provenance.
+RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "score": {"type": "integer", "minimum": 0, "maximum": 100},
+        "verdict": {"type": "string"},
+        "reasons": {"type": "array", "items": {"type": "string"}},
+        "strengths": {"type": "array", "items": {"type": "string"}},
+        "gaps": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": list(RESPONSE_KEYS),
+    "additionalProperties": False,
+}
 
 _NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
 
@@ -413,10 +430,9 @@ def parse_score(payload: Mapping[str, Any] | Any) -> Score:
 
 
 def _resolve_client(config: Any, client: Any) -> Any:
-    """Return the injected client, or build the one `llm.provider` asks for."""
-    if client is not None:
-        return client
-    return client_from_config(config)
+    """The injected client, or what the config asks for — a plain client, or
+    a `ModelChain` when `scoring.fallback_models` names fallbacks."""
+    return chain_from_config(config, "scoring", client=client)
 
 
 def score_job(job: Job, cv_markdown: str, config: Any, *, client: Any = None) -> Score:
@@ -443,6 +459,10 @@ def score_job(job: Job, cv_markdown: str, config: Any, *, client: Any = None) ->
                                 rules=_candidate_rules(config)),
             max_tokens=max_tokens,
             temperature=temperature,
+            # Enforced by grammar where the provider supports it; a no-op
+            # (the prompt path) everywhere else, injected fakes included.
+            schema=RESPONSE_SCHEMA,
+            structured=structured_mode(config),
         )
     except LLMError as exc:
         logger.warning("scoring %s failed: %s", job.label, exc)
@@ -452,7 +472,9 @@ def score_job(job: Job, cv_markdown: str, config: Any, *, client: Any = None) ->
         return Score(value=0, model=model, error=str(exc))
 
     score = parse_score(payload)
-    score.model = model
+    # A chain may have answered from a fallback; attribute the score to the
+    # model that actually produced it, not the one the config hoped for.
+    score.model = getattr(llm, "last_model", None) or model
     if score.error:
         logger.warning("scoring %s returned an unusable payload: %s", job.label, score.error)
     return score

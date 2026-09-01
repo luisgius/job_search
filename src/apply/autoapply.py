@@ -380,6 +380,18 @@ def eligible(
             f"score {scored.score_value} is below apply.min_score ({min_score})"
         )
 
+    # A letter the validator kept but flagged (overlong, never names the
+    # company) may be typed into a dry-run form — that is what dry runs are
+    # for — but never into a live one: it ships under the user's real name
+    # and nobody has read it yet.
+    flags = [str(f) for f in (getattr(scored, "cover_flags", None) or [])]
+    if flags and not bool(_cfg(config, "apply.dry_run", True)):
+        return False, (
+            "the cover letter carries validator flags ("
+            + "; ".join(flags)
+            + ") — read it yourself before anything is submitted"
+        )
+
     if bool(_cfg(config, "apply.require_pdf", True)):
         pdf = str(getattr(scored.artifacts, "cv_pdf", "") or "")
         if not pdf:

@@ -23,7 +23,7 @@ from typing import Any, Iterable, Iterator
 
 from .models import ApplyStatus, Job, ensure_utc, utcnow
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 MIGRATIONS: list[str] = [
     # v1 — initial schema
@@ -87,6 +87,13 @@ MIGRATIONS: list[str] = [
         method        TEXT NOT NULL DEFAULT '',
         attempted_at  TEXT NOT NULL
     );
+    """,
+    # v3 — the scorer's reasons, kept. The score alone cannot calibrate the
+    # threshold ("was 63 really worse than 67?"); the reasons are the
+    # calibration data, and until this column they were printed once in the
+    # digest and thrown away. JSON-encoded list, NULL when never scored.
+    """
+    ALTER TABLE applications ADD COLUMN score_reasons TEXT;
     """,
 ]
 
@@ -159,6 +166,36 @@ class Tracker:
             self.conn.commit()
         finally:
             self.conn.close()
+
+    def backup(self, *, keep: int = 14, now: datetime | None = None) -> Path | None:
+        """One dated copy per day into `<db dir>/backups/`, oldest pruned.
+
+        The tracker is the single record of what was applied to — the one
+        file in `output/` that cannot be regenerated. sqlite3's backup API
+        copies a *consistent* snapshot even mid-transaction, which a plain
+        file copy of a WAL database does not guarantee. Same-day re-runs
+        reuse the day's file (the daily granularity is the point: yesterday's
+        state survives today's mistake). Returns the path, or None when
+        nothing was written (in-memory tracker, or today's copy exists).
+        """
+        if self.path == ":memory:":
+            return None
+        stamp = (ensure_utc(now) or utcnow()).strftime("%Y-%m-%d")
+        directory = Path(self.path).parent / "backups"
+        directory.mkdir(parents=True, exist_ok=True)
+        target = directory / f"tracker-{stamp}.sqlite3"
+        if target.exists():
+            return None
+        with sqlite3.connect(target) as copy:
+            self.conn.backup(copy)
+        copy.close()
+        backups = sorted(directory.glob("tracker-*.sqlite3"))
+        for stale in backups[:-max(1, int(keep))]:
+            try:
+                stale.unlink()
+            except OSError:
+                pass  # a survivor costs disk, not correctness
+        return target
 
     def __enter__(self) -> "Tracker":
         return self
@@ -384,6 +421,7 @@ class Tracker:
         *,
         detail: str = "",
         score: int | None = None,
+        score_reasons: list[str] | None = None,
         method: str = "",
         artifacts_dir: str | None = None,
         now: datetime | None = None,
@@ -392,28 +430,37 @@ class Tracker:
 
         An `applied` row is never downgraded: once something has really been
         submitted, a later run recording `digest` must not erase that fact.
+        `score_reasons` is the calibration data — JSON-encoded, and like the
+        score itself never erased by a later reason-less recording.
         """
         status_value = status.value if isinstance(status, ApplyStatus) else str(status)
         stamp = (ensure_utc(now) or utcnow()).isoformat()
         existing = self.get_status(key)
         if existing in TERMINAL_APPLY_STATUSES and status_value not in TERMINAL_APPLY_STATUSES:
             return
+        reasons_json = (
+            json.dumps([str(r) for r in score_reasons], ensure_ascii=False)
+            if score_reasons else None
+        )
         self.conn.execute(
             """
-            INSERT INTO applications (key, status, detail, score, method,
-                                      artifacts_dir, created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?,?)
+            INSERT INTO applications (key, status, detail, score, score_reasons,
+                                      method, artifacts_dir, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?)
             ON CONFLICT(key) DO UPDATE SET
                 status        = excluded.status,
                 detail        = excluded.detail,
                 score         = COALESCE(excluded.score, applications.score),
+                score_reasons = COALESCE(excluded.score_reasons,
+                                         applications.score_reasons),
                 method        = CASE WHEN excluded.method != ''
                                      THEN excluded.method ELSE applications.method END,
                 artifacts_dir = COALESCE(excluded.artifacts_dir,
                                          applications.artifacts_dir),
                 updated_at    = excluded.updated_at
             """,
-            (key, status_value, detail, score, method, artifacts_dir, stamp, stamp),
+            (key, status_value, detail, score, reasons_json, method,
+             artifacts_dir, stamp, stamp),
         )
         self.conn.commit()
 
