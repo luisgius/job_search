@@ -66,20 +66,28 @@ def test_the_installer_and_the_template_agree_on_the_label():
 
 def test_the_wrapper_loads_env_takes_a_lock_and_never_opens_a_browser():
     wrapper = (SCRIPTS / "run_daily.sh").read_text(encoding="utf-8")
-    assert "set -a" in wrapper and '. "$REPO/.env"' in wrapper
+    # Sourcing is GUARDED: an unquoted space in .env is a command-not-found
+    # under set -e, and it must cost a log line, never the silent death of
+    # the whole run (the exact failure a scheduler hides best).
+    assert 'if ! . "$REPO/.env"' in wrapper
+    assert "set -a" in wrapper
     assert 'mkdir "$LOCK"' in wrapper, "overlap protection is load-bearing"
     assert "--no-browser" in wrapper, "a scheduler must not pop windows"
+    # The breadcrumb precedes the first thing that can fail, so "the wrapper
+    # ran at all" is always answerable from the daily log.
+    assert wrapper.index("wrapper invoked") < wrapper.index('. "$REPO/.env"')
     # Monitoring is best-effort: every healthcheck ping must swallow failure.
     assert wrapper.count("|| true") >= 2
 
 
 def test_env_example_cannot_carry_a_value():
     """Tracked file, so it must be structurally secret-proof: every line is a
-    comment, blank, or `KEY=` with nothing after the equals sign."""
+    comment, blank, or `KEY=` with nothing after the equals sign — an empty
+    quoted string allowed, since it doubles as the quote-your-spaces hint."""
     for line in (REPO / ".env.example").read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        assert re.fullmatch(r"[A-Z0-9_]+=", stripped), (
+        assert re.fullmatch(r'[A-Z0-9_]+=(""|\'\')?', stripped), (
             f".env.example line carries a value: {line!r}"
         )

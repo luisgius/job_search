@@ -27,13 +27,23 @@ cd "$REPO"
 LOG_DIR="$REPO/output/logs"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/daily-$(date +%Y-%m-%d).log"
+# The breadcrumb comes BEFORE anything that can fail: a wrapper that dies
+# early must still leave "I ran" in the daily log, or debugging starts from
+# a missing file instead of an error message.
+echo "$(date -u +%FT%TZ) wrapper invoked" >>"$LOG"
 
 # Secrets and knobs for scheduled runs. `set -a` exports everything the file
 # assigns, so the pipeline sees them as environment (env-wins in config.py).
+# Sourced inside `if !` on purpose: an unquoted value with spaces in .env
+# ("PHONE=+34 600 ...") is a command-not-found under `set -e`, and it must
+# cost a loud log line — every good line still applied — never the whole run.
 if [ -f "$REPO/.env" ]; then
     set -a
     # shellcheck disable=SC1091
-    . "$REPO/.env"
+    if ! . "$REPO/.env" 2>>"$LOG"; then
+        echo "$(date -u +%FT%TZ) WARNING: a line in .env failed to parse —" \
+             "quote values that contain spaces (see .env.example)" >>"$LOG"
+    fi
     set +a
 fi
 
