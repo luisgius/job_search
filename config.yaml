@@ -84,11 +84,9 @@ sources:
   # employers actually are — turning them on is the single biggest change you
   # can make to how many relevant postings you see each morning.
   greenhouse: true
-  # Off since 2026-09-01: the demo Lever tenant (plaid) left Lever and the
-  # watchlist has no verified replacement yet — Phase 3 brings them, then
-  # this flips back. An enabled board over an empty list reads as a quiet
-  # market, which is the silent failure this file keeps refusing.
-  lever: false
+  # Back on since the Phase 3 verification round (2026-09-01): swordhealth
+  # answered with a live board, so the list is no longer empty-or-guessed.
+  lever: true
   # ON since Phase 3 (2026-09-01): each of the six now has at least one
   # LIVE-VERIFIED tenant in watchlist.yaml, plus candidates awaiting your
   # one `--check-all` run — a candidate that 404s degrades visibly in the

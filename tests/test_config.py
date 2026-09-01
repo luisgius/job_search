@@ -255,10 +255,8 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         # Validation period: a $0 OpenRouter model until the pipeline proves
         # itself on the user's machine; DEFAULTS keeps the real recommendation.
         "scoring.model": "free-tier validation period",
-        "sources.lever": (
-            "off until Phase 3 verifies real Lever tenants — the demo slug "
-            "left Lever (live 404, 2026-09-01)"
-        ),
+        # sources.lever was here while its watchlist had no verified tenant;
+        # the Phase 3 round verified one and it flipped back to the default.
         "scoring.concurrency": "free-tier validation period (20 req/min cap)",
         "tailoring.model": "free-tier validation period",
         "scoring.fallback_models": (
