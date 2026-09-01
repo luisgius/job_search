@@ -131,8 +131,10 @@ LEVER_EXPECTED = ("categories", "createdAt")
 WORKABLE_REQUIRED = ("title", "shortcode")
 #: Everything the parser bets on beyond bare usability. `requirements` and
 #: `benefits` only appear with `?details=true`, and they are half the ad.
-WORKABLE_EXPECTED = ("state", "location", "published_on", "created_at",
-                     "description", "requirements", "benefits", "employment_type")
+# The live widget's shape as of 2026-09-01: requirements/benefits live
+# inside `description`, geography inside the `locations` list.
+WORKABLE_EXPECTED = ("published_on", "description", "locations",
+                     "department", "url")
 
 #: Every spelling the parser will accept for a Workable posting's *extra*
 #: offices. Which one is live has never been seen; the test below records it.
@@ -509,6 +511,12 @@ def test_workable_requirements_and_benefits_are_separate_blocks(workable_slug):
     every ad — the half with the years-of-experience in it — disappears."""
     payload = _raw_payload(WORKABLE_ACCOUNT_URL.format(slug=slug), {"details": "true"})
     postings = payload.get("jobs", [])
+    if not any("requirements" in j for j in postings[:25]):
+        # Verified 2026-09-01: the widget folded requirements/benefits into
+        # `description` — the harmless direction, since the parser
+        # concatenates all three. The details-flag test above is what proves
+        # the substance still arrives.
+        pytest.skip("requirements folded into description — harmless, documented")
     assert any(str(j.get("requirements") or "").strip() for j in postings[:25]), (
         "no posting carries `requirements` — the most scoring-relevant part of "
         "the ad is no longer being read"
@@ -522,9 +530,23 @@ def test_workable_location_is_still_structured_parts(workable_slug):
     (`countryCode` and `country_code`) and the parser reads both — this test
     exists to record which one is actually live."""
     payload = _raw_payload(WORKABLE_ACCOUNT_URL.format(slug=slug), {"details": "true"})
-    locations = [j.get("location") for j in payload.get("jobs", [])[:25]]
-    objects = [loc for loc in locations if isinstance(loc, dict)]
-    assert objects, "workable `location` is no longer an object"
+    postings = payload.get("jobs", [])[:25]
+    objects = [j.get("location") for j in postings if isinstance(j.get("location"), dict)]
+    if not objects:
+        # Verified 2026-09-01: the singular object is gone; geography now
+        # arrives only in the `locations` list, whose entries must still be
+        # structured for the parser's city/country assembly to work.
+        listed = [
+            node
+            for j in postings
+            for node in (j.get("locations") or [])
+            if isinstance(node, dict)
+        ]
+        assert listed, (
+            "neither `location` objects nor structured `locations` entries — "
+            "the parser has no geography to assemble"
+        )
+        return
     keys = set()
     for loc in objects:
         keys.update(loc.keys())
@@ -1049,7 +1071,16 @@ def test_the_offline_fixtures_match_the_shape_of_the_live_payload():
 _DELIBERATELY_IGNORED_FIELDS: dict[str, frozenset[str]] = {
     # Modified dates. Reading one overstates freshness — a typo fix on a
     # three-month-old req looks like today's news.
-    "workable_jobs.json": frozenset({"updated_at"}),
+    "workable_jobs.json": frozenset({
+        "updated_at",
+        # The live widget slimmed down (verified 2026-09-01): requirements
+        # and benefits folded into `description`, the singular `location`
+        # object replaced by the `locations` list, workplace_type gone. The
+        # parser deliberately still reads every old spelling — tenants and
+        # gateways lag API changes — and the offline tests document that
+        # path, so the fixture keeps the fields on purpose.
+        "requirements", "benefits", "location", "workplace_type",
+    }),
     "smartrecruiters_postings.json": frozenset({
         "updatedOn",
         # Live payloads stopped sending createdOn (verified 2026-09-01); the
@@ -1492,13 +1523,15 @@ def test_arbeitnow_entries_still_have_the_fields_we_parse():
 LANDING_REQUIRED = ("id", "title")
 #: Groups where ANY member satisfies the parser — the API has served several
 #: spellings over time and `parse_job` reads all of them.
+# The live listing schema, recorded 2026-09-01 from the API itself: no
+# company field AT ALL (resolution goes through the per-job detail endpoint,
+# tested separately below), geography in `locations`, salary as
+# gross_salary_low/high + currency_code.
 LANDING_EXPECTED_GROUPS = (
-    # Live listings carry only company_id (verified 2026-09-01, matching the
-    # official API docs); fetch() resolves names via /api/v1/companies/{id}.
-    ("company_id", "company_name", "company"),
     ("url", "share_url", "landing_page"),
     ("published_at", "created_at"),
-    ("city", "location"),
+    ("locations", "city", "location"),
+    ("gross_salary_low", "salary_low"),
 )
 
 
@@ -1518,7 +1551,11 @@ def test_landing_jobs_listings_still_have_the_fields_we_parse():
     from src.sources.landing_jobs import API_URL, PAGE_LIMIT
 
     payload = _raw_payload(API_URL, {"offset": 0, "limit": PAGE_LIMIT})
-    batch = payload if isinstance(payload, list) else payload.get("jobs")
+    # Guarded lookup: a JSON scalar must land on the drift message below,
+    # not on an AttributeError.
+    batch = payload if isinstance(payload, list) else (
+        payload.get("jobs") if isinstance(payload, dict) else None
+    )
     assert isinstance(batch, list) and batch, (
         "the payload is neither a bare list nor a 'jobs' list — fetch() "
         "reports this as shape drift and the source degrades"
@@ -1532,6 +1569,32 @@ def test_landing_jobs_listings_still_have_the_fields_we_parse():
             "field any more. Keys the live listing DOES send: "
             f"{sorted(seen)} — re-shape the parser/fixture from these"
         )
+
+
+def test_landing_jobs_detail_carries_the_employer():
+    """The listing names no company at all (live schema 2026-09-01), so
+    parse-ability of an employer rests entirely on the per-job detail
+    endpoint. Self-revealing on failure: the message carries the detail's
+    real keys so the next paste re-shapes the resolver without a round trip."""
+    from src.sources.landing_jobs import API_URL, JOB_DETAIL_URL
+
+    listing = _raw_payload(API_URL, {"offset": 0, "limit": 5})
+    batch = listing if isinstance(listing, list) else (
+        listing.get("jobs") if isinstance(listing, dict) else None
+    )
+    entries = [e for e in batch or [] if isinstance(e, dict)]
+    if not entries:
+        pytest.skip("the board listed nothing to detail")
+    job_id = entries[0].get("id")
+    if not isinstance(job_id, int):
+        pytest.skip("listing entries carry no integer id to detail")
+    detail = _raw_payload(JOB_DETAIL_URL.format(job_id=job_id))
+    assert isinstance(detail, dict), "detail endpoint did not return an object"
+    keys = set(detail)
+    assert keys & {"company_id", "company_name", "company", "company_slug"}, (
+        "the detail endpoint names no employer either — keys it DOES send: "
+        f"{sorted(keys)} — re-shape the resolver from these"
+    )
 
 
 # ==========================================================================
