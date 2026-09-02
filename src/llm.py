@@ -447,7 +447,10 @@ class LLMClient:
                     "The `anthropic` package is not installed — "
                     "pip install -r requirements.txt"
                 ) from exc
-            self._real = anthropic.Anthropic(api_key=self.api_key)
+            options: dict[str, Any] = {"api_key": self.api_key}
+            if self.timeout:
+                options["timeout"] = self.timeout
+            self._real = anthropic.Anthropic(**options)
         return self._real
 
     # -- transports -------------------------------------------------------
@@ -1013,40 +1016,55 @@ def structured_mode(config: Any) -> str:
 # --------------------------------------------------------------------------
 
 
+def _entry_number(value: Any, *, minimum: int) -> int | None:
+    """A chain-entry setting: int or float, never bool, at least `minimum`;
+    anything else is "not set". `config.validate()` has already complained
+    about the malformed ones — this only keeps them from reaching the client."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if value < minimum:
+        return None
+    return int(value)
+
+
 def model_entries(config: Any, role: str) -> list[dict[str, Any]]:
     """The ordered chain for one role: `<role>.model` first, then each
     `<role>.fallback_models` entry.
 
     A fallback is a model-id string (inherits the global provider and
     base_url) or a mapping with `model` plus optional `provider`/`base_url`/
-    `timeout` (seconds, HTTP transport) — the mapping form is how a local
-    gateway joins the chain, with the patience a laptop-sized model needs:
+    `timeout` (seconds, HTTP transport)/`max_retries` (after the first
+    attempt) — the mapping form is how a local gateway joins the chain, with
+    the patience a laptop-sized model needs and no second helping of it (a
+    slow answer does not get faster on retry):
 
         fallback_models:
           - google/gemma-4-31b-it:free
-          - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1", timeout: 600}
+          - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1",
+             timeout: 600, max_retries: 0}
     """
     entries: list[dict[str, Any]] = []
     primary = str(_cfg(config, f"{role}.model", "") or "").strip()
     if primary:
         entries.append({"model": primary, "provider": None, "base_url": None,
-                        "timeout": None})
+                        "timeout": None, "max_retries": None})
     raw = _cfg(config, f"{role}.fallback_models", []) or []
     for item in raw if isinstance(raw, list) else []:
-        timeout = None
+        timeout = max_retries = None
         if isinstance(item, Mapping):
             model = str(item.get("model") or "").strip()
             provider = str(item.get("provider") or "").strip().lower() or None
             base_url = str(item.get("base_url") or "").strip() or None
-            raw_timeout = item.get("timeout")
-            if isinstance(raw_timeout, (int, float)) and not isinstance(raw_timeout, bool) \
-                    and raw_timeout > 0:
-                timeout = int(raw_timeout)
+            # Whole seconds, at least one: int() would turn 0.5 into 0, which
+            # `LLMClient` reads as "not set" — the default, silently.
+            timeout = _entry_number(item.get("timeout"), minimum=1)
+            # 0 is a real value here, so None is the only "not set".
+            max_retries = _entry_number(item.get("max_retries"), minimum=0)
         else:
             model = str(item or "").strip()
             provider = base_url = None
         entry = {"model": model, "provider": provider, "base_url": base_url,
-                 "timeout": timeout}
+                 "timeout": timeout, "max_retries": max_retries}
         # A duplicate buys a second identical failure, nothing else.
         if model and entry not in entries:
             entries.append(entry)
@@ -1121,14 +1139,19 @@ def _client_factory(
             return injected
         try:
             provider = entry.get("provider") or provider_of(config)
+            # The entry's own transport settings win over anything the
+            # caller set for the whole chain.
+            options: dict[str, Any] = dict(kwargs)
+            for key in ("timeout", "max_retries"):
+                if entry.get(key) is not None:
+                    options[key] = entry[key]
             client = LLMClient(
                 api_key_for(config, provider) if provider in PROVIDER_KEYS
                 else "",
                 provider=provider,
                 base_url=entry.get("base_url")
                 or (str(_cfg(config, "llm.base_url", "") or "") or None),
-                timeout=entry.get("timeout"),
-                **kwargs,
+                **options,
             )
         except LLMError as exc:
             state["error"] = exc

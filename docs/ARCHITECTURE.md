@@ -480,9 +480,12 @@ Three additions, all invisible until configured: `<role>.fallback_models`
 turns the client into a `ModelChain` that hops to the next entry on ANY
 `LLMError` (rotated `:free` id, spent quota, an entry that cannot build) and
 reports `last_model` for honest attribution — a mapping entry may carry
-`provider`, `base_url` and `timeout` (HTTP seconds, the patience a local
-27B thinking through a 5k-token prompt needs; the 120 s default would read
-that answer as a transient failure); every transport feeds a
+`provider`, `base_url`, `timeout` (HTTP seconds, the patience a local 27B
+thinking through a 5k-token prompt needs; the 120 s default would read that
+answer as a transient failure) and `max_retries` (after the first attempt;
+0 for that local entry, because a slow answer does not get faster on retry
+and two retries would turn a wedged Ollama into half an hour per job); every
+transport feeds a
 run-wide `UsageMeter` (tokens both dialects, plus the per-response cost
 OpenRouter returns when asked) that `main` snapshots into
 `RunStats.llm_usage` for the digest; and `schema=` requests

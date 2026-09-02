@@ -93,18 +93,24 @@ def test_model_entries_read_strings_mappings_and_drop_duplicates():
     assert entries[2]["base_url"] == "http://localhost:11434/v1"
 
 
-def test_model_entries_read_a_per_entry_timeout_from_the_mapping_form_only():
-    """The primary and string fallbacks keep util's 120 s default; a local
-    entry gets its own patience. A timeout that is not a positive number is
-    ignored here (config.validate complains about it up front)."""
+def test_model_entries_read_timeout_and_retries_from_the_mapping_form_only():
+    """The primary and string fallbacks keep the defaults (120 s, two
+    retries); a local entry gets its own patience and its own retry count,
+    where 0 is a real value. Malformed numbers are ignored here —
+    config.validate complains about them up front — and a half-second
+    timeout is malformed: int() would make it 0, i.e. "not set"."""
     entries = model_entries(cfg([
         "backup/model",
         {"model": "qwen3.8:27b", "base_url": "http://localhost:11434/v1",
-         "timeout": 600},
-        {"model": "other/local", "timeout": "soon"},
-        {"model": "third/local", "timeout": True},   # bool is not a number
+         "timeout": 600, "max_retries": 0},
+        {"model": "other/local", "timeout": "soon", "max_retries": "none"},
+        {"model": "third/local", "timeout": True, "max_retries": True},
+        {"model": "fourth/local", "timeout": 0.5, "max_retries": 1},
     ]), "scoring")
-    assert [e["timeout"] for e in entries] == [None, None, 600, None, None]
+    assert [e["timeout"] for e in entries] == \
+        [None, None, 600, None, None, None]
+    assert [e["max_retries"] for e in entries] == \
+        [None, None, 0, None, None, 1]
 
 
 def test_a_client_timeout_reaches_the_wire():
@@ -136,6 +142,25 @@ def test_the_chain_builds_the_local_entry_with_its_own_url_and_timeout():
     assert post["url"] == "http://localhost:11434/v1/chat/completions"
     assert post["timeout"] == 600
     assert post["json"]["model"] == "qwen3.8:27b"
+
+
+def test_the_local_entry_gets_one_attempt_and_its_own_settings_win():
+    """`max_retries: 0` on the local entry: a transient failure there (a
+    read timeout is one) costs ONE attempt. Under the default two retries a
+    wedged Ollama would turn the 600 s budget into half an hour per job,
+    forty times over. And the entry's own timeout beats a chain-wide one."""
+    session = PostSession([TimeoutError("read timed out")])
+    chain = chain_from_config(
+        cfg([{"model": "qwen3.8:27b", "base_url": "http://localhost:11434/v1",
+              "timeout": 600, "max_retries": 0}]),
+        "scoring", clients=[DeadClient(), None],
+        session=session, sleep=lambda _s: None, meter=UsageMeter(),
+        timeout=30,                       # chain-wide; the entry overrides it
+    )
+    with pytest.raises(LLMError, match="timed out"):
+        chain.complete(model="x", system="", prompt="p", max_tokens=10)
+    assert len(session.posts) == 1, "no second helping of a 600 s timeout"
+    assert session.posts[0]["timeout"] == 600
 
 
 def test_the_chain_advances_past_a_dead_entry_and_attributes_the_answer():

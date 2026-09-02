@@ -706,22 +706,34 @@ def test_fallback_model_entries_are_validated(tmp_path: Path):
     assert len(complaints) == 2  # the int and the model-less mapping
 
 
-def test_a_fallback_entry_timeout_must_be_a_positive_number(tmp_path: Path):
-    """`timeout: 600` is how the local 27B gets the minutes it needs. A
-    string or a zero would silently keep the 120 s default and let the entry
-    that exists for when the network is gone die as a 'transient' failure —
-    so it is a validation complaint, not a quiet fallback to the default."""
+def test_a_fallback_entry_timeout_and_retries_are_validated(tmp_path: Path):
+    """`timeout: 600, max_retries: 0` is how the local 27B gets the minutes
+    it needs and no second helping of them. A string, a zero, a half second
+    (int() would make it 0) or a negative retry count would silently keep
+    the defaults — 120 s and two retries — and the entry that exists for
+    when the network is gone would die as 'transient' or wait half an hour
+    per job. So they are validation complaints, not quiet fallbacks."""
     (tmp_path / "config.yaml").write_text(
         yaml.safe_dump({"tailoring": {"fallback_models": [
             {"model": "qwen3.8:27b", "base_url": "http://localhost:11434/v1",
-             "timeout": 600},
-            {"model": "qwen3.8:27b", "timeout": "10 minutes"},
-            {"model": "qwen3.8:27b", "timeout": 0},
+             "timeout": 600, "max_retries": 0},
+            {"model": "a/b", "timeout": "10 minutes"},
+            {"model": "a/b", "timeout": 0},
+            {"model": "a/b", "timeout": 0.5},
+            {"model": "a/b", "max_retries": -1},
+            {"model": "a/b", "max_retries": 1.5},
+            {"model": "a/b", "max_retries": True},
         ]}}),
         encoding="utf-8")
     cfg = Config.load(tmp_path / "config.yaml", tmp_path / "w.yaml",
                       root=tmp_path, env={})
-    complaints = [p for p in cfg.validate() if ".timeout" in p]
-    assert len(complaints) == 2, complaints
-    assert complaints[0].startswith("tailoring.fallback_models[1].timeout")
-    assert complaints[1].startswith("tailoring.fallback_models[2].timeout")
+    complaints = [p for p in cfg.validate()
+                  if ".timeout" in p or ".max_retries" in p]
+    assert [p.split(" must")[0] for p in complaints] == [
+        "tailoring.fallback_models[1].timeout",
+        "tailoring.fallback_models[2].timeout",
+        "tailoring.fallback_models[3].timeout",
+        "tailoring.fallback_models[4].max_retries",
+        "tailoring.fallback_models[5].max_retries",
+        "tailoring.fallback_models[6].max_retries",
+    ]

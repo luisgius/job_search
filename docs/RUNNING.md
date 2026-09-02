@@ -69,7 +69,8 @@ Ollama down means that entry costs three refused connections and about two
 seconds of backoff per job, and the job reaches the digest unscored, exactly
 as before the entry existed; Ollama up means a scoring takes minutes (the
 model thinks first, then answers at ~18 tok/s), which is why that entry
-carries its own `timeout: 600`.
+carries its own `timeout: 600` and `max_retries: 0` — one attempt of up to
+ten minutes, never three.
 
 ## 2. Heartbeat (optional, free, two minutes)
 

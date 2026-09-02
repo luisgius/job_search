@@ -220,12 +220,14 @@ DEFAULTS: dict[str, Any] = {
         "model": "anthropic/claude-sonnet-5",
         # Tried in order when `model` cannot answer (spent daily quota,
         # rotated :free id, outage). A string inherits llm.provider/base_url;
-        # a mapping may override them (plus `timeout`, HTTP seconds — the
-        # patience a laptop-sized model needs) — which is how a local
-        # gateway joins:
+        # a mapping may override them, plus `timeout` (HTTP seconds — the
+        # patience a laptop-sized model needs) and `max_retries` (after the
+        # first attempt; 0 for a local model, since a slow answer does not
+        # get faster on retry) — which is how a local gateway joins:
         #   fallback_models:
         #     - google/gemma-4-31b-it:free
-        #     - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1", timeout: 600}
+        #     - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1",
+        #        timeout: 600, max_retries: 0}
         "fallback_models": [],
         "threshold": 65,
         "max_jobs": 40,
@@ -677,23 +679,35 @@ class Config:
                 if isinstance(entry, str) and entry.strip():
                     continue
                 if isinstance(entry, dict) and str(entry.get("model") or "").strip():
-                    # A timeout that fails to parse would silently keep the
-                    # 120 s default — and the local entry that exists for
-                    # when the network is gone would die as "transient".
+                    # A number that fails to parse would silently keep the
+                    # defaults (120 s, two retries) — and the local entry
+                    # that exists for when the network is gone would die as
+                    # "transient", or wait half an hour per job.
                     timeout = entry.get("timeout")
                     if timeout is not None and (
                         isinstance(timeout, bool)
                         or not isinstance(timeout, (int, float))
-                        or timeout <= 0
+                        or timeout < 1
                     ):
                         problems.append(
                             f"{role}.fallback_models[{index}].timeout must be a "
-                            f"positive number of seconds — got {timeout!r}"
+                            f"number of seconds, at least 1 — got {timeout!r}"
+                        )
+                    retries = entry.get("max_retries")
+                    if retries is not None and (
+                        isinstance(retries, bool)
+                        or not isinstance(retries, int)
+                        or retries < 0
+                    ):
+                        problems.append(
+                            f"{role}.fallback_models[{index}].max_retries must "
+                            f"be a whole number, 0 or more — got {retries!r}"
                         )
                     continue
                 problems.append(
                     f"{role}.fallback_models[{index}] must be a model id or a "
-                    "mapping with `model` (and optional provider/base_url/timeout)"
+                    "mapping with `model` (and optional provider/base_url/"
+                    "timeout/max_retries)"
                 )
 
         # Loud about the one setting that can send email on the user's behalf.

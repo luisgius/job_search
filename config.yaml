@@ -374,12 +374,14 @@ scoring:
   # Conditions: the Ollama app must be running at 08:00 (menu-bar icon), and
   # the model thinks before it answers, so at ~18 tok/s one scoring takes
   # minutes, not seconds — hence its own `timeout` (seconds; the 120 s
-  # default would read a slow answer as a failure). 40 scorings on it is an
-  # hour-plus of laptop: right for a floor, wrong for a primary.
+  # default would read a slow answer as a failure) and no retries (a slow
+  # answer does not get faster the second time; the default two retries
+  # would turn one wedged Ollama into half an hour per offer). 40 scorings
+  # on it is an hour-plus of laptop: right for a floor, wrong for a primary.
   fallback_models:
     - google/gemma-4-26b-a4b-it:free
     - nvidia/nemotron-3-super-120b-a12b:free
-    - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1", timeout: 600}
+    - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1", timeout: 600, max_retries: 0}
   # PAID SWITCH — recommended once $10 of credits are in (lifts the free
   # pools to 1,000/day too, and the CV stops travelling to models that
   # train on prompts). Live prices 2026-09-01; at this run size scoring
@@ -437,8 +439,9 @@ tailoring:
     - nvidia/nemotron-3-super-120b-a12b:free
     # Same local floor as scoring (see the note there). A full letter at
     # ~18 tok/s is several minutes of generation on top of the thinking, so
-    # this timeout is the tailoring budget, not a guess.
-    - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1", timeout: 600}
+    # this timeout is the tailoring budget, not a guess — and one attempt
+    # of it is the whole budget.
+    - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1", timeout: 600, max_retries: 0}
   max_per_run: 10
   max_tokens: 4000
   temperature: 0.2
