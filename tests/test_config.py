@@ -260,8 +260,12 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         "scoring.concurrency": "free-tier validation period (20 req/min cap)",
         "tailoring.model": "free-tier validation period",
         "scoring.fallback_models": (
-            "free-tier validation period: a second :free id doubles the "
-            "per-model daily budget and covers a rotated primary"
+            "free-tier validation period: extra :free ids widen the per-model "
+            "daily budget and cover a rotated primary — both original ids "
+            "went paid-only on 2026-09-01"
+        ),
+        "tailoring.fallback_models": (
+            "free-tier validation period: same chain as scoring, same reason"
         ),
     }
     _PHASE3 = (

@@ -352,25 +352,36 @@ scoring:
   #
   # VALIDATION PERIOD — a $0 model until the machinery proves itself.
   # Three things to know about :free models:
-  #   * OpenRouter free tier: 20 req/min always, 50 req/day until $10 of
-  #     lifetime credits (then 1,000/day). A full run (40 scorings + the
-  #     tailorings) BLOWS the 50/day cap — validate with --limit 10.
+  #   * OpenRouter free tier: 20 req/min always, 50 req/day PER MODEL until
+  #     $10 of lifetime credits (then 1,000/day). Three ids below = three
+  #     pools. A full run (40 scorings + the tailorings) can still blow a
+  #     pool — validate with --limit 10 the first days.
   #   * :free routing requires the "allow training on prompts" toggle in
   #     your OpenRouter privacy settings: your CV goes into those prompts.
-  #   * Free ids rotate. If this one 404s, pick any current :free chat
-  #     model at openrouter.ai/models. Avoid reasoning models (DeepSeek R1)
-  #     here: their thinking eats max_tokens before the JSON.
-  # When validated, the upgrade back is one line:
-  #     model: anthropic/claude-sonnet-5   (or claude-haiku-4.5, ~10x cheaper)
-  model: meta-llama/llama-3.3-70b-instruct:free
-  # Tried in order when the model above cannot answer (spent 50/day cap,
-  # rotated id, outage) — a second :free id also DOUBLES the daily budget,
-  # since the caps are per model. Verify it on your first run; if it 404s,
-  # swap it for any current :free chat model. A mapping entry points the
-  # same chain at a local gateway, no key needed:
+  #   * Free ids rotate WITHOUT notice. On 2026-09-01 both ids this file
+  #     shipped with (llama-3.3-70b:free, mistral-small-3.1:free) went
+  #     paid-only the same day: every scoring failed, the chain hopped and
+  #     said so, the job reached the digest unscored. The ids below were
+  #     taken from the live list (openrouter.ai/api/v1/models) that day —
+  #     when one 404s again, re-list and swap; never guess a slug. Avoid
+  #     reasoning models (anything "-reasoning", R1-style): their thinking
+  #     eats max_tokens before the JSON.
+  model: google/gemma-4-31b-it:free
+  # Tried in order when the model above cannot answer (spent pool, rotated
+  # id, outage). A mapping entry points the same chain at a local gateway,
+  # no key needed:
   #   - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1"}
   fallback_models:
-    - mistralai/mistral-small-3.1-24b-instruct:free
+    - google/gemma-4-26b-a4b-it:free
+    - nvidia/nemotron-3-super-120b-a12b:free
+  # PAID SWITCH — recommended once $10 of credits are in (lifts the free
+  # pools to 1,000/day too, and the CV stops travelling to models that
+  # train on prompts). Live prices 2026-09-01; at this run size scoring
+  # costs ~$0.03/run, about €0.70/month:
+  #   model: mistralai/mistral-small-3.2-24b-instruct    # $0.075/M in · $0.20/M out
+  #   fallback_models:
+  #     - google/gemma-3-27b-it                          # $0.08/M in · $0.45/M out
+  #     - google/gemma-4-31b-it:free
   threshold: 65            # 65 medium · 75 strict
   max_jobs: 40             # hard cap on LLM calls per run — your cost ceiling
   max_tokens: 1500
@@ -408,10 +419,16 @@ scoring:
 
 tailoring:
   enabled: true
-  # Same validation-period model as scoring — fine for proving the plumbing,
-  # NOT for documents you would actually send. Before a real application:
+  # Same validation-period chain as scoring — fine for proving the plumbing,
+  # NOT for documents you would actually send. The paid step-up, live prices
+  # 2026-09-01 (10 tailorings/day ≈ $0.12/run, about €2.60/month):
+  #     model: meta-llama/llama-3.3-70b-instruct          # $0.71/M in · $0.71/M out
+  # and for a letter that has to be perfect, per application:
   #     model: anthropic/claude-sonnet-5
-  model: meta-llama/llama-3.3-70b-instruct:free
+  model: google/gemma-4-31b-it:free
+  fallback_models:
+    - google/gemma-4-26b-a4b-it:free
+    - nvidia/nemotron-3-super-120b-a12b:free
   max_per_run: 10
   max_tokens: 4000
   temperature: 0.2
