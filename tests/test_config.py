@@ -704,3 +704,24 @@ def test_fallback_model_entries_are_validated(tmp_path: Path):
                       root=tmp_path, env={})
     complaints = [p for p in cfg.validate() if "fallback_models" in p]
     assert len(complaints) == 2  # the int and the model-less mapping
+
+
+def test_a_fallback_entry_timeout_must_be_a_positive_number(tmp_path: Path):
+    """`timeout: 600` is how the local 27B gets the minutes it needs. A
+    string or a zero would silently keep the 120 s default and let the entry
+    that exists for when the network is gone die as a 'transient' failure —
+    so it is a validation complaint, not a quiet fallback to the default."""
+    (tmp_path / "config.yaml").write_text(
+        yaml.safe_dump({"tailoring": {"fallback_models": [
+            {"model": "qwen3.8:27b", "base_url": "http://localhost:11434/v1",
+             "timeout": 600},
+            {"model": "qwen3.8:27b", "timeout": "10 minutes"},
+            {"model": "qwen3.8:27b", "timeout": 0},
+        ]}}),
+        encoding="utf-8")
+    cfg = Config.load(tmp_path / "config.yaml", tmp_path / "w.yaml",
+                      root=tmp_path, env={})
+    complaints = [p for p in cfg.validate() if ".timeout" in p]
+    assert len(complaints) == 2, complaints
+    assert complaints[0].startswith("tailoring.fallback_models[1].timeout")
+    assert complaints[1].startswith("tailoring.fallback_models[2].timeout")

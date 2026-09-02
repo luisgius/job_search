@@ -61,6 +61,16 @@ inside your login session: a Mac sitting at the login window (say, after a
 FileVault reboot) skips the same way a powered-off one does; the heartbeat
 below is the net under both.
 
+One more thing that has to be running at 08:00 if you use it: the local
+model. The last entry of both model chains in `config.yaml` is
+`qwen3.8:27b` through the Ollama app (`http://localhost:11434/v1`) — the
+floor under the hosted ids, reached only when every one of them has failed.
+Ollama down means that entry costs three refused connections and about two
+seconds of backoff per job, and the job reaches the digest unscored, exactly
+as before the entry existed; Ollama up means a scoring takes minutes (the
+model thinks first, then answers at ~18 tok/s), which is why that entry
+carries its own `timeout: 600`.
+
 ## 2. Heartbeat (optional, free, two minutes)
 
 Every alert the pipeline can raise shares one blind spot: they run inside the

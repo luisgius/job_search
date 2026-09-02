@@ -220,10 +220,12 @@ DEFAULTS: dict[str, Any] = {
         "model": "anthropic/claude-sonnet-5",
         # Tried in order when `model` cannot answer (spent daily quota,
         # rotated :free id, outage). A string inherits llm.provider/base_url;
-        # a mapping may override them — which is how a local gateway joins:
+        # a mapping may override them (plus `timeout`, HTTP seconds — the
+        # patience a laptop-sized model needs) — which is how a local
+        # gateway joins:
         #   fallback_models:
-        #     - mistralai/mistral-small-3.1-24b-instruct:free
-        #     - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1"}
+        #     - google/gemma-4-31b-it:free
+        #     - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1", timeout: 600}
         "fallback_models": [],
         "threshold": 65,
         "max_jobs": 40,
@@ -675,10 +677,23 @@ class Config:
                 if isinstance(entry, str) and entry.strip():
                     continue
                 if isinstance(entry, dict) and str(entry.get("model") or "").strip():
+                    # A timeout that fails to parse would silently keep the
+                    # 120 s default — and the local entry that exists for
+                    # when the network is gone would die as "transient".
+                    timeout = entry.get("timeout")
+                    if timeout is not None and (
+                        isinstance(timeout, bool)
+                        or not isinstance(timeout, (int, float))
+                        or timeout <= 0
+                    ):
+                        problems.append(
+                            f"{role}.fallback_models[{index}].timeout must be a "
+                            f"positive number of seconds — got {timeout!r}"
+                        )
                     continue
                 problems.append(
                     f"{role}.fallback_models[{index}] must be a model id or a "
-                    "mapping with `model` (and optional provider/base_url)"
+                    "mapping with `model` (and optional provider/base_url/timeout)"
                 )
 
         # Loud about the one setting that can send email on the user's behalf.

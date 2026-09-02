@@ -479,7 +479,10 @@ recovered. Retry twice on transient API errors. `client=` is the test seam.
 Three additions, all invisible until configured: `<role>.fallback_models`
 turns the client into a `ModelChain` that hops to the next entry on ANY
 `LLMError` (rotated `:free` id, spent quota, an entry that cannot build) and
-reports `last_model` for honest attribution; every transport feeds a
+reports `last_model` for honest attribution — a mapping entry may carry
+`provider`, `base_url` and `timeout` (HTTP seconds, the patience a local
+27B thinking through a 5k-token prompt needs; the 120 s default would read
+that answer as a transient failure); every transport feeds a
 run-wide `UsageMeter` (tokens both dialects, plus the per-response cost
 OpenRouter returns when asked) that `main` snapshots into
 `RunStats.llm_usage` for the digest; and `schema=` requests

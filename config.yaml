@@ -368,12 +368,18 @@ scoring:
   #     eats max_tokens before the JSON.
   model: google/gemma-4-31b-it:free
   # Tried in order when the model above cannot answer (spent pool, rotated
-  # id, outage). A mapping entry points the same chain at a local gateway,
-  # no key needed:
-  #   - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1"}
+  # id, outage). The last entry is the local Qwen through Ollama's
+  # OpenAI-compatible endpoint: no key, no quota, no rotating id — the floor
+  # under the chain, reached only when every hosted id has failed.
+  # Conditions: the Ollama app must be running at 08:00 (menu-bar icon), and
+  # the model thinks before it answers, so at ~18 tok/s one scoring takes
+  # minutes, not seconds — hence its own `timeout` (seconds; the 120 s
+  # default would read a slow answer as a failure). 40 scorings on it is an
+  # hour-plus of laptop: right for a floor, wrong for a primary.
   fallback_models:
     - google/gemma-4-26b-a4b-it:free
     - nvidia/nemotron-3-super-120b-a12b:free
+    - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1", timeout: 600}
   # PAID SWITCH — recommended once $10 of credits are in (lifts the free
   # pools to 1,000/day too, and the CV stops travelling to models that
   # train on prompts). Live prices 2026-09-01; at this run size scoring
@@ -429,6 +435,10 @@ tailoring:
   fallback_models:
     - google/gemma-4-26b-a4b-it:free
     - nvidia/nemotron-3-super-120b-a12b:free
+    # Same local floor as scoring (see the note there). A full letter at
+    # ~18 tok/s is several minutes of generation on top of the thinking, so
+    # this timeout is the tailoring budget, not a guess.
+    - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1", timeout: 600}
   max_per_run: 10
   max_tokens: 4000
   temperature: 0.2

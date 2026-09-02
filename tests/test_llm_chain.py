@@ -93,6 +93,51 @@ def test_model_entries_read_strings_mappings_and_drop_duplicates():
     assert entries[2]["base_url"] == "http://localhost:11434/v1"
 
 
+def test_model_entries_read_a_per_entry_timeout_from_the_mapping_form_only():
+    """The primary and string fallbacks keep util's 120 s default; a local
+    entry gets its own patience. A timeout that is not a positive number is
+    ignored here (config.validate complains about it up front)."""
+    entries = model_entries(cfg([
+        "backup/model",
+        {"model": "qwen3.8:27b", "base_url": "http://localhost:11434/v1",
+         "timeout": 600},
+        {"model": "other/local", "timeout": "soon"},
+        {"model": "third/local", "timeout": True},   # bool is not a number
+    ]), "scoring")
+    assert [e["timeout"] for e in entries] == [None, None, 600, None, None]
+
+
+def test_a_client_timeout_reaches_the_wire():
+    session = PostSession()
+    llm = LLMClient("", provider="openrouter", session=session,
+                    base_url="http://localhost:11434/v1", sleep=lambda _s: None,
+                    meter=UsageMeter(), timeout=600)
+    llm.complete(model="qwen3.8:27b", system="", prompt="p", max_tokens=10)
+    assert session.posts[0]["timeout"] == 600
+
+
+def test_the_chain_builds_the_local_entry_with_its_own_url_and_timeout():
+    """End to end through the factory: the hosted primary is dead, the chain
+    reaches the Ollama entry, and the request it makes carries that entry's
+    base_url AND its 600 s — a 27B thinking through a scoring prompt on a
+    laptop takes minutes, and the default would call that a failure."""
+    session = PostSession([FakeResponse(status_code=200, _json=completion(FULL))])
+    chain = chain_from_config(
+        cfg([{"model": "qwen3.8:27b", "base_url": "http://localhost:11434/v1",
+              "timeout": 600}]),
+        "scoring", clients=[DeadClient(), None],
+        session=session, sleep=lambda _s: None, meter=UsageMeter(),
+    )
+    payload = chain.complete_json(model="ignored", system="s", prompt="p",
+                                  max_tokens=10, require_keys=KEYS)
+    assert payload["score"] == 71
+    assert chain.last_model == "qwen3.8:27b"
+    post = session.posts[0]
+    assert post["url"] == "http://localhost:11434/v1/chat/completions"
+    assert post["timeout"] == 600
+    assert post["json"]["model"] == "qwen3.8:27b"
+
+
 def test_the_chain_advances_past_a_dead_entry_and_attributes_the_answer():
     dead, ok = DeadClient(), OkClient({"score": 88})
     chain = chain_from_config(cfg(["backup/model"]), "scoring",

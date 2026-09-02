@@ -360,6 +360,7 @@ class LLMClient:
         sleep: Callable[[float], None] | None = None,
         headers: Mapping[str, str] | None = None,
         meter: UsageMeter | None = None,
+        timeout: int | None = None,
     ) -> None:
         # Each provider speaks through exactly one seam: `client=` is the
         # Anthropic SDK object, `session=` is the openrouter HTTP session.
@@ -401,6 +402,12 @@ class LLMClient:
         self._real: Any = None
         self._extra_headers = dict(headers or {})
         self._meter = meter if meter is not None else METER
+        # HTTP transport only. None keeps util's generous default; a chain
+        # entry for a local model sets its own — a 27B thinking through a
+        # 5k-token scoring prompt on a laptop can legitimately take minutes,
+        # and a timeout there reads as a transient failure that exhausts the
+        # very entry that exists for when the network is gone.
+        self.timeout = int(timeout) if timeout else None
         self.base_url = str(
             base_url or (OPENROUTER_BASE_URL if self.provider == "openrouter" else "")
         ).rstrip("/")
@@ -532,14 +539,14 @@ class LLMClient:
             # in `usage.cost` — telemetry without scraping a dashboard. Not
             # sent to other gateways, whose stricter parsers may reject it.
             payload["usage"] = {"include": True}
+        request: dict[str, Any] = dict(
+            json=payload, headers=headers, session=self._session,
+            retries=1,               # LLMClient owns the retry loop, not util
+        )
+        if self.timeout:
+            request["timeout"] = self.timeout
         try:
-            data = http_post_json(
-                f"{self.base_url}/chat/completions",
-                json=payload,
-                headers=headers,
-                session=self._session,
-                retries=1,           # LLMClient owns the retry loop, not util
-            )
+            data = http_post_json(f"{self.base_url}/chat/completions", **request)
         except HttpError as exc:
             # Translate into the vocabulary the retry loop understands. A
             # status means the server answered and we can judge it; no status
@@ -1011,27 +1018,35 @@ def model_entries(config: Any, role: str) -> list[dict[str, Any]]:
     `<role>.fallback_models` entry.
 
     A fallback is a model-id string (inherits the global provider and
-    base_url) or a mapping with `model` plus optional `provider`/`base_url` —
-    the mapping form is how a local gateway joins the chain:
+    base_url) or a mapping with `model` plus optional `provider`/`base_url`/
+    `timeout` (seconds, HTTP transport) — the mapping form is how a local
+    gateway joins the chain, with the patience a laptop-sized model needs:
 
         fallback_models:
-          - mistralai/mistral-small-3.1-24b-instruct:free
-          - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1"}
+          - google/gemma-4-31b-it:free
+          - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1", timeout: 600}
     """
     entries: list[dict[str, Any]] = []
     primary = str(_cfg(config, f"{role}.model", "") or "").strip()
     if primary:
-        entries.append({"model": primary, "provider": None, "base_url": None})
+        entries.append({"model": primary, "provider": None, "base_url": None,
+                        "timeout": None})
     raw = _cfg(config, f"{role}.fallback_models", []) or []
     for item in raw if isinstance(raw, list) else []:
+        timeout = None
         if isinstance(item, Mapping):
             model = str(item.get("model") or "").strip()
             provider = str(item.get("provider") or "").strip().lower() or None
             base_url = str(item.get("base_url") or "").strip() or None
+            raw_timeout = item.get("timeout")
+            if isinstance(raw_timeout, (int, float)) and not isinstance(raw_timeout, bool) \
+                    and raw_timeout > 0:
+                timeout = int(raw_timeout)
         else:
             model = str(item or "").strip()
             provider = base_url = None
-        entry = {"model": model, "provider": provider, "base_url": base_url}
+        entry = {"model": model, "provider": provider, "base_url": base_url,
+                 "timeout": timeout}
         # A duplicate buys a second identical failure, nothing else.
         if model and entry not in entries:
             entries.append(entry)
@@ -1112,6 +1127,7 @@ def _client_factory(
                 provider=provider,
                 base_url=entry.get("base_url")
                 or (str(_cfg(config, "llm.base_url", "") or "") or None),
+                timeout=entry.get("timeout"),
                 **kwargs,
             )
         except LLMError as exc:
