@@ -11,6 +11,7 @@ slugs, and they are the only way a user can tell "no jobs today" apart from
 from __future__ import annotations
 
 from datetime import timedelta
+from itertools import permutations
 
 import pytest
 
@@ -369,6 +370,84 @@ def test_dedupe_prefers_an_ats_source_on_a_tie():
     ats = make_job(source="lever", description="same", ats=None,
                    ats_job_id=None, country="DE")
     assert dedupe([aggregator, ats])[0].source == "lever"
+
+
+@pytest.mark.parametrize("same_url", [False, True])
+def test_dedupe_fresh_snippet_survives_before_freshness_filter(tmp_path, same_url):
+    old = make_job(source="nofluffjobs", ats=None, ats_job_id="old",
+                   hours_old=15 * 24, country="DE",
+                   description="Main technology: Python. Seniority: mid. Category: data.",
+                   raw={"snippet_only": True})
+    fresh = make_job(source="nofluffjobs", ats=None, ats_job_id="fresh",
+                     hours_old=20, country="DE",
+                     description="Seniority: mid. Category: data.",
+                     raw={"snippet_only": True})
+    if same_url:
+        fresh.url = old.url + "?utm_source=refresh"
+    config = write_config(tmp_path, {
+        "filters": {"title_include": [], "title_exclude": [], "countries": ["DE"]},
+        "freshness": {"max_age_hours": 72, "skip_undated": True},
+    })
+    original_dates = old.posted_at, fresh.posted_at
+    for batch in ([old, fresh], [fresh, old]):
+        assert dedupe(batch) == [fresh]
+        assert apply_filters(dedupe(batch), config, now=NOW).kept == [fresh]
+    assert (old.posted_at, fresh.posted_at) == original_dates
+
+
+@pytest.mark.parametrize("full_source", ["greenhouse", "nofluffjobs"])
+def test_dedupe_full_description_beats_newer_longer_snippet(full_source):
+    full = make_job(source=full_source, ats=None, ats_job_id="full",
+                    hours_old=100, description="Build forecasting models with Python.")
+    snippet = make_job(source="nofluffjobs", ats=None, ats_job_id="snippet",
+                       hours_old=1, description="Required skills: Python. " * 20,
+                       raw={"snippet_only": True})
+    for batch in ([full, snippet], [snippet, full]):
+        assert dedupe(batch) == [full]
+
+
+def test_dedupe_snippets_use_source_rank_then_recency_in_every_order():
+    older = make_job(source="adzuna", ats=None, ats_job_id="older",
+                     hours_old=100, description="Older long teaser. " * 20,
+                     raw={"snippet_only": True})
+    newer = make_job(source="nofluffjobs", ats=None, ats_job_id="newer",
+                     hours_old=20, description="Python", raw={"snippet_only": True})
+    email = make_job(source="linkedin_email", ats=None, ats_job_id="email",
+                     hours_old=1, description="Newest alert teaser. " * 30,
+                     raw={"snippet_only": True})
+    # A single transitive key must give the same winner in all six orders.
+    for batch in permutations([older, newer, email]):
+        assert dedupe(list(batch)) == [newer]
+
+
+def test_dedupe_dated_snippet_still_beats_undated_full_description():
+    undated = make_job(source="greenhouse", ats_job_id="undated", hours_old=None,
+                       description="Full employer description. " * 50)
+    dated = make_job(source="nofluffjobs", ats=None, ats_job_id="dated",
+                     hours_old=10, description="Python", raw={"snippet_only": True})
+    for batch in ([undated, dated], [dated, undated]):
+        assert dedupe(batch) == [dated]
+    assert undated.posted_at is None
+
+
+@pytest.mark.parametrize("hours_old", [None, 2])
+def test_dedupe_snippet_ties_ignore_length_and_keep_first_group_order(hours_old):
+    first = make_job(source="nofluffjobs", ats=None, ats_job_id="first",
+                     hours_old=hours_old, description="Python", raw={"snippet_only": True})
+    second = make_job(source="nofluffjobs", ats=None, ats_job_id="second",
+                      hours_old=hours_old, description="Much longer metadata. " * 10,
+                      raw={"snippet_only": True})
+    other = make_job(company="Different employer", ats_job_id="other")
+    assert dedupe([first, other, second]) == [first, other]
+    assert dedupe([second, other, first]) == [second, other]
+
+
+def test_dedupe_new_email_receipt_does_not_replace_dated_ats_body():
+    ats = make_job(source="greenhouse", ats_job_id="ats", hours_old=100,
+                   description="Full employer description with requirements.")
+    email = make_job(source="linkedin_email", ats=None, ats_job_id=None,
+                     hours_old=1, description="", url="https://www.linkedin.com/jobs/view/1")
+    assert dedupe([email, ats]) == [ats]
 
 
 def test_dedupe_keeps_genuinely_different_jobs():

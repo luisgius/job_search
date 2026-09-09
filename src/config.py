@@ -118,6 +118,7 @@ DEFAULTS: dict[str, Any] = {
         # health baseline alert) and never the run.
         "justjoin_it": False,
         "nofluffjobs": False,
+        "allegro": False,
         "linkedin_email": False,
     },
     "freshness": {
@@ -231,6 +232,10 @@ DEFAULTS: dict[str, Any] = {
         "fallback_models": [],
         "threshold": 65,
         "max_jobs": 40,
+        "backlog_max_jobs": 1000,
+        "backlog_max_age_days": 7,
+        "retry_max_attempts": 3,
+        "retry_base_hours": 1,
         "max_tokens": 1500,
         "temperature": 0.0,
         "concurrency": 4,
@@ -316,7 +321,7 @@ BOARD_SOURCE_NAMES: tuple[str, ...] = (
 #: Every source the config knows about, in fetch order.
 SOURCE_NAMES: tuple[str, ...] = BOARD_SOURCE_NAMES + (
     "adzuna", "arbeitnow", "landing_jobs", "justjoin_it", "nofluffjobs",
-    "linkedin_email",
+    "allegro", "linkedin_email",
 )
 
 WATCHLIST_DEFAULTS: dict[str, Any] = {
@@ -328,6 +333,13 @@ WATCHLIST_DEFAULTS: dict[str, Any] = {
     "personio": [],
     "recruitee": [],
     "teamtailor": [],
+    "allegro": {
+        "max_pages": 2,
+        "max_details": 8,
+        "max_requests": 12,
+        "timeout_seconds": 20,
+        "detail_urls": [],
+    },
     "adzuna": {
         "countries": [],
         "queries": [],
@@ -615,6 +627,18 @@ class Config:
             problems.append(f"scoring.threshold must be 0-100, got {threshold!r}")
 
         max_age = self.get("freshness.max_age_hours", DEFAULT_MAX_AGE_HOURS)
+        for name, minimum, maximum in (
+            ("backlog_max_jobs", 0, 10000),
+            ("backlog_max_age_days", 1, 30),
+            ("retry_max_attempts", 1, 10),
+            ("retry_base_hours", 1, 168),
+        ):
+            value = self.get(f"scoring.{name}", DEFAULTS["scoring"][name])
+            if isinstance(value, bool) or not isinstance(value, int) \
+                    or not minimum <= value <= maximum:
+                problems.append(
+                    f"scoring.{name} must be an integer {minimum}-{maximum}, got {value!r}"
+                )
         if isinstance(max_age, bool) or not isinstance(max_age, (int, float)) \
                 or max_age <= 0:
             problems.append(f"freshness.max_age_hours must be > 0, got {max_age!r}")

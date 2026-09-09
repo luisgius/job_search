@@ -110,6 +110,7 @@ sources:
   # and never takes the run down. Both filter to data/AI, junior+mid.
   justjoin_it: true        # justjoin.it — salary on every ad
   nofluffjobs: true        # nofluffjobs.com — PL/CEE, salary on every ad
+  allegro: true            # bounded public careers collector; limits in watchlist.yaml
   adzuna: false            # needs free keys from developer.adzuna.com
   linkedin_email: false    # needs gmail_credentials.json (see README)
 

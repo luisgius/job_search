@@ -328,10 +328,14 @@ def test_run_stats_to_dict_round_trips():
     stats = RunStats(fetched=10, matches=2)
     stats.errors.append("boom")
     stats.source_counts["greenhouse"] = 10
+    stats.filter_counts["stale"] = 3
     payload = stats.to_dict()
     assert payload["fetched"] == 10
     assert payload["errors"] == ["boom"]
     assert payload["source_counts"] == {"greenhouse": 10}
+    assert payload["filter_counts"] == {"stale": 3}
     # Mutating the dict must not reach back into the stats object.
     payload["errors"].append("other")
     assert stats.errors == ["boom"]
+    payload["filter_counts"]["stale"] = 99
+    assert stats.filter_counts == {"stale": 3}

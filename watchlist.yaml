@@ -25,9 +25,10 @@
 # nothing every morning and looks exactly like a quiet market.
 #
 # It is also the only part of this tool that makes requests to boards nobody
-# told it about, so it is bounded: at most 4 spellings per company and 120
-# requests a run, it stops as soon as a board answers with postings, and it
-# says out loud what each bound dropped. Raise `--max-requests` deliberately —
+# told it about, so it is bounded: at most 4 spellings per board/company and
+# 160 probes a run; Personio host fallback can add a second HTTP request.
+# It stops after the round where a board answers with postings, and reports
+# what each bound dropped. Raise `--max-requests` deliberately —
 # traffic that looks like a scanner gets you blocked from the boards the daily
 # run actually needs.
 #
@@ -155,9 +156,8 @@ smartrecruiters:
   # as "exists, nothing open". Treat persistent zeros with suspicion and
   # confirm the spelling on the company's own careers URL.
   - smartrecruiters  # VERIFIED 2026-09-01 · 2 postings · the vendor itself
-  - allegro          # answered 1 posting 2026-09-01 — suspiciously few for
-                     # Allegro's size; if it stays at ~1, try the capitalised
-                     # spelling from their careers URL (case matters here)
+  # Allegro moved to SAP; the dedicated allegro source below replaces the old
+  # tenant, which only returned a migration notice on 2026-09-09.
   # SonarSource and Visma answered 0 on 2026-09-01, which on THIS vendor is
   # indistinguishable from "no such slug" (see note above). Off until their
   # careers URLs confirm the exact spelling:
@@ -205,6 +205,18 @@ teamtailor:
   #   - https://careers.epidemicsound.com/jobs
   #   - https://careers.oda.com/jobs
   - https://career.teamtailor.com/jobs   # VERIFIED 2026-09-01 · 11 postings
+
+allegro:
+  # Official public careers pages; no SAP credentials or application actions.
+  # Collection is bounded and may be partial. Undated jobs remain undated.
+  max_pages: 4
+  max_details: 8
+  max_requests: 12
+  timeout_seconds: 20
+  # Explicitly discovered official detail; fetched again, never assumed open.
+  # Its original date remains unchanged and it may be outside daily freshness.
+  detail_urls:
+    - https://careers.allegro.eu/job/Warszawa-Data-Scientist-Allegro-AI-Hub-00-841/1365885255/
 
 adzuna:
   # Adzuna's European coverage, lowercase: at be ch de es fr gb it nl pl.

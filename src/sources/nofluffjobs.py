@@ -30,6 +30,7 @@ from __future__ import annotations
 import re
 from typing import Any, Mapping
 
+from .. import geo
 from ..models import Job
 from ..util import get_logger, http_get_json, parse_datetime
 
@@ -39,6 +40,14 @@ API_URL = "https://nofluffjobs.com/api/posting"
 
 #: The job page for one posting's `url` slug.
 JOB_URL = "https://nofluffjobs.com/job/{slug}"
+
+# ISO3 codes observed in the listing but absent from geo's free-text aliases:
+# ordinary words (FIN/NOR), non-EU Europe, and countries outside Europe.
+# Keep the shared aliases for the rest; never truncate an unknown ISO3 code.
+_ISO3_EXTRA = {
+    "ARE": "AE", "FIN": "FI", "NOR": "NO", "SAU": "SA",
+    "SRB": "RS", "UKR": "UA", "USA": "US",
+}
 
 #: Category slugs that count as data/AI. `business-intelligence` is included
 #: because this board files analytics-engineer-shaped roles there; the title
@@ -120,16 +129,18 @@ def _salary(posting: Mapping[str, Any]) -> str | None:
         return None
     amount = f"{low}–{high}" if low and high and low != high else (low or high)
     currency = _text(node.get("currency")).upper()
-    return f"{amount} {currency}".strip()
+    text = f"{amount} {currency}".strip()
+    period = _text(node.get("period")).lower()
+    return f"{text}/{period}" if period in {"hour", "month"} else text
 
 
-def _places(posting: Mapping[str, Any]) -> tuple[str, str | None, bool]:
-    """`(display cities, ISO country, fully_remote)` from the location node."""
+def _places(posting: Mapping[str, Any]) -> tuple[str, list[str], bool]:
+    """`(display cities, ISO countries, fully_remote)` from the location node."""
     node = posting.get("location")
     node = node if isinstance(node, Mapping) else {}
     remote = bool(node.get("fullyRemote"))
     cities: list[str] = []
-    country: str | None = None
+    countries: list[str] = []
     places = node.get("places")
     if isinstance(places, list):
         for place in places:
@@ -138,14 +149,35 @@ def _places(posting: Mapping[str, Any]) -> tuple[str, str | None, bool]:
             city = _text(place.get("city"))
             if city and city.lower() != "remote" and city not in cities:
                 cities.append(city)
-            if country is None:
-                nation = place.get("country")
-                code = (
-                    _text(nation.get("code")) if isinstance(nation, Mapping) else ""
-                ).upper()
-                if len(code) == 2 and code.isalpha():
-                    country = code
-    return ", ".join(cities), country, remote
+            nation = place.get("country")
+            code = (
+                _text(nation.get("code")) if isinstance(nation, Mapping) else ""
+            ).upper()
+            iso = None
+            if len(code) == 2 and code.isascii() and code.isalpha():
+                iso = code
+            elif len(code) == 3:
+                iso = _ISO3_EXTRA.get(code) or geo.COUNTRY_ALIASES.get(code.lower())
+            if iso and iso not in countries:
+                countries.append(iso)
+    # Keep the legacy display string: Job.key hashes it for this aggregator.
+    return ", ".join(cities), countries, remote
+
+
+def _requirements(posting: Mapping[str, Any]) -> list[str]:
+    node = posting.get("tiles")
+    values = node.get("values") if isinstance(node, Mapping) else None
+    requirements: list[str] = []
+    seen: set[str] = set()
+    for tile in values if isinstance(values, list) else []:
+        if not isinstance(tile, Mapping) or tile.get("type") != "requirement":
+            continue
+        value = tile.get("value")
+        value = value.strip() if isinstance(value, str) else ""
+        if value and value.casefold() not in seen:
+            requirements.append(value)
+            seen.add(value.casefold())
+    return requirements
 
 
 def parse_posting(posting: Mapping[str, Any]) -> Job | None:
@@ -156,7 +188,8 @@ def parse_posting(posting: Mapping[str, Any]) -> Job | None:
     if not title or not company or not slug:
         return None
 
-    location, country, fully_remote = _places(posting)
+    location, countries, fully_remote = _places(posting)
+    country = countries[0] if countries else None
     remote = True if fully_remote else None
     if remote and not location:
         location = "Remote"
@@ -171,7 +204,12 @@ def parse_posting(posting: Mapping[str, Any]) -> Job | None:
     category = _text(posting.get("category"))
     if category:
         parts.append(f"Category: {category}.")
+    requirements = _requirements(posting)
+    if requirements:
+        parts.append("Requirements: " + ", ".join(requirements) + ".")
 
+    salary_node = posting.get("salary")
+    salary_node = salary_node if isinstance(salary_node, Mapping) else {}
     posting_id = posting.get("id")
     return Job(
         source="nofluffjobs",
@@ -192,6 +230,14 @@ def parse_posting(posting: Mapping[str, Any]) -> Job | None:
             "category": category or None,
             "seniority": levels or None,
             "technology": technology or None,
+            # Preserve secondary location evidence without re-keying display
+            # locations or treating office countries as worldwide remote.
+            "location_countries": countries,
+            "requirements": requirements,
+            "salary_period": salary_node.get("period")
+            if isinstance(salary_node.get("period"), str) else None,
+            "salary_contract_type": salary_node.get("type")
+            if isinstance(salary_node.get("type"), str) else None,
             # `renewed` is the board bumping a stale ad back to the top; kept
             # for the tracker's repost logic to see, never used as freshness.
             "renewed": posting.get("renewed"),

@@ -397,6 +397,9 @@ class RunStats:
     #: charge OpenRouter reports per response. What turns "the free tier is
     #: probably fine" into a number the digest can print.
     llm_usage: dict[str, Any] = field(default_factory=dict)
+    #: First failing hard-filter reason for newly evaluated jobs. These
+    #: counts are order-dependent and do not measure independent gate recall.
+    filter_counts: dict[str, int] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -415,4 +418,5 @@ class RunStats:
             "source_counts": dict(self.source_counts),
             "source_after_filters": dict(self.source_after_filters),
             "llm_usage": dict(self.llm_usage),
+            "filter_counts": dict(self.filter_counts),
         }

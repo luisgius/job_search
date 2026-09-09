@@ -736,8 +736,11 @@ def _richness(job: Job) -> tuple[int, int, int, float]:
     """Sort key for "which copy of this posting do we keep?".
 
     A real date first (freshness filtering depends on it), then the longest
-    description (the scorer reads it), then the most trustworthy source, and
-    only then the most recent posting date.
+    non-snippet description, then the most trustworthy source, and only then
+    the most recent posting date. Snippet-only descriptions contribute zero
+    richness: extra metadata boilerplate must not let a stale listing hide a
+    fresh one. Snippets therefore compare by source rank and recency, never
+    by teaser length, using the same transitive tuple as every other record.
 
     Recency is *last* on purpose. Boards accumulate — the same role sits there
     as a two-day-old req and as today's repost — and when the two copies tie
@@ -753,7 +756,8 @@ def _richness(job: Job) -> tuple[int, int, int, float]:
     if job.ats and rank == 0:
         rank = 3  # an unknown source that still carries an ATS id is an ATS
     posted = job.posted_at.timestamp() if job.posted_at else 0.0
-    return (1 if job.posted_at else 0, len(job.description or ""), rank, posted)
+    description_chars = 0 if job.raw.get("snippet_only") else len(job.description or "")
+    return (1 if job.posted_at else 0, description_chars, rank, posted)
 
 
 def dedupe(jobs: list[Job]) -> list[Job]:

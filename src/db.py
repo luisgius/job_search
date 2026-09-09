@@ -1,9 +1,11 @@
 """SQLite tracker — the thing that stops you applying to the same job twice.
 
-Two tables carry the load:
+The tracker separates sightings, application history and processing work:
 
   jobs          every posting we have ever normalised, keyed by `Job.key`
   applications  the outcome per job (digest / dry-run / applied / failed)
+  scoring_backlog  bounded pending evidence and durable retry/stop reasons
+  submit_attempts  write-ahead protection against repeated submissions
 
 `has_applied()` is the hard gate in front of the auto-apply stage, and
 `should_surface()` is the softer gate in front of the digest.
@@ -23,7 +25,7 @@ from typing import Any, Iterable, Iterator
 
 from .models import ApplyStatus, Job, ensure_utc, utcnow
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 MIGRATIONS: list[str] = [
     # v1 — initial schema
@@ -95,6 +97,23 @@ MIGRATIONS: list[str] = [
     """
     ALTER TABLE applications ADD COLUMN score_reasons TEXT;
     """,
+    # v4 — processing evidence is independent of application outcomes.
+    """
+    CREATE TABLE scoring_backlog (
+        key TEXT PRIMARY KEY REFERENCES jobs(key),
+        job_json TEXT,
+        state TEXT NOT NULL DEFAULT 'pending',
+        queued_at TEXT NOT NULL,
+        last_observed_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        next_attempt_at TEXT NOT NULL,
+        application_status TEXT,
+        application_updated_at TEXT,
+        detail TEXT NOT NULL DEFAULT 'pending scoring'
+    );
+    CREATE INDEX idx_scoring_backlog_due ON scoring_backlog(state, next_attempt_at);
+    """,
 ]
 
 # Statuses that mean "this job has been sent somewhere on your behalf".
@@ -149,6 +168,109 @@ class Tracker:
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA journal_mode = WAL")
         self.migrate()
+
+    # -- scoring work (never writes application or submission state) ------
+
+    def get_scoring(self, key: str) -> dict[str, Any] | None:
+        row = self.conn.execute(
+            "SELECT * FROM scoring_backlog WHERE key = ?", (key,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def pending_scoring(self) -> list[dict[str, Any]]:
+        return [dict(row) for row in self.conn.execute(
+            "SELECT * FROM scoring_backlog WHERE state = 'pending' "
+            "ORDER BY queued_at, rowid"
+        )]
+
+    def enqueue_scoring(self, job: Job, *, max_pending: int = 1000,
+                        max_age_days: int = 7, now: datetime | None = None) -> bool:
+        """Retain admitted evidence before a cap; never reset an existing retry.
+
+        Stopped rows keep a small reason/timestamp tombstone, but release their
+        evidence. This prevents an exhausted job being automatically requeued.
+        """
+        moment = ensure_utc(now) or utcnow()
+        if self.get_scoring(job.key) is not None:
+            return False
+        count = self.conn.execute(
+            "SELECT COUNT(*) FROM scoring_backlog WHERE state = 'pending'"
+        ).fetchone()[0]
+        if count >= max(0, max_pending):
+            return False
+        data = job.to_dict()
+        data.pop("key")
+        data["raw"] = job.raw
+        snapshot = json.dumps(data, ensure_ascii=False, default=str)
+        # Bound evidence bytes as well as row count; never silently truncate
+        # descriptions or requirement metadata before scoring.
+        if len(snapshot.encode("utf-8")) > 256 * 1024:
+            raise ValueError("scoring evidence exceeds 256 KiB")
+        self.record_job(job, now=moment)
+        application = self.get_application(job.key) or {}
+        self.conn.execute(
+            "INSERT INTO scoring_backlog "
+            "(key, job_json, queued_at, last_observed_at, expires_at, next_attempt_at, "
+            "application_status, application_updated_at) VALUES (?,?,?,?,?,?,?,?)",
+            (job.key, snapshot, _iso(moment), _iso(moment),
+             _iso(moment + timedelta(days=max(0, max_age_days))), _iso(moment),
+             application.get("status"), application.get("updated_at")),
+        )
+        self.conn.commit()
+        return True
+
+    def observe_scoring(self, job: Job, *, now: datetime) -> Job:
+        """Refresh evidence, preserving the posting date at queue admission."""
+        row = self.get_scoring(job.key)
+        if row is None or row["state"] != "pending":
+            raise ValueError("job has no pending scoring work")
+        original = json.loads(row["job_json"])
+        data = job.to_dict()
+        data.pop("key")
+        data["posted_at"] = original["posted_at"]
+        data["raw"] = job.raw
+        snapshot = json.dumps(data, ensure_ascii=False, default=str)
+        if len(snapshot.encode("utf-8")) > 256 * 1024:
+            raise ValueError("scoring evidence exceeds 256 KiB")
+        self.conn.execute(
+            "UPDATE scoring_backlog SET job_json = ?, last_observed_at = ? "
+            "WHERE key = ?", (snapshot, _iso(now), job.key),
+        )
+        self.conn.commit()
+        data["posted_at"] = _parse_iso(data["posted_at"])
+        return Job(**data)
+
+    def scoring_detail(self, key: str, detail: str) -> None:
+        self.conn.execute("UPDATE scoring_backlog SET detail = ? WHERE key = ?",
+                          (detail[:2000], key))
+        self.conn.commit()
+
+    def stop_scoring(self, key: str, state: str, detail: str) -> None:
+        if state not in {"expired", "exhausted", "ineligible", "protected"}:
+            raise ValueError(f"invalid scoring stop state: {state}")
+        self.conn.execute(
+            "UPDATE scoring_backlog SET state = ?, detail = ?, job_json = NULL "
+            "WHERE key = ?", (state, detail[:2000], key),
+        )
+        self.conn.commit()
+
+    def begin_scoring(self, key: str, *, retry_hours: int, now: datetime) -> None:
+        """Write ahead of the model call so crashes consume a bounded attempt."""
+        row = self.get_scoring(key)
+        if row is None or row["state"] != "pending":
+            raise ValueError("job has no pending scoring work")
+        delay = max(1, retry_hours) * 2 ** min(row["attempts"], 10)
+        self.conn.execute(
+            "UPDATE scoring_backlog SET attempts = attempts + 1, "
+            "next_attempt_at = ?, detail = ? WHERE key = ?",
+            (_iso(now + timedelta(hours=delay)),
+             "scoring attempt started; retry if interrupted", key),
+        )
+        self.conn.commit()
+
+    def complete_scoring(self, key: str) -> None:
+        self.conn.execute("DELETE FROM scoring_backlog WHERE key = ?", (key,))
+        self.conn.commit()
 
     # -- lifecycle --------------------------------------------------------
 

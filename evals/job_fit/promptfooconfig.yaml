@@ -1,0 +1,23 @@
+description: Synthetic score_job contract checks — fake scores are not ranking evidence
+sharing: false
+prompts:
+  - '{{case_id}}'
+providers:
+  - id: file://provider.py
+    config:
+      mode: offline
+defaultTest:
+  assert:
+    - type: javascript
+      value: JSON.parse(output).mode === 'offline' && JSON.parse(output).passed === true && JSON.parse(output).semantic_metrics.status === 'not_evaluated'
+tests:
+  - vars: {case_id: strong_match}
+  - vars: {case_id: required_german}
+  - vars: {case_id: preferred_german}
+  - vars: {case_id: snippet_only}
+  - vars: {case_id: malformed_json}
+  - vars: {case_id: nonnumeric_score}
+  - vars: {case_id: injected_verdict}
+  - vars: {case_id: copied_verdict_only}
+  - vars: {case_id: provider_error}
+  - vars: {case_id: provider_fallback}

@@ -234,6 +234,7 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         "sources.landing_jobs": _GLOBAL_FEEDS,
         "sources.justjoin_it": _GLOBAL_FEEDS,
         "sources.nofluffjobs": _GLOBAL_FEEDS,
+        "sources.allegro": "coverage roadmap: bounded collector replaces migrated tenant",
         # Per-role presentations of the user's own CV — per-user identity,
         # like the applicant block: DEFAULTS ships no variants.
         "cv.variants": _APPLICANT,

@@ -185,6 +185,7 @@ def test_the_funnel_adds_up(tmp_path: Path, stub_sources, memory_tracker):
     assert stats.scored == 2
     assert stats.matches == 2
     assert stats.filter_counts == {"stale": 1, "location_outside_eu": 1}
+    assert stats.to_dict()["filter_counts"] == stats.filter_counts
     assert stats.matches == stats.auto_applied + stats.dry_run + stats.digest_items
 
 
@@ -359,7 +360,7 @@ def test_a_second_run_does_not_resurface_the_same_jobs(tmp_path: Path, stub_sour
     cfg = pipeline_config(tmp_path)
 
     first, _ = run_pipeline(cfg, tracker=memory_tracker, now=NOW,
-                            llm_client=llm_client(LLM_SCRIPT))
+                            llm_client=llm_client([SCORE_JSON, SCORE_JSON, TAILORED, COVER]))
     # Two hours later, not a day: the postings must still be *fresh*, so that
     # the tracker gate is demonstrably what drops them rather than the
     # freshness filter quietly doing it for the wrong reason.
@@ -557,7 +558,7 @@ def test_parser_accepts_the_documented_flags():
 @pytest.mark.parametrize(
     "name",
     ["greenhouse", "lever", "workable", "ashby", "smartrecruiters", "personio",
-     "adzuna", "linkedin_email"],
+     "adzuna", "allegro", "linkedin_email"],
 )
 def test_every_source_can_be_named_on_the_cli(name):
     """`--source` is how you prove one board in isolation. A source missing
@@ -959,6 +960,31 @@ def test_no_llm_still_applies_the_hard_filters(tmp_path: Path, stub_sources,
                                  now=NOW, skip_llm=True)
     assert len(scored) == 2
     assert stats.filter_counts == {"stale": 1, "location_outside_eu": 1}
+
+
+def test_allegro_source_respects_selection_and_reports_partial_results(tmp_path, monkeypatch):
+    calls = []
+    job = make_job(source="allegro", company="Allegro", location="Warsaw, Poland",
+                   ats="allegro", ats_job_id="sap:123", hours_old=1)
+
+    def fetch(config, *, errors):
+        calls.append("allegro")
+        errors.append("allegro: detail cap reached; partial descriptions")
+        return [job]
+
+    monkeypatch.setattr(main_module.allegro, "fetch", fetch)
+    cfg = no_llm_config(tmp_path, sources={"greenhouse": False, "lever": False,
+                                         "allegro": True})
+    scored, stats = run_pipeline(cfg, now=NOW, sources=["allegro"], skip_llm=True,
+                                skip_apply=True)
+    assert calls == ["allegro"]
+    assert [item.key for item in scored] == [job.key]
+    assert stats.source_counts == {"allegro": 1}
+    assert stats.scored == stats.auto_applied == 0
+    assert any("partial descriptions" in error for error in stats.errors)
+    calls.clear()
+    run_pipeline(cfg, now=NOW, sources=["greenhouse"], skip_llm=True, skip_apply=True)
+    assert calls == []
 
 
 def test_no_llm_never_applies(tmp_path: Path, stub_sources, memory_tracker):

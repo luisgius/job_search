@@ -16,6 +16,7 @@ cv/*.pdf
 # directory, so the negation below would never be reached.
 output/*
 !output/.gitkeep
+exploration_output/
 
 # --- your PDF hook is yours; the example stays tracked ---
 src/render_pdf.py
@@ -34,3 +35,6 @@ htmlcov/
 
 # --- os ---
 .DS_Store
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

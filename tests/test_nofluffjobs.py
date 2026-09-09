@@ -19,8 +19,12 @@ disagree.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 
+import pytest
+
+from src.filters import apply_filters, dedupe, passes_location
 from src.sources.nofluffjobs import (
     DATA_CATEGORIES,
     fetch,
@@ -98,12 +102,10 @@ def test_the_full_posting_maps_every_field():
     assert "Python" in job.description
 
 
-def test_a_three_letter_country_code_is_not_passed_through():
-    """The fixture's first posting says `POL`; `Job.country` speaks ISO
-    alpha-2 and a wrong pass-through would corrupt the geo filter. Left unset,
-    geo resolves the city instead — Warszawa is already in its tables."""
+def test_a_three_letter_country_code_is_normalized():
+    """Explicit POL evidence survives even when a city cannot resolve it."""
     job = by_company(fetch(None, session=nf_session()))["Kramerica Labs"]
-    assert job.country is None
+    assert job.country == "PL"
 
 
 def test_a_two_letter_code_is_passed_through():
@@ -114,13 +116,216 @@ def test_a_two_letter_code_is_passed_through():
 def test_fully_remote_reads_remote_and_drops_the_placeholder_city():
     job = by_company(fetch(None, session=nf_session()))["Pendant Publishing"]
     assert job.remote is True
-    assert job.location == "Remote"  # the literal "Remote" place is not a city
+    assert job.location == "Remote"
 
 
 def test_parse_posting_requires_title_company_and_slug():
     assert parse_posting({"title": "X", "name": "Y", "url": ""}) is None
     assert parse_posting({"title": "X", "url": "z"}) is None
     assert parse_posting({"name": "Y", "url": "z"}) is None
+
+
+# Small synthetic examples of the September 2026 listing: a Remote placeholder
+# followed by country-bearing province-only places, with no recognized city.
+NOW = datetime(2026, 9, 9, 12, tzinfo=UTC)
+POLAND_FILTERS = {
+    "filters": {"countries": ["PL"], "allow_remote": True,
+                "remote_requires_eu_hint": True},
+    "freshness": {"max_age_hours": 72, "skip_undated": True},
+}
+
+
+def province_posting(*codes, fully_remote=True, age_hours=24, company="DCG"):
+    posted = None if age_hours is None else int(
+        (NOW - timedelta(hours=age_hours)).timestamp() * 1000
+    )
+    return {
+        "id": f"data-scientist-{company}-remote",
+        "url": f"data-scientist-{company}-remote",
+        "name": company, "title": "Data Scientist", "category": "data",
+        "seniority": ["Mid"], "technology": "Python", "posted": posted,
+        "location": {
+            "fullyRemote": fully_remote,
+            "places": ([{"city": "Remote"}] if fully_remote else []) + [
+                {"country": {"code": code}, "provinceOnly": True,
+                 "province": "masovian"} for code in codes
+            ],
+        },
+    }
+
+
+@pytest.mark.parametrize("code, expected", [
+    ("POL", "PL"), ("ARE", "AE"), ("DEU", "DE"), ("USA", "US"),
+    ("SAU", "SA"), ("DNK", "DK"), ("HRV", "HR"), ("ROU", "RO"),
+    ("ESP", "ES"), ("CHE", "CH"), ("FRA", "FR"), ("AUT", "AT"),
+    ("NLD", "NL"), ("BEL", "BE"), ("FIN", "FI"), ("HUN", "HU"),
+    ("GRC", "GR"), ("SRB", "RS"), ("NOR", "NO"), ("UKR", "UA"),
+    ("SVK", "SK"), ("pl", "PL"), ("ua", "UA"), (" de ", "DE"),
+    (" pol ", "PL"), ("US", "US"),
+])
+def test_observed_country_codes_normalize_without_a_city(code, expected):
+    job = parse_posting(province_posting(code))
+    assert job.country == expected
+    assert job.remote is True
+
+
+@pytest.mark.parametrize("code", [None, "", "XXX", "PLO", "PL1", "Poland", {}, 123])
+def test_unknown_country_codes_are_not_guessed(code):
+    job = parse_posting(province_posting(code))
+    assert job.country is None
+    assert job.location == "Remote"
+    assert passes_location(job, POLAND_FILTERS)[0] is False
+
+
+@pytest.mark.parametrize("location", [None, {}, "Remote", {"places": None},
+                                      {"places": [None, {}, {"country": "POL"}]}])
+def test_missing_or_malformed_location_stays_unknown(location):
+    posting = province_posting()
+    posting["location"] = location
+    job = parse_posting(posting)
+    assert job.country is None
+    assert job.remote is None
+    assert passes_location(job, POLAND_FILTERS)[0] is False
+
+
+@pytest.mark.parametrize("code, expected, city", [
+    ("DEU", "DE", "Berlin"), ("USA", "US", "New York"),
+    ("ARE", "AE", "Dubai"), ("SAU", "SA", "Riyadh"),
+    ("HUN", "HU", "Budapest"), ("UKR", "UA", "Kyiv"),
+    ("SRB", "RS", "Belgrade"),
+])
+@pytest.mark.parametrize("include_city", [False, True])
+def test_explicit_foreign_remote_does_not_become_polish(code, expected, city, include_city):
+    posting = province_posting(code)
+    if include_city:
+        posting["location"]["places"][-1]["city"] = city
+    job = parse_posting(posting)
+    job.description += " Our colleagues work in Poland and Berlin."
+    assert job.country == expected
+    assert passes_location(job, POLAND_FILTERS)[0] is False
+    assert job.country == expected
+
+
+@pytest.mark.parametrize("codes", [("DEU", "POL"), ("POL", "DEU"), ("USA", "POL")])
+@pytest.mark.parametrize("fully_remote", [True, False])
+def test_multiple_places_preserve_poland_without_inventing_remote(codes, fully_remote):
+    job = parse_posting(province_posting(*codes, fully_remote=fully_remote))
+    assert job.remote is (True if fully_remote else None)
+    assert job.raw["location_countries"] == [
+        {"DEU": "DE", "POL": "PL", "USA": "US"}[code] for code in codes
+    ]
+    assert job.location == ("Remote" if fully_remote else "")
+    # The existing filter reads a single declared country. Preserve secondary
+    # evidence for future consumers without changing historical tracker keys.
+    assert passes_location(job, POLAND_FILTERS)[0] is (codes[0] == "POL")
+    assert job.remote is fully_remote
+    assert passes_location(job, {"filters": {"countries": ["ES"]}})[0] is False
+
+
+@pytest.mark.parametrize("code", ["PL", "POL"])
+@pytest.mark.parametrize("cities, fully_remote, expected", [
+    (["Remote"], True, "Remote"),
+    (["Warszawa"], False, "Warszawa"),
+    (["Warszawa", "Kraków", "Warszawa"], False, "Warszawa, Kraków"),
+    (["Warszawa", "Remote"], True, "Warszawa"),
+])
+def test_country_normalization_preserves_legacy_location_key_and_date(
+    code, cities, fully_remote, expected,
+):
+    posting = province_posting(code, fully_remote=fully_remote)
+    posting["location"]["places"] = [
+        {"city": city, "country": {"code": code}} for city in cities
+    ]
+    job = parse_posting(posting)
+    legacy = replace(job, location=expected, country="PL" if code == "PL" else None)
+    assert job.location == expected
+    assert job.key == legacy.key
+    assert job.ats is None
+    assert job.ats_job_id == posting["id"]
+    assert job.posted_at == NOW - timedelta(hours=24)
+
+
+def test_requirement_tiles_keep_only_nonempty_deduplicated_requirements():
+    posting = province_posting("POL")
+    posting["tiles"] = {"values": [
+        {"type": "category", "value": "data"},
+        {"type": "requirement", "value": " Python "},
+        {"type": "requirement", "value": "python"},
+        {"type": "requirement", "value": "ML"},
+        {"type": "requirement", "value": "Power BI"},
+        {"type": "requirement", "value": "Tableau"},
+        {"type": "promotional", "value": "Apply now"},
+        {"type": "requirement", "value": " "},
+        {"type": "requirement", "value": ["SQL"]},
+        {"type": "requirement", "value": 42}, None, "SQL", {},
+    ]}
+    job = parse_posting(posting)
+    assert job.raw["requirements"] == ["Python", "ML", "Power BI", "Tableau"]
+    assert "Requirements: Python, ML, Power BI, Tableau." in job.description
+    assert "Apply now" not in job.description
+    assert job.raw["snippet_only"] is True
+
+
+@pytest.mark.parametrize("tiles", [None, [], "Python", {}, {"values": "Python"},
+                                   {"values": {"type": "requirement", "value": "SQL"}}])
+def test_malformed_tiles_do_not_invent_requirements(tiles):
+    posting = province_posting("POL")
+    posting["tiles"] = tiles
+    job = parse_posting(posting)
+    assert job.raw["requirements"] == []
+    assert "Requirements:" not in job.description
+    assert job.raw["snippet_only"] is True
+
+
+@pytest.mark.parametrize("period, suffix", [
+    ("Hour", "/hour"), ("Month", "/month"), (" hour ", "/hour"),
+    ("Fortnight", ""), (None, ""), ("", ""), ({"unit": "Hour"}, ""),
+])
+def test_salary_preserves_explicit_period_and_contract_without_conversion(period, suffix):
+    posting = province_posting("POL")
+    posting["salary"] = {"from": 120, "to": 150, "currency": "PLN",
+                         "period": period, "type": "b2b"}
+    job = parse_posting(posting)
+    assert job.salary == f"120–150 PLN{suffix}"
+    assert job.raw["salary_period"] == (period if isinstance(period, str) else None)
+    assert job.raw["salary_contract_type"] == "b2b"
+
+
+@pytest.mark.parametrize("salary", [None, [], "120 PLN", {},
+                                    {"period": "Hour", "type": {"name": "b2b"}}])
+def test_malformed_or_amountless_salary_does_not_invent_pay(salary):
+    posting = province_posting("POL")
+    posting["salary"] = salary
+    job = parse_posting(posting)
+    assert job.salary is None
+    assert job.raw["salary_contract_type"] is None
+
+
+def test_fresh_polish_remote_survives_dedupe_and_strict_72_hour_filters():
+    fresh = province_posting("POL", "POL")
+    duplicate = {**fresh, "id": "data-scientist-DCG-masovian",
+                 "url": "data-scientist-DCG-masovian"}
+    stale = province_posting("POL", age_hours=72.001, company="Stale")
+    stale["renewed"] = int(NOW.timestamp() * 1000)  # renewal is not publication
+    postings = [fresh, duplicate, stale,
+                province_posting("POL", age_hours=72, company="Boundary"),
+                province_posting("POL", age_hours=None, company="Undated"),
+                province_posting("USA", company="Foreign"),
+                province_posting(company="Unknown")]
+    errors = []
+    jobs = fetch(None, session=nf_session({"postings": postings}), errors=errors)
+    assert not errors
+    assert len(jobs) == 7
+    unique = dedupe(jobs)
+    assert len(unique) == 6
+    result = apply_filters(unique, POLAND_FILTERS, now=NOW)
+    assert {j.company for j in result.kept} == {"DCG", "Boundary"}
+    assert all(j.country == "PL" and j.remote is True for j in result.kept)
+    assert all(j.raw["snippet_only"] for j in result.kept)
+    reasons = {j.company: reason for j, reason in result.rejected}
+    assert set(reasons) == {"Stale", "Undated", "Foreign", "Unknown"}
+    assert "European hint" in reasons["Unknown"]
+    assert result.counts["location_outside_eu"] == 2
 
 
 # ==========================================================================

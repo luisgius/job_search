@@ -1,0 +1,1094 @@
+# Research evidence only; never loaded into the watchlist. See docs/EMPLOYER_COVERAGE.md.
+schemaVersion: 1
+updatedOn: '2026-09-09'
+employers:
+- employerId: allegro
+  name: Allegro
+  aliases: []
+  officialDomain: allegro.eu
+  careersUrl: https://careers.allegro.eu/job/Warszawa-Data-Scientist-Allegro-AI-Hub-00-841/1365885255/
+  locations:
+  - country: PL
+    city: Warsaw
+    kind: job_location
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://careers.allegro.eu/job/Warszawa-Data-Scientist-Allegro-AI-Hub-00-841/1365885255/
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: 'Prior report: full description and Apply now rendered; SAP cookie provider and SuccessFactors
+      assets observed. Web crawl age is not publication date; acceptance unknown.'
+  - id: collector-implementation
+    url: https://careers.allegro.eu/job/Warszawa-Data-Scientist-Allegro-AI-Hub-00-841/1365885255/
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: 'Implementation review: src/sources/allegro.py:144-207,225-346; src/config.py:312-321
+      (2026-09-09)'
+    note: The implemented allegro collector supports bounded employer listing/detail retrieval; this is
+      limited employer-specific compatibility, not a generic SAP connector. A live complete-feed health
+      check remains pending. Feed uid identities and separately seeded career-path identities are distinct;
+      a feed uid is not proven to be the native ATS requisition ID.
+  surfaces:
+    frontend:
+      status: observed
+      label: SAP SuccessFactors Recruiting Marketing
+      url: https://careers.allegro.eu/job/Warszawa-Data-Scientist-Allegro-AI-Hub-00-841/1365885255/
+      evidence:
+      - career
+    apply:
+      status: observed
+      label: SAP profile route
+      url: https://career55.sapsf.eu
+      evidence:
+      - career
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: supported
+    adapter: allegro
+    evidence:
+    - career
+    - collector-implementation
+  endpoints:
+  - url: https://careers.allegro.eu/job/Warszawa-Data-Scientist-Allegro-AI-Hub-00-841/1365885255/
+    scope: job_detail
+    health: unknown
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: researched
+  liveHiringStatus: unknown
+  nextAction: Run a bounded live complete-feed check of the implemented allegro collector and compare
+    listing/detail identities; preserve unknown endpoint health until verified.
+- employerId: lufthansa-group-business-services
+  name: Lufthansa Group Business Services
+  aliases:
+  - LGBS
+  officialDomain: lufthansagroup.careers
+  careersUrl: https://apply.lufthansagroup.careers/index.php?ac=jobad&id=134587&language=1
+  locations:
+  - country: PL
+    city: Kraków
+    kind: job_location
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://apply.lufthansagroup.careers/index.php?ac=jobad&id=134587&language=1
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: 'Prior check in market report: HTTP 200, description and application control for requisition
+      134587. Vendor and current acceptance unknown.'
+  surfaces:
+    frontend:
+      status: observed
+      label: Employer-branded careers page
+      url: https://apply.lufthansagroup.careers/index.php?ac=jobad&id=134587&language=1
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://apply.lufthansagroup.careers/index.php?ac=jobad&id=134587&language=1
+    scope: job_detail
+    health: reachable
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: researched
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: amway
+  name: Amway
+  aliases: []
+  officialDomain: amway.com
+  careersUrl: https://jobs.amway.com/job/Data-Scientist/43227-en_US
+  locations:
+  - country: PL
+    city: Kraków
+    kind: job_location
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://jobs.amway.com/job/Data-Scientist/43227-en_US
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: 'Prior report: HTTP 200 and Apply now for 43227; June 25 employer date, 3–5 years and three
+      office days. Current acceptance and vendor unknown.'
+  surfaces:
+    frontend:
+      status: observed
+      label: Employer-branded careers page
+      url: https://jobs.amway.com/job/Data-Scientist/43227-en_US
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://jobs.amway.com/job/Data-Scientist/43227-en_US
+    scope: job_detail
+    health: reachable
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: researched
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: smartrecruiters
+  name: SmartRecruiters
+  aliases: []
+  officialDomain: smartrecruiters.com
+  careersUrl: https://jobs.smartrecruiters.com/smartrecruiters/744000137413079
+  locations:
+  - country: PL
+    city: null
+    kind: remote_country
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://jobs.smartrecruiters.com/smartrecruiters/744000137413079
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: Prior report attributes employer board/API to existing SmartRecruiters adapter; remote Poland
+      listing dated July 13. This is route compatibility, not a fresh endpoint check or suitable/open
+      job claim.
+  surfaces:
+    frontend:
+      status: observed
+      label: SmartRecruiters
+      url: https://jobs.smartrecruiters.com/smartrecruiters/744000137413079
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: observed
+      label: SmartRecruiters
+      url: https://jobs.smartrecruiters.com/smartrecruiters/744000137413079
+      evidence:
+      - career
+  sourceCompatibility:
+    status: supported
+    adapter: smartrecruiters
+    evidence:
+    - career
+  endpoints:
+  - url: https://jobs.smartrecruiters.com/smartrecruiters/744000137413079
+    scope: job_detail
+    health: unknown
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: researched
+  liveHiringStatus: unknown
+  nextAction: Use existing adapter diagnostics and inspect freshness/title exclusions; do not add a duplicate
+    source.
+- employerId: fetcherr
+  name: Fetcherr
+  aliases: []
+  officialDomain: fetcherr.io
+  careersUrl: https://www.fetcherr.io/career
+  locations:
+  - country: PL
+    city: Warsaw
+    kind: job_location
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://www.fetcherr.io/career
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: 'Prior report: official index and Data Scientist role/application section rendered; at least
+      five years required. Index date is not an original job publication date.'
+  surfaces:
+    frontend:
+      status: observed
+      label: Employer-branded careers page
+      url: https://www.fetcherr.io/career
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://www.fetcherr.io/career
+    scope: careers_index
+    health: unknown
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: researched
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: here-technologies
+  name: HERE Technologies
+  aliases:
+  - HERE
+  officialDomain: here.com
+  careersUrl: https://careers-here.icims.com/jobs/81790/data-scientist-ii/job
+  locations:
+  - country: PL
+    city: Kraków
+    kind: historical_job
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://careers-here.icims.com/jobs/81790/data-scientist-ii/job
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: Prior same-date canonical check returned 410 Gone for requisition 81790. Historical employer/location
+      evidence only; unavailable job does not mean the company is closed.
+  surfaces:
+    frontend:
+      status: observed
+      label: iCIMS
+      url: https://careers-here.icims.com/jobs/81790/data-scientist-ii/job
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: observed
+      label: iCIMS
+      url: https://careers-here.icims.com/jobs/81790/data-scientist-ii/job
+      evidence:
+      - career
+  sourceCompatibility:
+    status: unsupported
+    adapter: null
+    evidence:
+    - career
+  endpoints:
+  - url: https://careers-here.icims.com/jobs/81790/data-scientist-ii/job
+    scope: job_detail
+    health: unavailable
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: needs_review
+  liveHiringStatus: unknown
+  nextAction: Find a distinct current requisition; never revive HERE 81790 or 81009 from cached results.
+- employerId: hitachi-energy
+  name: Hitachi Energy
+  aliases: []
+  officialDomain: hitachienergy.com
+  careersUrl: https://www.hitachienergy.com/careers/open-jobs/details/JID3-188787
+  locations:
+  - country: PL
+    city: Kraków
+    kind: historical_job
+    evidence:
+    - career
+  - country: PL
+    city: Warsaw
+    kind: historical_job
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://www.hitachienergy.com/careers/open-jobs/details/JID3-188787
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: 'Prior report: 410 Gone. Indexed senior and associate pages share requisition R0057558 despite
+      different titles/dates; do not count as two open jobs or infer employer closure.'
+  - id: associate-closed
+    url: https://www.hitachienergy.com/me/en/careers/open-jobs/details/JID3-178519
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: 'Prior report: this associate-version page also returned 410; same R0057558 identity as the
+      senior page.'
+  surfaces:
+    frontend:
+      status: observed
+      label: Employer-branded careers page
+      url: https://www.hitachienergy.com/careers/open-jobs/details/JID3-188787
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://www.hitachienergy.com/careers/open-jobs/details/JID3-188787
+    scope: job_detail
+    health: unavailable
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  - url: https://www.hitachienergy.com/me/en/careers/open-jobs/details/JID3-178519
+    scope: job_detail
+    health: unavailable
+    checkedOn: '2026-09-09'
+    evidence:
+    - associate-closed
+  status: needs_review
+  liveHiringStatus: unknown
+  nextAction: Find a current canonical requisition and resolve R0057558 identity; retain unavailable historical
+    pages as negative controls.
+- employerId: motorola-solutions
+  name: Motorola Solutions
+  aliases: []
+  officialDomain: motorolasolutions.com
+  careersUrl: https://motorolasolutions.wd5.myworkdayjobs.com/careers/job/krakow-poland/data-analyst---marketing_r65933-1
+  locations:
+  - country: PL
+    city: Kraków
+    kind: job_location
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://motorolasolutions.wd5.myworkdayjobs.com/careers/job/krakow-poland/data-analyst---marketing_r65933-1
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: 'Prior report: indexed Kraków Data Analyst – Marketing R65933; detail open returned no readable
+      lines. Workday host observed; live role and full requirements unknown.'
+  surfaces:
+    frontend:
+      status: observed
+      label: Workday careers
+      url: https://motorolasolutions.wd5.myworkdayjobs.com/careers/job/krakow-poland/data-analyst---marketing_r65933-1
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: observed
+      label: Workday
+      url: https://motorolasolutions.wd5.myworkdayjobs.com/careers/job/krakow-poland/data-analyst---marketing_r65933-1
+      evidence:
+      - career
+  sourceCompatibility:
+    status: unsupported
+    adapter: null
+    evidence:
+    - career
+  endpoints:
+  - url: https://motorolasolutions.wd5.myworkdayjobs.com/careers/job/krakow-poland/data-analyst---marketing_r65933-1
+    scope: job_detail
+    health: unknown
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: needs_review
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: astrazeneca
+  name: AstraZeneca
+  aliases: []
+  officialDomain: astrazeneca.com
+  careersUrl: https://careers.astrazeneca.com/job/warsaw/senior-clinical-data-scientist-i/7684/100129670688
+  locations:
+  - country: PL
+    city: Warsaw
+    kind: job_location
+    evidence:
+    - career
+  - country: PL
+    city: Kraków
+    kind: office
+    evidence:
+    - poland
+  evidence:
+  - id: career
+    url: https://careers.astrazeneca.com/job/warsaw/senior-clinical-data-scientist-i/7684/100129670688
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: 'Prior report: English description and Apply link; header September 3 and body September 4 conflict;
+      stated closing September 10. Eightfold application route and TalentBrew assets observed; underlying
+      ATS unknown.'
+  - id: poland
+    url: https://careers.astrazeneca.com/poland
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: 'Prior report: official Poland careers overview identifies Warsaw and Kraków; this establishes
+      geography, not a Kraków vacancy.'
+  surfaces:
+    frontend:
+      status: observed
+      label: TalentBrew assets on branded frontend
+      url: https://careers.astrazeneca.com/job/warsaw/senior-clinical-data-scientist-i/7684/100129670688
+      evidence:
+      - career
+    apply:
+      status: observed
+      label: Eightfold application/talent route
+      url: https://astrazeneca.eightfold.ai
+      evidence:
+      - career
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://careers.astrazeneca.com/job/warsaw/senior-clinical-data-scientist-i/7684/100129670688
+    scope: job_detail
+    health: unknown
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: researched
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: ing-hubs-poland
+  name: ING Hubs Poland
+  aliases: []
+  officialDomain: ing.com
+  careersUrl: https://careers.ing.com/pl/praca/warszawa/machine-learning-credit-model-developer/3121/39544909632
+  locations:
+  - country: PL
+    city: Warsaw
+    kind: historical_job
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://careers.ing.com/pl/praca/warszawa/machine-learning-credit-model-developer/3121/39544909632
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: 'Prior report: indexed Machine Learning Credit Model Developer REQ-10116532; canonical open
+      returned 404. No open-role or employer-wide closure claim.'
+  surfaces:
+    frontend:
+      status: observed
+      label: Employer-branded careers page
+      url: https://careers.ing.com/pl/praca/warszawa/machine-learning-credit-model-developer/3121/39544909632
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://careers.ing.com/pl/praca/warszawa/machine-learning-credit-model-developer/3121/39544909632
+    scope: job_detail
+    health: unavailable
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: needs_review
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: roche
+  name: Roche
+  aliases: []
+  officialDomain: roche.com
+  careersUrl: https://careers.roche.com/global/en/warsaw
+  locations:
+  - country: PL
+    city: Warsaw
+    kind: office
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://careers.roche.com/global/en/warsaw
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: 'Prior report: official Warsaw location page indexed with Data Science & Advanced Analytics.
+      No requisition or live endpoint verified.'
+  surfaces:
+    frontend:
+      status: observed
+      label: Employer-branded careers page
+      url: https://careers.roche.com/global/en/warsaw
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://careers.roche.com/global/en/warsaw
+    scope: careers_index
+    health: not_checked
+    checkedOn: null
+    evidence: []
+  status: lead
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: cisco
+  name: Cisco
+  aliases: []
+  officialDomain: cisco.com
+  careersUrl: https://jobs.cisco.com/jobs/SearchJobs/sci
+  locations:
+  - country: PL
+    city: Kraków
+    kind: historical_job
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://jobs.cisco.com/jobs/SearchJobs/sci
+    observedOn: '2026-09-09'
+    method: prior_report
+    provenance: docs/COVERAGE_MARKET_2026-09-09.md
+    note: 'Prior report: official indexed Data Scientist (Workforce Data) result mentions Kraków alternate
+      location; crawl reported last year. Current career destination, platform and availability unknown.'
+  surfaces:
+    frontend:
+      status: observed
+      label: Employer-branded careers page
+      url: https://jobs.cisco.com/jobs/SearchJobs/sci
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://jobs.cisco.com/jobs/SearchJobs/sci
+    scope: careers_index
+    health: not_checked
+    checkedOn: null
+    evidence: []
+  status: lead
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: google
+  name: Google
+  aliases: []
+  officialDomain: google.com
+  careersUrl: https://www.google.com/about/careers/applications/locations/krakow/
+  locations:
+  - country: PL
+    city: Kraków
+    kind: office
+    evidence:
+    - office
+  evidence:
+  - id: career
+    url: https://www.google.com/about/careers/applications/locations/krakow/
+    observedOn: '2026-09-09'
+    method: search_index
+    provenance: Bounded employer registry research, 2026-09-09; official source via web retrieval
+    note: Search-indexed official Krakow careers page has mostly boilerplate; live listings and platform
+      not established.
+  - id: office
+    url: https://about.google/company-info/locations/
+    observedOn: '2026-09-09'
+    method: primary_page
+    provenance: Bounded registry research; opened official office directory 2026-09-09
+    note: Official office directory lists Rynek Główny 12, Kraków, Poland. Office presence does not establish
+      an open job.
+  surfaces:
+    frontend:
+      status: observed
+      label: Employer-branded careers page
+      url: https://www.google.com/about/careers/applications/locations/krakow/
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://www.google.com/about/careers/applications/locations/krakow/
+    scope: careers_index
+    health: not_checked
+    checkedOn: null
+    evidence: []
+  status: lead
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: ibm
+  name: IBM
+  aliases: []
+  officialDomain: ibm.com
+  careersUrl: https://www.ibm.com/careers/locations?source=WEB_Search_NA
+  locations:
+  - country: PL
+    city: null
+    kind: country_presence
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://www.ibm.com/careers/locations?source=WEB_Search_NA
+    observedOn: '2026-09-09'
+    method: primary_page
+    provenance: Bounded employer registry research, 2026-09-09; official source via web retrieval
+    note: Official careers locations page lists Poland in Europe and a Poland software employee story.
+      This cohort records country presence only; Kraków was not established by this careers page.
+  surfaces:
+    frontend:
+      status: observed
+      label: Employer-branded careers page
+      url: https://www.ibm.com/careers/locations?source=WEB_Search_NA
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://www.ibm.com/careers/locations?source=WEB_Search_NA
+    scope: careers_index
+    health: unknown
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: lead
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: hsbc
+  name: HSBC
+  aliases: []
+  officialDomain: hsbc.com
+  careersUrl: https://www.hsbc.com/careers/students-and-graduates/find-a-programme?page=2&take=10
+  locations:
+  - country: PL
+    city: Kraków
+    kind: historical_job
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://www.hsbc.com/careers/students-and-graduates/find-a-programme?page=2&take=10
+    observedOn: '2026-09-09'
+    method: search_index
+    provenance: Bounded employer registry research, 2026-09-09; official source via web retrieval
+    note: Official search-indexed programmes list Poland, Krakow, including technology programmes with
+      past April/June 2026 closing dates. Open returned a differently aged page (last-year crawl); current
+      hiring unknown.
+  surfaces:
+    frontend:
+      status: observed
+      label: Employer-branded careers page
+      url: https://www.hsbc.com/careers/students-and-graduates/find-a-programme?page=2&take=10
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://www.hsbc.com/careers/students-and-graduates/find-a-programme?page=2&take=10
+    scope: careers_index
+    health: unknown
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: lead
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: ubs
+  name: UBS
+  aliases: []
+  officialDomain: ubs.com
+  careersUrl: https://www.ubs.com/global/en/careers/about-us/locations/poland.html
+  locations:
+  - country: PL
+    city: Kraków
+    kind: office
+    evidence:
+    - career
+  - country: PL
+    city: Wrocław
+    kind: office
+    evidence:
+    - career
+  - country: PL
+    city: Warsaw
+    kind: office
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://www.ubs.com/global/en/careers/about-us/locations/poland.html
+    observedOn: '2026-09-09'
+    method: primary_page
+    provenance: Bounded employer registry research, 2026-09-09; official source via web retrieval
+    note: Official Poland careers page names Krakow, Wroclaw and Warsaw, and engineering internship teams
+      in Krakow/Wroclaw. Links to jobs.ubs.com were observed; no application destination or ATS vendor
+      verified.
+  surfaces:
+    frontend:
+      status: observed
+      label: Employer-branded careers page
+      url: https://www.ubs.com/global/en/careers/about-us/locations/poland.html
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://www.ubs.com/global/en/careers/about-us/locations/poland.html
+    scope: careers_index
+    health: unknown
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: lead
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: sabre
+  name: Sabre
+  aliases: []
+  officialDomain: sabre.com
+  careersUrl: https://sabre.wd1.myworkdayjobs.com/en-US/SabreJobs/job/Software-Engineering-Intern_JR107575
+  locations:
+  - country: PL
+    city: Kraków
+    kind: job_location
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://sabre.wd1.myworkdayjobs.com/en-US/SabreJobs/job/Software-Engineering-Intern_JR107575
+    observedOn: '2026-09-09'
+    method: search_index
+    provenance: Bounded employer registry research, 2026-09-09; official source via web retrieval
+    note: Search-indexed employer Workday Software Engineering Intern JR107575 names Krakow; five-month
+      crawl. Detail open returned zero readable lines; official Poland careers overview open failed internally.
+      Hiring unknown.
+  surfaces:
+    frontend:
+      status: observed
+      label: Workday careers
+      url: https://sabre.wd1.myworkdayjobs.com/en-US/SabreJobs/job/Software-Engineering-Intern_JR107575
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: observed
+      label: Workday
+      url: https://sabre.wd1.myworkdayjobs.com/en-US/SabreJobs/job/Software-Engineering-Intern_JR107575
+      evidence:
+      - career
+  sourceCompatibility:
+    status: unsupported
+    adapter: null
+    evidence:
+    - career
+  endpoints:
+  - url: https://sabre.wd1.myworkdayjobs.com/en-US/SabreJobs/job/Software-Engineering-Intern_JR107575
+    scope: job_detail
+    health: unknown
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: lead
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: state-street
+  name: State Street
+  aliases: []
+  officialDomain: statestreet.com
+  careersUrl: https://careers.statestreet.com/global/en/poland?from=50&rk=l-poland&s=1
+  locations:
+  - country: PL
+    city: Kraków
+    kind: job_location
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://careers.statestreet.com/global/en/poland?from=50&rk=l-poland&s=1
+    observedOn: '2026-09-09'
+    method: search_index
+    provenance: Bounded employer registry research, 2026-09-09; official source via web retrieval
+    note: Search-indexed official Poland results include Krakow and analytics titles; counts are cached,
+      not a live inventory. Page open did not verify individual requisitions or collector health.
+  surfaces:
+    frontend:
+      status: observed
+      label: Employer-branded careers page
+      url: https://careers.statestreet.com/global/en/poland?from=50&rk=l-poland&s=1
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+  sourceCompatibility:
+    status: unknown
+    adapter: null
+    evidence: []
+  endpoints:
+  - url: https://careers.statestreet.com/global/en/poland?from=50&rk=l-poland&s=1
+    scope: careers_index
+    health: unknown
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: lead
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: aptiv
+  name: Aptiv
+  aliases: []
+  officialDomain: aptiv.com
+  careersUrl: https://aptiv.wd5.myworkdayjobs.com/en-US/APTIV_CAREERS/job/Expert-AI-ML-Engineer---Perception---Planning_J000700856-1
+  locations:
+  - country: PL
+    city: Kraków
+    kind: office
+    evidence:
+    - office
+  evidence:
+  - id: career
+    url: https://aptiv.wd5.myworkdayjobs.com/en-US/APTIV_CAREERS/job/Expert-AI-ML-Engineer---Perception---Planning_J000700856-1
+    observedOn: '2026-09-09'
+    method: search_index
+    provenance: Bounded employer registry research, 2026-09-09; official source via web retrieval
+    note: Search-indexed employer Workday expert AI/ML role explicitly names Krakow engineering center.
+      Detail was not opened; no live vacancy claim.
+  - id: office
+    url: https://www.aptiv.com/pl/aptiv-w-polsce
+    observedOn: '2026-09-09'
+    method: primary_page
+    provenance: Bounded registry research; opened official Poland page 2026-09-09
+    note: Official Poland page describes the Kraków technical center and gives local addresses; it links
+      to praca.aptiv.com. No new collector tested.
+  surfaces:
+    frontend:
+      status: observed
+      label: Workday careers
+      url: https://aptiv.wd5.myworkdayjobs.com/en-US/APTIV_CAREERS/job/Expert-AI-ML-Engineer---Perception---Planning_J000700856-1
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: observed
+      label: Workday
+      url: https://aptiv.wd5.myworkdayjobs.com/en-US/APTIV_CAREERS/job/Expert-AI-ML-Engineer---Perception---Planning_J000700856-1
+      evidence:
+      - career
+  sourceCompatibility:
+    status: unsupported
+    adapter: null
+    evidence:
+    - career
+  endpoints:
+  - url: https://aptiv.wd5.myworkdayjobs.com/en-US/APTIV_CAREERS/job/Expert-AI-ML-Engineer---Perception---Planning_J000700856-1
+    scope: job_detail
+    health: not_checked
+    checkedOn: null
+    evidence: []
+  status: lead
+  liveHiringStatus: unknown
+  nextAction: Verify a current official listing and collection route in a separate bounded review.
+- employerId: tesco-technology
+  name: Tesco Technology
+  aliases:
+  - Tesco Technology & Services Europe
+  officialDomain: careers.smartrecruiters.com
+  careersUrl: https://careers.smartrecruiters.com/TescoTechnologyCE/poland
+  locations:
+  - country: PL
+    city: Kraków
+    kind: office
+    evidence:
+    - career
+  evidence:
+  - id: career
+    url: https://careers.smartrecruiters.com/TescoTechnologyCE/poland
+    observedOn: '2026-09-09'
+    method: primary_page
+    provenance: Bounded employer registry research, 2026-09-09; official source via web retrieval
+    note: Employer-branded SmartRecruiters board describes its Kraków hub. Rendered page states no job
+      postings currently available; this could be an empty/retired/dynamic board and does not establish
+      company-wide hiring cessation. Corporate root domain unverified; officialDomain records the evidenced
+      career host.
+  surfaces:
+    frontend:
+      status: observed
+      label: SmartRecruiters
+      url: https://careers.smartrecruiters.com/TescoTechnologyCE/poland
+      evidence:
+      - career
+    apply:
+      status: unknown
+      label: null
+      url: null
+      evidence: []
+    ats:
+      status: observed
+      label: SmartRecruiters
+      url: https://careers.smartrecruiters.com/TescoTechnologyCE/poland
+      evidence:
+      - career
+  sourceCompatibility:
+    status: supported
+    adapter: smartrecruiters
+    evidence:
+    - career
+  endpoints:
+  - url: https://careers.smartrecruiters.com/TescoTechnologyCE/poland
+    scope: careers_index
+    health: unknown
+    checkedOn: '2026-09-09'
+    evidence:
+    - career
+  status: needs_review
+  liveHiringStatus: unknown
+  nextAction: Verify whether this observed board is current and inspect its public endpoint before considering
+    enrollment; do not activate the tenant from its URL alone.

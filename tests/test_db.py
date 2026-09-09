@@ -691,7 +691,7 @@ def test_migration_v3_upgrades_a_v2_tracker_in_place(tmp_path):
     conn.close()
 
     tracker = Tracker(path)
-    assert tracker.conn.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert tracker.conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
     columns = {row[1] for row in
                tracker.conn.execute("PRAGMA table_info(applications)")}
     assert "score_reasons" in columns
@@ -730,7 +730,7 @@ def test_backup_writes_one_dated_consistent_copy_and_prunes(tmp_path):
     assert made is not None and made.name == "tracker-2026-09-01.sqlite3"
     # The copy is a real snapshot, not a torn file copy of a WAL database.
     copy = sqlite3.connect(made)
-    assert copy.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert copy.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
     copy.close()
 
     assert tracker.backup(keep=2, now=day1) is None  # same day: no second copy
@@ -781,7 +781,7 @@ def test_a_failed_backup_never_claims_the_day(tmp_path):
     made = tracker.backup(keep=5, now=day)  # the same-day retry succeeds
     assert made == target
     copy = sqlite3.connect(made)
-    assert copy.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert copy.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS)
     copy.close()
     tracker.close()
 

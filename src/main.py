@@ -36,7 +36,7 @@ from .db import Tracker
 from .models import ApplyStatus, Job, RunStats, ScoredJob, ensure_utc, utcnow
 from .sources import (
     adzuna, arbeitnow, ats_boards, justjoin_it, landing_jobs, linkedin_email,
-    nofluffjobs,
+    nofluffjobs, allegro,
 )
 from .util import get_logger, open_in_browser, setup_logging
 
@@ -297,6 +297,9 @@ def _fetch_all(config: Any, active: set[str], stats: RunStats) -> list[Job]:
     if "nofluffjobs" in active:
         jobs.extend(_safe_fetch("nofluffjobs", nofluffjobs.fetch, config, stats))
 
+    if "allegro" in active:
+        jobs.extend(_safe_fetch("allegro", allegro.fetch, config, stats))
+
     if "linkedin_email" in active:
         jobs.extend(_safe_fetch("linkedin_email", linkedin_email.fetch, config, stats))
 
@@ -411,6 +414,136 @@ def _newest_first(jobs: list[Job]) -> list[Job]:
     )
 
 
+class _QueuedFilters:
+    """An admitted posting may age in the queue; all other gates still apply."""
+
+    def __init__(self, config: Any):
+        self.config = config
+
+    def get(self, dotted: str, default: Any = None) -> Any:
+        if dotted == "freshness.max_age_hours":
+            return float("inf")
+        return _cfg(self.config, dotted, default)
+
+
+def _backlog_policy(config: Any, name: str, maximum: int) -> int:
+    default = config_module.DEFAULTS["scoring"][name]
+    minimum = 0 if name == "backlog_max_jobs" else 1
+    return min(maximum, max(minimum, _int(_cfg(config, f"scoring.{name}", default), default)))
+
+
+def _prepare_scoring_backlog(
+    fresh: list[Job], observed: dict[str, Job], tracker: Tracker,
+    config: Any, stats: RunStats, now: datetime,
+) -> list[Job]:
+    """Drain older admitted work first, using only currently observed evidence.
+
+    Source results are not authoritative closed-job lists (some are partial,
+    some swallow board failures). Absence always means availability unknown.
+    """
+    max_attempts = _backlog_policy(config, "retry_max_attempts", 10)
+    ready: list[Job] = []
+    for row in tracker.pending_scoring():
+        key = row["key"]
+        if now >= datetime.fromisoformat(row["expires_at"]):
+            detail = "queue lifetime expired; availability unknown, not confirmed closed"
+            tracker.stop_scoring(key, "expired", detail)
+            stats.errors.append(f"scoring backlog {key}: {detail}")
+            continue
+        if tracker.has_applied(key) or tracker.submit_attempted(key):
+            tracker.stop_scoring(key, "protected", "application or submit attempt already recorded")
+            continue
+        # Human/application outcomes written since admission take precedence.
+        application = tracker.get_application(key) or {}
+        if (application.get("status"), application.get("updated_at")) != (
+                row["application_status"], row["application_updated_at"]):
+            tracker.stop_scoring(key, "protected", "application outcome recorded since admission")
+            continue
+        if row["attempts"] >= max_attempts:
+            tracker.stop_scoring(key, "exhausted", "scoring attempt limit reached")
+            stats.errors.append(f"scoring backlog {key}: scoring attempt limit reached")
+            continue
+        if key not in observed:
+            tracker.scoring_detail(
+                key, "pending: current source observation needed; saved evidence is outdated; "
+                "availability unknown (source absent, partial, disabled, or failed)",
+            )
+            continue
+        try:
+            job = tracker.observe_scoring(observed[key], now=now)
+            tracker.record_job(job, now=now)
+            if tracker.has_applied_similar(job.dedupe_key):
+                tracker.stop_scoring(key, "protected", "similar role already applied")
+                continue
+            checked = filters.apply_filters([job], _QueuedFilters(config), now=now)
+            if not checked.kept:
+                detail = checked.rejected[0][1] if checked.rejected else "eligibility not established"
+                if checked.counts.get("filter_error"):
+                    # A detector/filter failure is missing eligibility evidence,
+                    # not proof that the posting violates an eligibility rule.
+                    tracker.scoring_detail(key, f"pending revalidation: {detail}")
+                    stats.errors.append(f"scoring backlog {key}: revalidation failed: {detail}")
+                    continue
+                tracker.stop_scoring(key, "ineligible", detail)
+                stats.errors.append(f"scoring backlog {key}: no longer eligible: {detail}")
+                continue
+            stats.after_filters += 1
+            source = (job.source or "unknown").lower()
+            stats.source_after_filters[source] = stats.source_after_filters.get(source, 0) + 1
+        except Exception as exc:
+            stats.errors.append(f"scoring backlog {key}: revalidation failed: {exc}")
+            tracker.scoring_detail(key, f"pending: current eligibility evidence needed: {exc}")
+            continue
+        if now < datetime.fromisoformat(row["next_attempt_at"]):
+            if "outdated" in row["detail"]:
+                tracker.scoring_detail(key, f"pending scoring retry after {row['next_attempt_at']}")
+            continue
+        tracker.scoring_detail(key, "pending scoring; current source observation available")
+        ready.append(job)
+
+    capacity = _backlog_policy(config, "backlog_max_jobs", 10000)
+    age_days = _backlog_policy(config, "backlog_max_age_days", 30)
+    for job in _newest_first(fresh):
+        if tracker.has_applied(job.key) or tracker.submit_attempted(job.key) \
+                or tracker.has_applied_similar(job.dedupe_key):
+            continue
+        try:
+            if tracker.enqueue_scoring(job, max_pending=capacity,
+                                       max_age_days=age_days, now=now):
+                ready.append(job)
+            else:
+                stats.errors.append(f"scoring backlog full ({capacity}); not queued: {job.label}")
+        except Exception as exc:
+            stats.errors.append(f"scoring backlog could not retain {job.label}: {exc}")
+    return ready
+
+
+def _record_scoring_attempts(
+    scored_jobs: list[ScoredJob], attempted: list[Job], tracker: Tracker,
+    config: Any, stats: RunStats,
+) -> None:
+    results = {item.key: item for item in scored_jobs}
+    for job in attempted:
+        item = results.get(job.key)
+        if item is not None and item.score is not None and item.score.ok:
+            # Completion is recorded only after application persistence.
+            continue
+        error = (item.score.error if item and item.score else None) or "scorer returned no result"
+        row = tracker.get_scoring(job.key)
+        if row["attempts"] >= _backlog_policy(config, "retry_max_attempts", 10):
+            detail = f"scoring retry limit reached: {error}"
+            tracker.stop_scoring(job.key, "exhausted", detail)
+            stats.errors.append(f"scoring {job.label}: {detail}")
+        else:
+            detail = f"pending scoring retry after {row['next_attempt_at']}: {error}"
+            tracker.scoring_detail(job.key, detail)
+            if item is None:
+                stats.errors.append(f"scoring {job.label}: {detail}")
+        if item is not None:
+            item.status_detail = detail
+
+
+
 def _read_cv(config: Any) -> str:
     """Load the base CV, or raise `ConfigError`.
 
@@ -489,8 +622,7 @@ def _count_outcomes(scored_jobs: list[ScoredJob], stats: RunStats) -> None:
     stats.digest_items = sum(
         1 for s in scored_jobs if _status_of(s) == ApplyStatus.DIGEST.value
     )
-    # Carried as a dynamic attribute, like filter_counts: RunStats is a
-    # foundation type. Without it the jobs that most need a human look were
+    # Carried as a dynamic attribute. Without it the jobs that most need a human look were
     # the only ones missing from the summary line cron writes to the log.
     stats.unconfirmed = sum(  # type: ignore[attr-defined]
         1 for s in scored_jobs
@@ -501,7 +633,8 @@ def _count_outcomes(scored_jobs: list[ScoredJob], stats: RunStats) -> None:
     )
 
 
-def _persist(scored_jobs: list[ScoredJob], tracker: Any, now: datetime) -> None:
+def _persist(scored_jobs: list[ScoredJob], tracker: Any, now: datetime,
+             *, errors: list[str] | None = None) -> None:
     """Write each job's final status to the tracker.
 
     `method` is deliberately left empty: the apply stage has already written
@@ -514,6 +647,11 @@ def _persist(scored_jobs: list[ScoredJob], tracker: Any, now: datetime) -> None:
     for item in scored_jobs:
         try:
             tracker.record_job(item.job, now=now)
+            if hasattr(tracker, "get_scoring") and tracker.get_scoring(item.key) \
+                    and (item.score is None or not item.score.ok):
+                # Showing an unscored card is not completion of scoring work,
+                # nor an application outcome that should suppress its retry.
+                continue
             tracker.record_status(
                 item.key,
                 item.status,
@@ -524,9 +662,13 @@ def _persist(scored_jobs: list[ScoredJob], tracker: Any, now: datetime) -> None:
                 artifacts_dir=(item.artifacts.dir if item.artifacts else None),
                 now=now,
             )
+            if hasattr(tracker, "complete_scoring") and item.score and item.score.ok:
+                tracker.complete_scoring(item.key)
         except Exception as exc:
             logger.warning("could not record %s for %s: %s",
                            _status_of(item), item.job.label, exc)
+            if errors is not None:
+                errors.append(f"could not persist {item.job.label}: {exc}")
 
 
 def _backup_tracker(tracker: Any, config: Any, now: datetime,
@@ -570,14 +712,9 @@ def run_pipeline(
     `client=`), `now=` and `sources=`. With those four supplied the whole
     pipeline runs offline, which is exactly how it is tested.
 
-    Two counters live on `stats` as dynamic attributes rather than
-    `RunStats` fields, because `RunStats` is a foundation file this module may
-    not edit:
-
-      * `stats.filter_counts` — reason -> n from `filters.apply_filters`.
-        `digest.build_context` already looks for it via `getattr`, so it
-        reaches the page without touching `RunStats.to_dict()`.
-      * `stats.digest_path` — where the digest was written, for `main` to print.
+    Hard-filter reason counts are serialized with `RunStats`, so the saved
+    run log retains the same rejection evidence shown in the digest.
+    `stats.digest_path` is a transient attribute for the CLI to print.
 
     Only a config problem (`ConfigError`, raised by the CV check) leaves this
     function. Everything else is caught, counted in `stats.errors` and
@@ -586,7 +723,6 @@ def run_pipeline(
     moment = ensure_utc(now) or utcnow()
     stats = RunStats()
     # Set before anything can fail, so the digest never meets a missing attribute.
-    stats.filter_counts = {}       # type: ignore[attr-defined]
     stats.digest_path = None       # type: ignore[attr-defined]
     # One run, one bill: the meter is process-wide, so a fresh run starts it
     # at zero rather than inheriting a previous in-process run's numbers.
@@ -608,18 +744,33 @@ def run_pipeline(
         stats.errors.append(f"dedupe failed: {exc}")
     stats.after_dedupe = len(jobs)
 
+    durable = isinstance(tracker, Tracker)
+    queue_failed = False
+    observed = {job.key: job for job in jobs}
+    if durable:
+        # Queued work is revalidated below without reapplying admission age.
+        # Stopped work keeps its tombstone so retries cannot reset themselves.
+        try:
+            jobs = [job for job in jobs if tracker.get_scoring(job.key) is None]
+        except Exception as exc:
+            # Unknown queue membership must not fall through as fresh work.
+            jobs = []
+            queue_failed = True
+            stats.errors.append(f"scoring backlog admission read failed: {exc}")
+
     # -- 3. hard filters --------------------------------------------------
     kept: list[Job] = jobs
     rejected: list[tuple[Job, str]] = []
     try:
         result = filters.apply_filters(jobs, config, now=moment)
         kept, rejected = result.kept, result.rejected
-        stats.filter_counts = dict(result.counts)  # type: ignore[attr-defined]
+        stats.filter_counts = dict(result.counts)
     except Exception as exc:
-        # Filters are pure, so this means a bug rather than bad weather. Keep
-        # everything: an unfiltered digest is recoverable, a silent empty one
-        # is not.
-        logger.warning("filtering failed (%s) — keeping every job", exc)
+        # Durable work must have established eligibility before admission.
+        # Preserve the legacy display fallback for callers without a tracker.
+        if durable:
+            kept = []
+        logger.warning("filtering failed (%s)", exc)
         stats.errors.append(f"filtering failed: {exc}")
     stats.after_filters = len(kept)
     for job in kept:
@@ -632,24 +783,24 @@ def run_pipeline(
 
     # -- 4. tracker gate --------------------------------------------------
     fresh = _gate_on_tracker(kept, rejected, tracker, config, stats, moment)
+    if durable and not queue_failed:
+        try:
+            fresh = _prepare_scoring_backlog(fresh, observed, tracker, config, stats, moment)
+        except Exception as exc:
+            # Partial queue writes stay durable, but no unverified candidate
+            # from this preparation batch may proceed to scoring/application.
+            fresh = []
+            queue_failed = True
+            stats.errors.append(f"scoring backlog preparation failed: {exc}")
 
     # -- 5. the CV (fatal when missing, but only the LLM stages read it) ---
     cv_markdown = "" if skip_llm else _read_cv(config)
 
     # -- 6. scoring -------------------------------------------------------
-    # Newest first, *before* anything truncates. Two things downstream cut
-    # this list — `--limit` immediately below and `scoring.max_jobs` inside
-    # `score_jobs` — and both slice from the front. Until this sort they
-    # sliced in fetch order, which is board order: `_fetch_all` extends in
-    # source order and both `apply_filters` and `_gate_on_tracker` append in
-    # input order. So with 40 postings 48h old ahead of 5 posted two hours
-    # ago, the 40-job cost ceiling was spent entirely on the older ones and
-    # the freshest five were not scored at all. The harm is a one-run delay
-    # rather than a permanent loss — a job truncated before scoring never
-    # gets an `applications` row, so `should_surface` shows it tomorrow — but
-    # it is systematic in the worst direction: on any given morning you were
-    # least likely to see the postings you most wanted.
-    fresh = _newest_first(fresh)
+    # Old queued work precedes new admissions; each admission batch is newest
+    # first. Persisting before both caps prevents overflow aging out unseen.
+    if not durable:
+        fresh = _newest_first(fresh)
     if limit is not None and 0 <= limit < len(fresh):
         logger.info("--limit %d: scoring %d of %d jobs", limit, limit, len(fresh))
         fresh = fresh[:limit]
@@ -667,6 +818,21 @@ def run_pipeline(
         ]
         stats.llm_skipped = True   # type: ignore[attr-defined]
     else:
+        if durable:
+            cap = max(0, _int(_cfg(config, "scoring.max_jobs", 40), 40))
+            fresh = fresh[:cap]
+            started: list[Job] = []
+            for job in fresh:
+                try:
+                    tracker.begin_scoring(
+                        job.key, retry_hours=_backlog_policy(config, "retry_base_hours", 168),
+                        now=moment,
+                    )
+                except Exception as exc:
+                    stats.errors.append(f"scoring attempt not confirmed for {job.label}: {exc}")
+                    continue
+                started.append(job)
+            fresh = started
         try:
             scored_jobs = scoring.score_jobs(
                 fresh, cv_markdown, config, client=llm_client, errors=stats.errors
@@ -674,6 +840,12 @@ def run_pipeline(
         except Exception as exc:
             logger.warning("scoring failed: %s", exc)
             stats.errors.append(f"scoring failed: {exc}")
+        if durable:
+            try:
+                _record_scoring_attempts(scored_jobs, fresh, tracker, config, stats)
+            except Exception as exc:
+                queue_failed = True
+                stats.errors.append(f"scoring backlog result recording failed: {exc}")
     # Honest funnel: with --no-llm nothing was scored, however many jobs the
     # digest ends up showing.
     stats.scored = 0 if skip_llm else len(scored_jobs)
@@ -686,8 +858,30 @@ def run_pipeline(
         1 for s in scored_jobs if _status_of(s) == ApplyStatus.DIGEST.value
     )
 
+    queued_notes: dict[str, str] = {}
+    if durable and not queue_failed:
+        try:
+            for item in scored_jobs:
+                row = tracker.get_scoring(item.key)
+                if row is None:
+                    raise ValueError(f"scoring work disappeared for {item.key}")
+                if datetime.fromisoformat(row["queued_at"]) < moment:
+                    queued_notes[item.key] = (
+                        f"queued since {row['queued_at']}; source observed this run; "
+                        "original posting date retained"
+                    )
+        except Exception as exc:
+            queue_failed = True
+            stats.errors.append(f"scoring backlog evidence read failed: {exc}")
+    if queue_failed:
+        for item in scored_jobs:
+            item.status_detail = (
+                f"{item.status_detail}; queue storage uncertain; outcome not persisted; "
+                "automatic application withheld"
+            ).lstrip("; ")
+
     # -- 7. tailoring -----------------------------------------------------
-    if scored_jobs and not skip_llm:
+    if scored_jobs and not skip_llm and not queue_failed:
         try:
             scored_jobs = tailor.tailor_jobs(
                 scored_jobs, cv_markdown, config, client=llm_client, errors=stats.errors
@@ -709,6 +903,8 @@ def run_pipeline(
         # no score floor to clear. Saying so beats letting `eligible` refuse
         # every job one at a time.
         logger.info("--no-llm: auto-apply skipped, there is nothing to attach")
+    elif queue_failed:
+        logger.warning("auto-apply skipped: scoring queue storage is uncertain")
     elif skip_apply:
         logger.info("--skip-apply: every match goes to the digest")
     elif not bool(_cfg(config, "apply.enabled", True)):
@@ -725,7 +921,34 @@ def run_pipeline(
     # What this run actually spent — injected test clients never touch the
     # meter, so offline runs report honest zeros and the digest stays quiet.
     stats.llm_usage = llm_module.usage_snapshot()
-    _persist(scored_jobs, tracker, moment)
+    for item in scored_jobs:
+        if item.key in queued_notes:
+            item.status_detail = f"{item.status_detail}; {queued_notes[item.key]}".lstrip("; ")
+    if not queue_failed:
+        _persist(scored_jobs, tracker, moment, errors=stats.errors)
+    if durable:
+        try:
+            pending = tracker.pending_scoring()
+        except Exception as exc:
+            pending = []
+            stats.errors.append(f"scoring backlog diagnostics unavailable: {exc}")
+        if pending:
+            outdated = sum("outdated" in row["detail"] for row in pending)
+            stats.errors.append(
+                f"scoring backlog: {len(pending)} pending, {outdated} need current source "
+                "evidence; original posting dates retained (see scoring_backlog details)"
+            )
+            # Keep the existing digest error area useful without generating
+            # thousands of cards or implying that these have been scored.
+            for row in pending[:5]:
+                label = row["key"]
+                try:
+                    job = tracker.get_job(row["key"])
+                    if job:
+                        label = f"{job['company']} — {job['title']}"
+                except Exception as exc:
+                    stats.errors.append(f"scoring backlog label unavailable for {label}: {exc}")
+                stats.errors.append(f"scoring pending: {label}: {row['detail']}")
     _backup_tracker(tracker, config, moment, stats)
 
     # -- 11. digest -------------------------------------------------------
