@@ -196,7 +196,7 @@ def test_an_undated_card_says_so_instead_of_guessing(tmp_path: Path, memory_trac
     assert item["posted_label"] == "no posting date"
     html = render_html(ctx)
     assert "no posting date" in html
-    assert "2026-08-01" not in html          # the first_seen_at, unmentioned
+    assert "First detected: 2026-08-01" in html  # distinct from unknown publication
     assert "3d ago" not in html
 
 
@@ -628,14 +628,14 @@ def test_the_funnel_and_the_page_agree_about_how_many_jobs_matched(
     # `matches` counts the DIGEST-status jobs the run handed over — the two
     # above the threshold. Built to describe *these* jobs, so the comparison
     # below has two independent sides.
-    run = RunStats(fetched=312, after_dedupe=287, after_filters=41, scored=3,
+    run = RunStats(fetched=312, after_dedupe=287, after_filters=41, scored=3, scoring_attempted=3, scoring_completed=3,
                    matches=2)
 
     ctx = build_context(scored, run, digest_config(tmp_path), now=NOW,
                         tracker=memory_tracker)
     assert any(item["flags"] for item in ctx["needs_click"])   # a flag did fire
     assert funnel_of(ctx)["matched"] == ctx["totals"]["needs_click"]
-    assert funnel_of(ctx)["scored"] == ctx["totals"]["all"]
+    assert funnel_of(ctx)["attempted"] == ctx["totals"]["all"]
     assert ctx["totals"]["all"] == 3
     assert ctx["totals"]["needs_click"] == 2
     assert ctx["totals"]["below"] == 1
@@ -850,7 +850,7 @@ def test_a_failed_score_is_shown_as_unscored_not_as_zero(tmp_path: Path):
     job.status_detail = "scorer failed (API timeout) — shown unscored, judge it yourself"
     ctx = build_context([job], stats(), digest_config(tmp_path), now=NOW)
 
-    item = ctx["needs_click"][0]
+    item = ctx["pending"][0]
     assert item["score_label"] == "?"          # not "0"
     assert item["score_error"] == "API timeout"
     assert "API timeout" in render_html(ctx)
@@ -1127,3 +1127,57 @@ def test_llm_usage_line_hides_zero_call_runs_and_formats_spend():
 
     paid = _llm_usage({"llm_usage": {"calls": 1, "cost": 0.0123}})
     assert paid["cost"] == "$0.0123"
+
+
+def test_mixed_run_counts_stay_separate_from_accumulated_backlog(tmp_path):
+    from src.models import Score
+
+    below = make_scored(score=10, company='Completed', ats_job_id='complete')
+    below.status = ApplyStatus.SCORED_BELOW
+    below.score = Score(10, reasons=['Required qualification is missing', XSS])
+    below.status_detail = 'Original posting description was not retained.'
+    pending = []
+    for key in ('failed-1', 'failed-2'):
+        item = make_scored(score=0, ats_job_id=key)
+        item.score = Score(0, error='model returned nothing')
+        item.status = ApplyStatus.SCORING_PENDING
+        pending.append(item)
+    run = RunStats(fetched=5185, after_dedupe=4592, after_filters=3,
+                   scoring_attempted=3, scoring_completed=1, scoring_failed=2,
+                   scoring_pending=7, scoring_blocked=1, matches=0)
+    context = build_context([below, *pending], run, digest_config(tmp_path), now=NOW)
+    context['backlog'].update(current_evidence_needed=5, missing_paused_evidence=1)
+    page = render_html(context)
+    evaluations = page.split('<h3>Evaluation outcomes this run</h3>', 1)[1].split('<section id="backlog">', 1)[0]
+    outcomes = dict(re.findall(r'<div class="v">(\d+)</div><div class="k">([^<]+)</div>', evaluations))
+    assert outcomes == {'3': 'attempted', '1': 'completed', '2': 'failed', '0': 'matched'}
+    assert 'pending' not in evaluations and 'paused' not in evaluations
+    assert '7 pending in the queue; 1 paused at retry or age limits.' in page
+    assert '5 pending entries need current source evidence.' in page
+    assert '1 historical paused entry has no retained posting data.' in page
+    assert 'These 2 cards are pending evaluations from this run.' in page
+    assert 'Saved evidence is retained' not in page
+    section = page.split('<section id="below">', 1)[1].split('</section>', 1)[0]
+    assert '<span class="n">1</span>' in section and '10' in section
+    assert 'Required qualification is missing' in section
+    assert XSS not in section and '&lt;img' in section
+    assert 'Original posting description was not retained.' in section
+    assert 'Nothing scored below' not in page
+    assert 'No validated matches in this run.' in page
+    assert 'Nothing above the threshold' not in page
+
+
+def test_no_click_cards_does_not_deny_matches_in_protected_outcomes(tmp_path):
+    applied = make_scored(score=90)
+    applied.status = ApplyStatus.APPLIED
+    page = render_html(build_context([applied], RunStats(matches=1), digest_config(tmp_path), now=NOW))
+    assert 'No validated matches awaiting your click' in page
+    assert 'No validated matches in this run.' not in page
+
+
+def test_historical_digest_timestamp_can_be_labeled_without_claiming_generation(tmp_path):
+    context = build_context([], RunStats(), digest_config(tmp_path), now=NOW)
+    context['timestamp_label'] = 'historical run started'
+    page = render_html(context)
+    assert '· historical run started ' in page
+    assert '· generated ' not in page

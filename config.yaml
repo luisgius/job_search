@@ -127,8 +127,8 @@ freshness:
   # posting when the next run is Monday. A board that publishes in batches, or
   # a company whose HR team posts at 18:00 on a day the run happened at 08:00.
   # Adzuna's `created` is its own ingest time, not the employer's, and lags.
-  # Greenhouse's `first_published` is missing often enough that the fallback
-  # matters. Every one of those is a real job that never appears, with no trace
+  # Greenhouse's missing `first_published` stays unknown; an update timestamp
+  # does not establish publication age. Every one of those is a real job that never appears, with no trace
   # anywhere that it existed — which is the one failure this tool must not have.
   #
   # The premise behind 24 was "apply in the first day or you have lost". That
@@ -210,13 +210,9 @@ filters:
   countries_if_sponsorship:
     - GB
 
-  # Drop postings whose description is not in a language you read. Judged on
-  # the description only (a German title over an English body is an English
-  # ad), only above language_min_chars (snippets are guesswork — in doubt,
-  # the job stays), and the per-source drop counts land in the run log so a
-  # whole country's volume can never vanish silently.
-  languages:
-    - en
+  # Ad language is not a work requirement. Explicit requirements are checked
+  # against language_levels below; missing or ambiguous requirements stay unknown.
+  languages: []  # legacy option, no longer a rejection gate
 
   # Empty = allow any title. Whole-word, case-insensitive matching — so
   # "data scientist" also catches "Senior Data Scientist" (which the exclude
@@ -238,6 +234,15 @@ filters:
   # Stamped as raw["level"]="junior" when an included title carries one of
   # these — metadata for scoring/digest, never a gate. A plain "Data
   # Scientist" is NOT junior: mid is the target, junior is acceptable.
+  # CV-backed adjacent roles require quantitative product/experiment duties.
+  title_adjacent:
+    - product analyst
+    - product analytics
+    - experimentation analyst
+    - experimentation scientist
+    - decision science analyst
+    - causal inference scientist
+  language_levels: {en: C1, es: native, de: A2, pl: beginner}
   title_junior_markers:
     - junior
     - associate
@@ -382,7 +387,7 @@ scoring:
   fallback_models:
     - google/gemma-4-26b-a4b-it:free
     - nvidia/nemotron-3-super-120b-a12b:free
-    - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1", timeout: 600, max_retries: 0}
+    - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1", timeout: 600, max_retries: 0, reasoning_effort: none}
   # PAID SWITCH — recommended once $10 of credits are in (lifts the free
   # pools to 1,000/day too, and the CV stops travelling to models that
   # train on prompts). Live prices 2026-09-01; at this run size scoring

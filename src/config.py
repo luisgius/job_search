@@ -207,12 +207,12 @@ DEFAULTS: dict[str, Any] = {
         "title_junior_markers": [
             "junior", "associate", "graduate", "early career", "entry level",
         ],
-        # ISO-639-1 codes of the languages the user reads; empty = no gate.
-        # Judged on the description only (a German title over an English body
-        # is an English ad), with lingua, and only above min_chars — short
-        # or synthesized snippets are guesswork, and in doubt the job stays.
+        # Legacy ad-language settings are retained for config compatibility only.
+        # Hard language checks use explicit job requirements and known CV levels.
         "languages": [],
         "language_min_chars": 150,
+        "language_levels": {},
+        "title_adjacent": [],
         # Countries reachable only with the employer's help: allowed when —
         # and only when — the posting explicitly offers visa sponsorship.
         "countries_if_sponsorship": [],
@@ -717,6 +717,12 @@ class Config:
                             f"{role}.fallback_models[{index}].timeout must be a "
                             f"number of seconds, at least 1 — got {timeout!r}"
                         )
+                    effort = entry.get("reasoning_effort")
+                    if effort is not None and effort not in ("none", "low", "medium", "high"):
+                        problems.append(f"{role}.fallback_models[{index}].reasoning_effort must be none, low, medium or high")
+                    tokens = entry.get("max_tokens")
+                    if tokens is not None and (type(tokens) is not int or not 1 <= tokens <= 32768):
+                        problems.append(f"{role}.fallback_models[{index}].max_tokens must be an integer from 1 to 32768")
                     retries = entry.get("max_retries")
                     if retries is not None and (
                         isinstance(retries, bool)

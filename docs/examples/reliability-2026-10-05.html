@@ -1,0 +1,980 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reconstructed audit example — 2026-10-05</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f4f6f9;
+  --panel: #ffffff;
+  --panel-2: #f8fafc;
+  --ink: #14181f;
+  --muted: #5b6673;
+  --line: #e1e6ed;
+  --accent: #1b4dd8;
+  --accent-ink: #ffffff;
+  --good: #0f7a45;
+  --good-bg: #e8f6ee;
+  --warn: #9a6100;
+  --warn-bg: #fdf3e0;
+  --bad: #b3261e;
+  --bad-bg: #fdeceb;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 4px 16px rgba(16, 24, 40, .05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --panel-2: #1c222b;
+    --ink: #e6ebf2;
+    --muted: #97a3b2;
+    --line: #262d38;
+    --accent: #7ba2ff;
+    --accent-ink: #0b1020;
+    --good: #56d39a;
+    --good-bg: #102b1f;
+    --warn: #e5ad5a;
+    --warn-bg: #2c2213;
+    --bad: #ff8b82;
+    --bad-bg: #2e1614;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5);
+  }
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+a {
+  color: var(--accent);
+}
+h1, h2, h3, h4 {
+  margin: 0;
+  line-height: 1.25;
+}
+.wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* ---------- sticky header ---------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+.topbar .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+.brand h1 {
+  font-size: 19px;
+  letter-spacing: -.01em;
+}
+.brand .sub {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin-top: 2px;
+}
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 12.5px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pill b {
+  color: var(--ink);
+  font-size: 14px;
+}
+.pill.hot {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.pill.hot b {
+  color: var(--accent-ink);
+}
+
+/* ---------- layout ---------- */
+main {
+  padding: 26px 0 60px;
+}
+section {
+  margin: 0 0 34px;
+}
+.sec-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.sec-head h2 {
+  font-size: 17px;
+}
+.sec-head .n {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.sec-head .hint {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin-left: auto;
+}
+.empty {
+  color: var(--muted);
+  font-size: 13.5px;
+  background: var(--panel);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 0;
+}
+.banner {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 26px;
+  box-shadow: var(--shadow);
+}
+.banner h2 {
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+.banner p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+/* ---------- cards ---------- */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+.card.good {
+  border-left: 4px solid var(--good);
+}
+.card.warn {
+  border-left: 4px solid var(--warn);
+}
+.card.bad {
+  border-left: 4px solid var(--bad);
+}
+.head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.who {
+  min-width: 0;
+  flex: 1;
+}
+.role {
+  font-size: 16.5px;
+  letter-spacing: -.01em;
+  word-break: break-word;
+}
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12.5px;
+  margin-top: 5px;
+}
+.tag {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  border-radius: 5px;
+  padding: 1px 7px;
+  font-size: 11.5px;
+  letter-spacing: .02em;
+}
+.tag.src {
+  text-transform: lowercase;
+}
+.health {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em;
+}
+/* The theme's own good/warn/bad pairs, so the dark-mode block above
+   recolours the chips along with everything else. */
+.health.ok       { background: var(--good-bg); color: var(--good); }
+.health.degraded { background: var(--warn-bg); color: var(--warn); }
+.health.error    { background: var(--bad-bg); color: var(--bad); }
+.badge {
+  flex: none;
+  min-width: 48px;
+  text-align: center;
+  padding: 8px 6px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
+}
+.score-90 {
+  background: var(--good-bg);
+  color: var(--good);
+  border-color: var(--good);
+}
+.score-80 {
+  background: rgba(27, 77, 216, .1);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.score-70 {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.score-low {
+  background: var(--panel-2);
+  color: var(--muted);
+  border-color: var(--line);
+}
+.score-unscored {
+  background: var(--muted-bg, #e8e8ea);
+  color: var(--muted-fg, #555);
+}
+.score-error {
+  background: var(--bad-bg);
+  color: var(--bad);
+  border-color: var(--bad);
+}
+.verdict {
+  margin: 12px 0 0;
+  font-size: 14.5px;
+}
+.alert {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bad-bg);
+  color: var(--bad);
+  font-size: 13px;
+}
+/* Same shape as .alert, amber instead of red, plus a rule down the side so
+   the two stay apart for a red-green colour-blind reader as well. `.alert`
+   means "something in this run failed and needs you"; `.advisory` means
+   "this posting may not be what it looks like" — a hedge, not a failure. */
+.advisory {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--warn);
+  border-radius: 0 8px 8px 0;
+  background: var(--warn-bg);
+  color: var(--warn);
+  font-size: 13px;
+}
+.note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.note code {
+  font-size: 12.5px;
+  word-break: break-word;
+}
+
+/* ---------- actions ---------- */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+}
+/* The apply button hides its destination; the host printed beside it is the
+   anti-phishing measure — a reader who expects greenhouse.io and sees
+   grëenhouse.io has been warned by the page itself. */
+.links .host {
+  font-family: var(--mono, monospace);
+  font-size: 12px;
+  color: var(--muted, #667);
+}
+.btn {
+  background: var(--accent);
+  color: var(--accent-ink);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14.5px;
+  padding: 9px 16px;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+.btn:hover {
+  filter: brightness(1.08);
+}
+.file {
+  text-decoration: none;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 11px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.file:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- reasons ---------- */
+.cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 6px 22px;
+  margin-top: 12px;
+}
+.cols h4 {
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.cols ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+}
+.cols li {
+  margin: 2px 0;
+}
+
+/* ---------- disclosure blocks ---------- */
+details {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  user-select: none;
+}
+summary:hover {
+  color: var(--accent);
+}
+details pre, .excerpt {
+  margin: 10px 0 0;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+.excerpt {
+  font-family: inherit;
+  color: var(--muted);
+}
+
+/* ---------- screenshots ---------- */
+.shot {
+  display: block;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel-2);
+  max-width: 520px;
+}
+.shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ---------- tables ---------- */
+.scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13.5px;
+}
+th, td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  white-space: nowrap;
+}
+tr:last-child td {
+  border-bottom: none;
+}
+td.num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---------- stats ---------- */
+.funnel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+.step {
+  flex: 1 1 130px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.step .v {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.step .k {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.arrow {
+  align-self: center;
+  color: var(--muted);
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.grid2 h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+pre.errors {
+  margin: 0;
+  background: var(--bad-bg);
+  color: var(--bad);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- footer ---------- */
+footer {
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12.5px;
+  padding: 18px 0 40px;
+  background: var(--panel);
+}
+footer p {
+  margin: 4px 0;
+}
+footer code {
+  overflow-wrap: anywhere;
+}
+.mode-dry {
+  color: var(--warn);
+  font-weight: 600;
+}
+.mode-live {
+  color: var(--bad);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .wrap {
+    padding: 0 14px;
+  }
+  .badge {
+    min-width: 42px;
+    font-size: 16px;
+  }
+  .btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+@media print {
+  .topbar {
+    position: static;
+  }
+  body {
+    background: #fff;
+  }
+}
+</style>
+</head>
+<body><p style="padding:16px;background:#fff3cd;color:#111">AUDIT EXAMPLE: reconstruction of run 28 from retained logs/database. No new search or application. Queue totals include earlier runs. One completed evaluation (Legartis, 10/100) is below threshold and is not a match. Its saved reasons are included; its original posting description is unavailable.</p>
+
+
+
+
+
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <h1>Job Hunter — Luis Gimenez</h1>
+      <div class="sub">Monday 2026-10-05 · historical run started 2026-10-05 06:00 UTC</div>
+    </div>
+    <div class="counts">
+      <a class="pill hot" href="#needs-click"><b>0</b> need your click</a>
+      <a class="pill" href="#pending"><b>2</b> pending evaluation</a>
+      <a class="pill" href="#auto-applied"><b>0</b> applied</a>
+      <a class="pill" href="#dry-run"><b>0</b> dry run</a>
+      <a class="pill" href="#failed"><b>0</b> skipped</a>
+      <a class="pill" href="#below"><b>1</b> below</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+
+<section id="source-health">
+  <div class="sec-head">
+    <h2>Sources</h2>
+    <span class="hint">how each feed did this run — a Tier 2 endpoint that silently died shows here first</span>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>source</th><th class="num">fetched</th><th class="num">kept</th>
+          <th class="num">new today</th><th>status</th><th>last OK</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>allegro</td>
+          <td class="num">1</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td><span class="health degraded">degraded</span></td>
+          <td>this run</td>
+        </tr>
+        <tr>
+          <td>arbeitnow</td>
+          <td class="num">750</td>
+          <td class="num">3</td>
+          <td class="num">3</td>
+          <td><span class="health ok">ok</span></td>
+          <td>this run</td>
+        </tr>
+        <tr>
+          <td>ashby</td>
+          <td class="num">148</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td><span class="health ok">ok</span></td>
+          <td>this run</td>
+        </tr>
+        <tr>
+          <td>greenhouse</td>
+          <td class="num">3573</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td><span class="health ok">ok</span></td>
+          <td>this run</td>
+        </tr>
+        <tr>
+          <td>justjoin_it</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td><span class="health error">error</span></td>
+          <td>never</td>
+        </tr>
+        <tr>
+          <td>landing_jobs</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td><span class="health ok">ok</span></td>
+          <td>never</td>
+        </tr>
+        <tr>
+          <td>lever</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td><span class="health ok">ok</span></td>
+          <td>never</td>
+        </tr>
+        <tr>
+          <td>nofluffjobs</td>
+          <td class="num">662</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td><span class="health ok">ok</span></td>
+          <td>this run</td>
+        </tr>
+        <tr>
+          <td>personio</td>
+          <td class="num">1</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td><span class="health ok">ok</span></td>
+          <td>this run</td>
+        </tr>
+        <tr>
+          <td>recruitee</td>
+          <td class="num">26</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td><span class="health ok">ok</span></td>
+          <td>this run</td>
+        </tr>
+        <tr>
+          <td>smartrecruiters</td>
+          <td class="num">1</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td><span class="health ok">ok</span></td>
+          <td>this run</td>
+        </tr>
+        <tr>
+          <td>teamtailor</td>
+          <td class="num">14</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td><span class="health ok">ok</span></td>
+          <td>this run</td>
+        </tr>
+        <tr>
+          <td>workable</td>
+          <td class="num">9</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td><span class="health ok">ok</span></td>
+          <td>this run</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">LLM this run: 5 calls
+    · 17,368 in / 7,195 out tokens
+    · no cost reported · nvidia/nemotron-3-super-120b-a12b:free, qwen3.8:27b</p>
+</section>
+
+<section id="pending">
+  <div class="sec-head"><h2>Pending evaluation — not validated matches</h2><span class="n">2</span></div>
+  <p class="note">These 2 cards are pending evaluations from this run. A failed evaluation does not authorize an application; availability remains unknown. See the separate backlog totals below.</p>
+  <article class="card"><div class="head">
+  <span class="badge score-error" title="fit score">?</span>
+  <div class="who">
+    <h3 class="role">Predium — Associate Data Scientist (f/m/d)</h3>
+    <div class="meta">
+      <span>Munich</span>
+<span class="tag">DE</span><span class="tag src">arbeitnow</span>      <span>posted 4d ago</span>
+    </div>
+  </div>
+</div>
+
+<p class="note">Source update: unknown · First detected: 2026-10-01 06:04 UTC · Work-language requirement: unknown</p>
+<p class="alert">Scorer failed: Historical run: model returned nothing — evaluation pending; this is not a validated match.</p>
+<div class="links">
+  <a class="btn" href="https://www.arbeitnow.com/jobs/companies/predium/associate-data-scientist-munich-18247" target="_blank" rel="noopener">Review source posting →</a>
+<span class="host">www.arbeitnow.com</span></div>
+
+<p class="note">pending scoring retry after 2026-10-05T08:00:03.643383+00:00: model returned nothing</p></article>
+  <article class="card"><div class="head">
+  <span class="badge score-error" title="fit score">?</span>
+  <div class="who">
+    <h3 class="role">Lemrock — AI Engineer</h3>
+    <div class="meta">
+      <span>Paris (hybrid)</span>
+<span class="tag">FR</span><span class="tag src">arbeitnow</span>      <span>posted 13h ago</span>
+    </div>
+  </div>
+</div>
+
+<p class="note">Source update: unknown · First detected: 2026-10-05 06:00 UTC · Work-language requirement: unknown</p>
+<p class="alert">Scorer failed: Historical run: model returned nothing — evaluation pending; this is not a validated match.</p>
+<div class="links">
+  <a class="btn" href="https://www.arbeitnow.fr/jobs/companies/lemrock/ai-engineer-paris-365273" target="_blank" rel="noopener">Review source posting →</a>
+<span class="host">www.arbeitnow.fr</span></div>
+
+<p class="note">pending scoring retry after 2026-10-05T07:00:03.643383+00:00: model returned nothing</p></article>
+</section>
+
+<section id="needs-click">
+  <div class="sec-head">
+    <h2>Needs your click</h2>
+    <span class="n">0</span>
+    <span class="hint">threshold 65 · sorted by fit</span>
+  </div>
+    <p class="empty">No validated matches in this run. Pending or failed evaluations cannot establish whether those postings meet the threshold.</p>
+</section>
+
+<section class="sec">
+  <h2>⚠️ Submitted — but unconfirmed <span class="count">0</span></h2>
+<p class="empty">Nothing unconfirmed. Good.</p></section>
+
+<section id="auto-applied">
+  <div class="sec-head">
+    <h2>Auto-applied</h2>
+    <span class="n">0</span>
+    <span class="hint">submitted on your behalf — verify in your inbox</span>
+  </div>
+    <p class="empty">Nothing was submitted automatically — dry run is on, which is the point.</p>
+</section>
+
+<section id="dry-run">
+  <div class="sec-head">
+    <h2>Dry run — check these</h2>
+    <span class="n">0</span>
+    <span class="hint">form filled, nothing submitted — open each screenshot</span>
+  </div>
+    <p class="empty">No forms were filled this run.</p>
+</section>
+
+<section id="failed">
+  <div class="sec-head">
+    <h2>Skipped auto-apply / failed</h2>
+    <span class="n">0</span>
+    <span class="hint">why it bailed, verbatim — this is the safety net working</span>
+  </div>
+    <p class="empty">Nothing bailed out this run.</p>
+</section>
+
+<section id="below">
+  <div class="sec-head">
+    <h2>Below threshold</h2>
+    <span class="n">1</span>
+    <span class="hint">audit this in week one — if you would have applied, your threshold is too high</span>
+  </div>
+  <details>
+    <summary>Show 1 posting scored under 65</summary>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Score</th><th>Company</th><th>Title</th><th>Where</th><th>Verdict</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="num">10</td>
+            <td>Legartis</td>
+            <td>
+              <a href="https://www.arbeitnow.com/jobs/companies/legartis/legal-ai-engineer-berlin-or-leipzig-383972" target="_blank" rel="noopener">Legal AI Engineer (Berlin or Leipzig)</a>
+            </td>
+            <td>Berlin</td>
+            <td>Historical completed evaluation; original posting description was not retained.
+<details><summary>Saved evaluation reasons</summary>
+              <ul><li>Posting states: &#39;Excellent German and English. German is non-negotiable.&#39;</li><li>CV shows: &#39;German: Beginner (A2)&#39;.</li><li>Posting requires: &#39;Legal foundation. A law degree with a commercial-contracts focus: German-qualified (Bachelor, Master, or Staatsexamen) or an equivalent qualification&#39;.</li><li>CV lists degrees: &#39;B.Sc. Computer Science &amp; B.Sc. Business Administration&#39; with no law degree.</li><li>Posting expects: &#39;You have worked hands-on with German commercial contracts, drafting, reviewing, and negotiating them&#39;.</li><li>CV contains no legal work experience; roles are Data Scientist at Uber, Junior Data Scientist at Buynomics, Data Analyst at Porsche, ERP Consultant at Capgemini.</li></ul></details>            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
+
+
+<section id="stats">
+  <div class="sec-head">
+    <h2>Run stats</h2>
+    <span class="hint">read the numbers, not just the cards — zero fetched is a broken run, not a quiet day</span>
+  </div>
+
+  <div class="funnel">
+    <div class="step">
+      <div class="v">5185</div>
+      <div class="k">fetched</div>
+    </div>
+<div class="arrow">→</div>    <div class="step">
+      <div class="v">4592</div>
+      <div class="k">deduped</div>
+    </div>
+<div class="arrow">→</div>    <div class="step">
+      <div class="v">3</div>
+      <div class="k">eligible / retries</div>
+    </div>
+  </div>
+
+  <h3>Evaluation outcomes this run</h3>
+  <div class="funnel">
+    <div class="step"><div class="v">3</div><div class="k">attempted</div></div>
+    <div class="step"><div class="v">1</div><div class="k">completed</div></div>
+    <div class="step"><div class="v">2</div><div class="k">failed</div></div>
+    <div class="step"><div class="v">0</div><div class="k">matched</div></div>
+  </div>
+
+  <section id="backlog">
+    <h3>Backlog totals — across runs</h3>
+    <p>7 pending in the queue; 1 paused at retry or age limits.</p>
+<p>5 pending entries need current source evidence.</p>    <p class="note">Use saved posting evidence where available for retry or review. Older paused entries may lack saved posting data; availability remains unknown.</p>
+<p>1 historical paused entry has no retained posting data.</p>  </section>
+
+  <div class="grid2">
+    <div>
+      <h3>Per source</h3>
+      <div class="scroll">
+        <table>
+          <tbody>
+              <tr><td>greenhouse</td><td class="num">3573</td></tr>
+              <tr><td>arbeitnow</td><td class="num">750</td></tr>
+              <tr><td>nofluffjobs</td><td class="num">662</td></tr>
+              <tr><td>ashby</td><td class="num">148</td></tr>
+              <tr><td>recruitee</td><td class="num">26</td></tr>
+              <tr><td>teamtailor</td><td class="num">14</td></tr>
+              <tr><td>workable</td><td class="num">9</td></tr>
+              <tr><td>allegro</td><td class="num">1</td></tr>
+              <tr><td>personio</td><td class="num">1</td></tr>
+              <tr><td>smartrecruiters</td><td class="num">1</td></tr>
+              <tr><td>justjoin_it</td><td class="num">0</td></tr>
+              <tr><td>landing_jobs</td><td class="num">0</td></tr>
+              <tr><td>lever</td><td class="num">0</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <h3>First filter rejection</h3>
+      <p class="note">One first failing reason per posting; these counts do not measure every possible rejection.</p>
+      <div class="scroll">
+        <table>
+          <tbody>
+              <tr><td>title_excluded</td><td class="num">2654</td></tr>
+              <tr><td>title_not_included</td><td class="num">1911</td></tr>
+              <tr><td>location_outside_eu</td><td class="num">13</td></tr>
+              <tr><td>stale</td><td class="num">9</td></tr>
+              <tr><td>language</td><td class="num">1</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <h3>Outcomes</h3>
+      <div class="scroll">
+        <table>
+          <tbody>
+            <tr><td>already seen (not re-surfaced)</td><td class="num">0</td></tr>
+            <tr><td>tailored</td><td class="num">0</td></tr>
+            <tr><td>auto-applied</td><td class="num">0</td></tr>
+            <tr><td>dry run</td><td class="num">0</td></tr>
+            <tr><td>apply failed</td><td class="num">0</td></tr>
+            <tr><td>in this digest</td><td class="num">3</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div>
+      <h3>Settings this run</h3>
+      <div class="scroll">
+        <table>
+          <tbody>
+            <tr><td>score threshold</td><td class="num">65</td></tr>
+            <tr><td>auto-apply floor</td><td class="num">80</td></tr>
+            <tr><td>max age (hours)</td><td class="num">72</td></tr>
+            <tr><td>flag a re-listing after (days)</td><td class="num">14</td></tr>
+            <tr><td>scoring model</td><td>google/gemma-4-31b-it:free</td></tr>
+            <tr><td>tailoring model</td><td>google/gemma-4-31b-it:free</td></tr>
+            <tr><td>sources enabled</td><td>greenhouse, lever, workable, ashby, smartrecruiters, personio, recruitee, teamtailor, arbeitnow, landing_jobs, justjoin_it, nofluffjobs, allegro</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:16px">Errors (14)</h3>
+  <pre class="errors">justjoin_it: page 1: GET https://api.justjoin.it/v2/user-panel/offers failed after 3 attempts: https://api.justjoin.it/v2/user-panel/offers -&gt; HTTP 503
+allegro: page 1: skipped 10 malformed/non-job records
+allegro: page 2: skipped 10 malformed/non-job records
+allegro: page 3: skipped 10 malformed/non-job records
+allegro: page 4: skipped 10 malformed/non-job records
+allegro: page cap reached (4/16); coverage partial
+scoring Predium — Associate Data Scientist (f/m/d) failed: model returned nothing
+scoring Lemrock — AI Engineer failed: model returned nothing
+scoring backlog: 7 pending, 5 need current source evidence; original posting dates retained (see scoring_backlog details)
+scoring pending: gravity9 — Forward Deployed AI Engineer: pending: current source observation needed; saved evidence is outdated; availability unknown (source absent, partial, disabled, or failed)
+scoring pending: Wheely — Data Scientist: pending: current source observation needed; saved evidence is outdated; availability unknown (source absent, partial, disabled, or failed)
+scoring pending: Monzo — Data Scientist, L30: pending: current source observation needed; saved evidence is outdated; availability unknown (source absent, partial, disabled, or failed)
+scoring pending: Predium — Associate Data Scientist (f/m/d): pending scoring retry after 2026-10-05T08:00:03.643383+00:00: model returned nothing
+scoring pending: F H Bertling — Machine Learning Engineer (m/f/x): pending: current source observation needed; saved evidence is outdated; availability unknown (source absent, partial, disabled, or failed)
+</pre>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>
+      Auto-apply:
+        <span class="mode-dry">dry run</span> — forms are filled and screenshotted, nothing is ever submitted.
+    </p>
+    <p>Tracker database: <code>/tmp/job-reliability-oct05/work/output/tracker.sqlite3</code> — it is the only record that you applied to anything. Back it up.</p>
+    <p>Artifacts: <code>/tmp/job-reliability-oct05/work/output</code> · this page overwrites itself on a re-run.</p>
+  </div>
+</footer>
+
+</body>
+</html>

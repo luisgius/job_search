@@ -322,8 +322,8 @@ def test_a_failed_score_still_reaches_the_digest(tmp_path):
     cfg = write_config(tmp_path)
     scored = score_jobs([make_job()], BASE_CV, cfg, client=llm_client(["nonsense"]))
     assert len(scored) == 1
-    assert scored[0].status is ApplyStatus.DIGEST
-    assert "scorer failed" in scored[0].status_detail
+    assert scored[0].status is ApplyStatus.SCORING_PENDING
+    assert "evaluation pending" in scored[0].status_detail
 
 
 def test_max_jobs_caps_spend_and_says_so(tmp_path, caplog):
@@ -349,7 +349,7 @@ def test_a_missing_api_key_costs_one_error_not_one_per_job(tmp_path):
     errors: list[str] = []
     scored = score_jobs(jobs, BASE_CV, cfg, client=None, errors=errors)
     assert len(scored) == 5
-    assert all(s.status is ApplyStatus.DIGEST for s in scored)
+    assert all(s.status is ApplyStatus.SCORING_PENDING for s in scored)
     assert len(errors) == 1
 
 

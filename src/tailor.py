@@ -878,7 +878,8 @@ def tailor_jobs(
 
     eligible = [
         item for item in items
-        if item.status is ApplyStatus.DIGEST and item.score_value >= threshold
+        if item.status is ApplyStatus.DIGEST and item.score and item.score.ok
+        and item.score_value >= threshold
     ]
     # 0 means zero, matching scoring.max_jobs and apply.max_per_run. Reading
     # it as "unlimited" uncapped the most expensive stage in the pipeline.

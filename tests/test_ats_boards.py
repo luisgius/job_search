@@ -247,12 +247,13 @@ def test_greenhouse_prefers_first_published_over_updated_at():
     assert stale.posted_at != datetime(2026, 8, 4, 12, 0, tzinfo=UTC)   # updated_at
 
 
-def test_greenhouse_falls_back_to_updated_at():
+def test_greenhouse_update_alone_does_not_establish_publication():
     payload = {"jobs": [{"id": 1, "title": "Engineer", "absolute_url": "https://x/1",
                          "updated_at": "2026-08-04T07:30:00-04:00",
                          "location": {"name": "Berlin"}, "content": ""}]}
     job = fetch_greenhouse("acme", session=gh_session(payload))[0]
-    assert job.posted_at == datetime(2026, 8, 4, 11, 30, tzinfo=UTC)
+    assert job.posted_at is None
+    assert job.raw["updated_at"] == "2026-08-04T07:30:00-04:00"
 
 
 def test_greenhouse_undated_posting_yields_none_not_a_guess():

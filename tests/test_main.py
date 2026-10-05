@@ -137,7 +137,8 @@ def test_a_full_run_produces_a_digest(tmp_path: Path, stub_sources, memory_track
 
     assert len(scored) == 2
     assert stats.fetched == 2
-    assert stats.matches == 2
+    assert stats.matches == 1
+    assert stats.scoring_pending == 1
     digest = Path(stats.digest_path)
     assert digest.exists()
     assert "Company0" in digest.read_text(encoding="utf-8")
@@ -182,8 +183,10 @@ def test_the_funnel_adds_up(tmp_path: Path, stub_sources, memory_tracker):
     assert stats.fetched == 4
     assert stats.after_dedupe == 4
     assert stats.after_filters == 2
-    assert stats.scored == 2
-    assert stats.matches == 2
+    assert stats.scoring_attempted == 2
+    assert stats.scored == stats.scoring_completed == 1
+    assert stats.matches == 1
+    assert stats.scoring_pending == 1
     assert stats.filter_counts == {"stale": 1, "location_outside_eu": 1}
     assert stats.to_dict()["filter_counts"] == stats.filter_counts
     assert stats.matches == stats.auto_applied + stats.dry_run + stats.digest_items
@@ -225,8 +228,9 @@ def test_a_relisted_job_is_flagged_on_the_page_and_not_dropped_from_it(
     # counted at step 6, the cards are built at step 11; dropping a flagged job
     # breaks the equality between them. Every job here is above the threshold,
     # so `matches` is the whole set and the count is unambiguous.
-    assert stats.matches == len(scored) == 2
-    assert html.count('<article class="card') == stats.matches
+    assert len(scored) == 2
+    assert stats.matches == 1 and stats.scoring_pending == 1
+    assert html.count('<article class="card') == stats.matches + stats.scoring_pending
     assert "Company0" in html and "Company1" in html
 
 
@@ -439,7 +443,7 @@ def test_a_scoring_outage_still_produces_a_digest(tmp_path: Path, stub_sources,
     scored, stats = run_pipeline(pipeline_config(tmp_path), tracker=memory_tracker,
                                  now=NOW, llm_client=llm_client(["not json at all"]))
     assert len(scored) == 2
-    assert all(s.status is ApplyStatus.DIGEST for s in scored)
+    assert all(s.status is ApplyStatus.SCORING_PENDING for s in scored)
     assert Path(stats.digest_path).exists()
 
 
@@ -496,7 +500,8 @@ def test_limit_caps_what_reaches_scoring(tmp_path: Path, stub_sources, memory_tr
     stub_sources.results["ats_boards"] = fresh_jobs(5)
     _, stats = run_pipeline(pipeline_config(tmp_path), tracker=memory_tracker,
                             now=NOW, limit=2, llm_client=llm_client(LLM_SCRIPT))
-    assert stats.scored == 2
+    assert stats.scoring_attempted == 2
+    assert stats.scored == stats.scoring_completed == 1
 
 
 def test_dedupe_collapses_the_same_role_seen_through_two_sources(
@@ -668,7 +673,7 @@ def test_format_summary_reads_like_the_documented_output(tmp_path: Path,
     _, stats = run_pipeline(pipeline_config(tmp_path), tracker=memory_tracker,
                             now=NOW, llm_client=llm_client(LLM_SCRIPT))
     summary = format_summary(stats)
-    for token in ("fetched", "deduped", "filtered", "scored", "matched",
+    for token in ("fetched", "deduped", "eligible / retries", "attempted", "completed", "failed", "pending", "matched",
                   "auto-applied", "dry-run", "needs your click", "digest:"):
         assert token in summary
 
@@ -928,7 +933,7 @@ def test_the_digest_shows_an_unscored_job_as_a_dash(tmp_path: Path, stub_sources
     cfg = no_llm_config(tmp_path)
     scored, stats = run_pipeline(cfg, tracker=memory_tracker, now=NOW, skip_llm=True)
 
-    item = build_context(scored, stats, cfg, now=NOW)["needs_click"][0]
+    item = build_context(scored, stats, cfg, now=NOW)["pending"][0]
     assert item["unscored"] is True
     assert item["score_label"] == "—"
     assert item["score_class"] == "score-unscored"
@@ -1018,3 +1023,21 @@ def test_without_no_llm_the_key_and_cv_are_still_required(tmp_path: Path, capsys
     err = capsys.readouterr().err
     assert "API key" in err
     assert "CV not found" in err
+
+
+def test_summary_separates_run_failures_from_backlog_totals():
+    from src.models import RunStats
+
+    summary = format_summary(RunStats(
+        fetched=5185, after_dedupe=4592, after_filters=3,
+        scoring_attempted=3, scoring_completed=1, scoring_failed=2,
+        scoring_pending=7, scoring_blocked=1, matches=0,
+    ))
+    lines = summary.splitlines()
+    run = next(line for line in lines if line.startswith("Evaluation outcomes this run:"))
+    backlog = next(line for line in lines if line.startswith("Backlog totals across runs:"))
+    for value in ("attempted 3", "completed 1", "failed 2", "matched 0"):
+        assert value in run
+    assert "pending" not in run and "paused" not in run
+    assert "pending 7" in backlog and "paused at retry/age limits 1" in backlog
+    assert "new 3" not in summary

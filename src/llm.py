@@ -309,8 +309,9 @@ def _openrouter_text(payload: Any) -> str:
             elif isinstance(part, str):
                 parts.append(part)
         return "".join(parts)
-    # Reasoning models sometimes answer with only `reasoning` populated.
-    return str(message.get("reasoning") or "")
+    # Internal reasoning is not a final answer, even if it happens to contain
+    # JSON. Never turn a reasoning-only completion into a candidate verdict.
+    return ""
 
 
 def _message_text(message: Any) -> str:
@@ -361,6 +362,8 @@ class LLMClient:
         headers: Mapping[str, str] | None = None,
         meter: UsageMeter | None = None,
         timeout: int | None = None,
+        reasoning_effort: str | None = None,
+        generation_max_tokens: int | None = None,
     ) -> None:
         # Each provider speaks through exactly one seam: `client=` is the
         # Anthropic SDK object, `session=` is the openrouter HTTP session.
@@ -408,6 +411,8 @@ class LLMClient:
         # and a timeout there reads as a transient failure that exhausts the
         # very entry that exists for when the network is gone.
         self.timeout = int(timeout) if timeout else None
+        self.reasoning_effort = reasoning_effort
+        self.generation_max_tokens = generation_max_tokens
         self.base_url = str(
             base_url or (OPENROUTER_BASE_URL if self.provider == "openrouter" else "")
         ).rstrip("/")
@@ -527,6 +532,8 @@ class LLMClient:
                 + [{"role": "user", "content": prompt}]
             ),
         }
+        if self.reasoning_effort is not None:
+            payload["reasoning_effort"] = self.reasoning_effort
         if schema_native:
             # The OpenAI dialect's grammar constraint. Only sent when the
             # capability decision (`_native_schema_wanted`) said this
@@ -560,9 +567,24 @@ class LLMClient:
                 raise LLMError(f"openrouter request failed: {exc}",
                                transient=True) from exc
             raise LLMError(str(exc), status_code=status) from exc
-        text = _openrouter_text(data)
         self._record_usage(model, data.get("usage")
                            if isinstance(data, Mapping) else None)
+        text = _openrouter_text(data)
+        choice = data["choices"][0]
+        message = choice.get("message") or {}
+        finish = choice.get("finish_reason")
+        if finish == "length" or not text.strip():
+            reasoning = message.get("reasoning") or message.get("reasoning_content") or ""
+            usage = data.get("usage") or {}
+            # Metadata only: no CV, prompt, or private reasoning in logs.
+            raise LLMError(
+                f"{model}: {'generation limit reached' if finish == 'length' else 'empty final response'}; "
+                f"finish_reason={finish}; content_chars={len(text)}; "
+                f"reasoning_chars={len(str(reasoning))}; "
+                f"completion_tokens={usage.get('completion_tokens', 'unknown')}; "
+                f"max_tokens={max_tokens}",
+                transient=False if finish == "length" else True,
+            )
         return text
 
     # -- calls ------------------------------------------------------------
@@ -588,6 +610,8 @@ class LLMClient:
         (`complete_json` decides when — callers wanting text never set it).
         """
         sleeper = sleep or self._sleep
+        if self.generation_max_tokens is not None:
+            max_tokens = self.generation_max_tokens
         attempts = self.max_retries + 1
         last: BaseException | None = None
 
@@ -627,7 +651,7 @@ class LLMClient:
                 continue
 
             if not text.strip():
-                logger.warning("%s returned no text content", model)
+                raise LLMError(f"{model}: empty final response")
             return text
 
         raise LLMError(f"{model} call failed after {attempts} attempts: {last}")
@@ -683,15 +707,15 @@ class LLMClient:
                     # A "constrained" reply that is not JSON is a gateway
                     # that ignored the parameter; the recovery scan still
                     # applies and costs no extra call.
-                    return extract_json(reply, require_keys=require_keys,
-                                        forbid_verbatim=forbid_verbatim)
+                    candidate = extract_json(reply, require_keys=require_keys,
+                                             forbid_verbatim=forbid_verbatim)
                 untrusted = str(forbid_verbatim or "")
                 if untrusted and _looks_lifted_from(candidate, untrusted):
                     raise LLMError(
                         "the structured reply reproduces the job posting "
                         "verbatim — refusing planted text as an answer"
                     )
-                return candidate
+                return validate_json_result(candidate, require_keys=require_keys, schema=schema)
 
         text = prompt
         if schema_hint:
@@ -699,7 +723,7 @@ class LLMClient:
                 f"{prompt}\n\nRespond with a single JSON object and nothing "
                 f"else — no prose, no code fences. Expected shape:\n{schema_hint}"
             )
-        return extract_json(
+        return validate_json_result(extract_json(
             self.complete(
                 model=model,
                 system=system,
@@ -710,7 +734,52 @@ class LLMClient:
             ),
             require_keys=require_keys,
             forbid_verbatim=forbid_verbatim,
-        )
+        ), require_keys=require_keys, schema=schema)
+
+
+def validate_json_result(value: Any, *, require_keys=None, schema=None) -> dict[str, Any]:
+    """Validate the consumed schema subset even when a gateway ignores it.
+
+    This is deliberately independent of native-format support. Invalid objects
+    must fail inside the chain, so another model can still answer.
+    """
+    if not isinstance(value, Mapping):
+        raise LLMError("invalid JSON result: expected an object")
+    if not set(require_keys or ()).issubset(value):
+        raise LLMError("invalid JSON result: missing required fields")
+
+    def check(node, spec, path):
+        kind = spec.get("type")
+        valid = {"object": isinstance(node, Mapping), "array": isinstance(node, list),
+                 "string": isinstance(node, str), "boolean": isinstance(node, bool),
+                 "integer": type(node) is int,
+                 "number": type(node) in (int, float), "null": node is None}
+        if kind and not any(valid.get(t, False) for t in (kind if isinstance(kind, list) else [kind])):
+            raise LLMError(f"invalid JSON result: {path} has wrong type")
+        if "enum" in spec and node not in spec["enum"]:
+            raise LLMError(f"invalid JSON result: {path} is not an allowed value")
+        if isinstance(node, Mapping):
+            if spec.get("additionalProperties") is False and set(node) - set(spec.get("properties", {})):
+                raise LLMError(f"invalid JSON result: {path} has unexpected fields")
+            if not set(spec.get("required", ())).issubset(node):
+                raise LLMError(f"invalid JSON result: {path} missing required fields")
+            for key, child in spec.get("properties", {}).items():
+                if key in node:
+                    check(node[key], child, f"{path}.{key}")
+        elif isinstance(node, list):
+            for item in node:
+                check(item, spec.get("items", {}), path + "[]")
+        elif type(node) in (int, float):
+            import math
+            if not math.isfinite(node):
+                raise LLMError(f"invalid JSON result: {path} must be finite")
+            if "minimum" in spec and node < spec["minimum"]:
+                raise LLMError(f"invalid JSON result: {path} is below minimum")
+            if "maximum" in spec and node > spec["maximum"]:
+                raise LLMError(f"invalid JSON result: {path} exceeds maximum")
+    if schema:
+        check(value, schema, "response")
+    return dict(value)
 
 
 # --------------------------------------------------------------------------
@@ -1065,6 +1134,10 @@ def model_entries(config: Any, role: str) -> list[dict[str, Any]]:
             provider = base_url = None
         entry = {"model": model, "provider": provider, "base_url": base_url,
                  "timeout": timeout, "max_retries": max_retries}
+        if isinstance(item, Mapping):
+            for key in ("reasoning_effort", "max_tokens"):
+                if key in item:
+                    entry[key] = item[key]
         # A duplicate buys a second identical failure, nothing else.
         if model and entry not in entries:
             entries.append(entry)
@@ -1086,10 +1159,20 @@ class ModelChain:
 
     def __init__(self, entries: list[tuple[Callable[[], Any], str]]) -> None:
         self._entries = list(entries)
-        self.last_model: str | None = None
+        self._receipt = threading.local()
+
+    @property
+    def last_model(self) -> str | None:
+        return getattr(self._receipt, "model", None)
+
+    @last_model.setter
+    def last_model(self, value: str | None) -> None:
+        self._receipt.model = value
 
     def _walk(self, method: str, kwargs: dict[str, Any]) -> Any:
         last: BaseException | None = None
+        failures = []
+        self.last_model = None
         for build, model in self._entries:
             try:
                 target = getattr(build(), method)
@@ -1097,17 +1180,22 @@ class ModelChain:
                 logger.warning("model chain: %s is unusable (%s) — trying the "
                                "next entry", model, exc)
                 last = exc
+                failures.append(f"{model}: {exc}")
                 continue
             try:
                 result = target(**{**kwargs, "model": model})
+                if method == "complete_json":
+                    result = validate_json_result(result, require_keys=kwargs.get("require_keys"),
+                                                  schema=kwargs.get("schema"))
             except LLMError as exc:
                 logger.warning("model chain: %s failed (%s) — trying the next "
                                "entry", model, exc)
                 last = exc
+                failures.append(f"{model}: {exc}")
                 continue
             self.last_model = model
             return result
-        raise last if last is not None else LLMError("the model chain is empty")
+        raise LLMError("all models failed: " + " | ".join(failures)) if last is not None else LLMError("the model chain is empty")
 
     def complete(self, **kwargs: Any) -> str:
         return self._walk("complete", kwargs)
@@ -1145,6 +1233,10 @@ def _client_factory(
             for key in ("timeout", "max_retries"):
                 if entry.get(key) is not None:
                     options[key] = entry[key]
+            if entry.get("reasoning_effort") is not None:
+                options["reasoning_effort"] = entry["reasoning_effort"]
+            if entry.get("max_tokens") is not None:
+                options["generation_max_tokens"] = entry["max_tokens"]
             client = LLMClient(
                 api_key_for(config, provider) if provider in PROVIDER_KEYS
                 else "",

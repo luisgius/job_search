@@ -610,13 +610,13 @@ GERMAN_AD = (
 )
 
 
-def test_a_non_english_description_is_dropped_and_says_which_language():
-    cfg = {"filters": {"languages": ["en"]}}
+def test_explicit_german_requirement_conflicts_with_known_a2():
+    cfg = {"filters": {"language_levels": {"de": "A2"}}}
     job = make_job(title="Data Scientist", description=GERMAN_AD)
     result = apply_filters([job], cfg, now=NOW)
     assert result.kept == []
-    assert result.counts.get("language") == 1
-    assert "German" in result.rejected[0][1]
+    assert result.counts.get("language_requirement") == 1
+    assert "Deutschkenntnisse" in result.rejected[0][1]
 
 
 def test_an_english_description_passes_the_language_gate():

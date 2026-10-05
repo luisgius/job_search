@@ -1316,6 +1316,8 @@ def apply_one(
 
 #: Statuses an earlier stage already settled — auto-apply leaves them alone.
 _SKIP_STATUSES: frozenset[ApplyStatus] = frozenset({
+    ApplyStatus.SCORING_PENDING,
+    ApplyStatus.SUBMITTED_UNCONFIRMED,
     ApplyStatus.FILTERED,
     ApplyStatus.SCORED_BELOW,
     ApplyStatus.SKIPPED_DUPLICATE,

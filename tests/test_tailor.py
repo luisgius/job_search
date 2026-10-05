@@ -369,8 +369,9 @@ def test_an_empty_cover_letter_is_reported_not_written_as_garbage(tmp_path: Path
     cfg = tailor_config(tmp_path)
     scored = make_scored()
     tailor_job(scored, BASE_CV, cfg, client=llm_client([TAILORED_CV, "   "]))
-    assert scored.cover_letter_md == ""
-    assert "cover letter" in scored.status_detail
+    assert scored.cover_letter_md is None
+    assert "empty final response" in scored.status_detail
+    assert not list(tmp_path.rglob("*cover*.md"))
 
 
 def test_tailor_job_reports_an_unwritable_output_directory(tmp_path: Path):

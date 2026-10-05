@@ -83,7 +83,7 @@ DS_RE = re.compile(
     r"data scien(?:ce|tist)s?|machine[- ]learning|deep learning|"
     r"ml|ai|nlp|llm|computer vision|mlops|"
     r"applied scien(?:ce|tist)s?|decision scien(?:ce|tist)s?|"
-    r"analytics|data analyst|data engineer"
+    r"product analyst|experimentation|causal inference|analytics|data analyst|data engineer"
     r")\b",
     re.IGNORECASE,
 )

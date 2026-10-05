@@ -246,7 +246,9 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         "filters.countries": "Phase 4 search shape (see comment above)",
         "filters.title_include": "Phase 4 search shape (see comment above)",
         "filters.title_exclude": "Phase 4 search shape (see comment above)",
-        "filters.languages": "Phase 4 search shape (see comment above)",
+        "filters.languages": "legacy setting; ad language no longer gates eligibility",
+        "filters.title_adjacent": "CV-backed product/experimentation functions required",
+        **{f"filters.language_levels.{code}": _APPLICANT for code in ("en", "es", "de", "pl")},
         "filters.countries_if_sponsorship": "Phase 4 search shape (see comment above)",
         # Phase 5: prompt-only positioning for this candidate; DEFAULTS ship
         # empty because there is no generic candidate.

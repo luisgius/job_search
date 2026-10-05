@@ -164,12 +164,13 @@ def test_content_returned_as_a_list_of_parts_is_joined():
                         max_tokens=10) == "part one part two"
 
 
-def test_a_reasoning_only_answer_is_not_lost():
+def test_reasoning_only_output_is_not_a_final_answer():
     payload = completion()
     payload["choices"][0]["message"] = {"role": "assistant", "content": None,
                                         "reasoning": "the answer is 88"}
     llm, _ = client([FakeResponse(_json=payload)])
-    assert "88" in llm.complete(model="m", system="s", prompt="p", max_tokens=10)
+    with pytest.raises(LLMError, match="empty final response"):
+        llm.complete(model="m", system="s", prompt="p", max_tokens=10)
 
 
 def test_an_error_object_returned_with_http_200_is_not_read_as_an_empty_answer():

@@ -37,9 +37,9 @@ sources can actually guarantee.
 
 - **Greenhouse** exposes `updated_at` on every job and `first_published` on
   most. `updated_at` moves when *anything* changes — a typo fix on a
-  three-month-old req makes it look brand new. The implementation prefers
-  `first_published` and falls back to `updated_at`, which is the right call,
-  but the fallback is a known source of false freshness.
+  three-month-old req can look brand new. The implementation now uses only
+  `first_published` for publication age. Missing publication stays unknown;
+  `updated_at` remains source metadata, never a freshness substitute.
 - **Lever** gives `createdAt`, which is trustworthy.
 - **Adzuna** gives `created`, which is the aggregator's ingest time, not the
   employer's publish time. It lags, and it re-lists.

@@ -258,7 +258,14 @@ def _check_title(job: Job, config: Any) -> _Check:
     hit = _first_match(tokens, exclude)
     if hit:
         return _Check(False, f"title contains excluded term {hit!r}", "title_excluded")
-    if include and not _first_match(tokens, include):
+    adjacent = _terms(_cfg(config, "filters.title_adjacent", []))
+    supported_adjacent = False
+    if _first_match(tokens, adjacent):
+        from .requirements import adjacent_role_evidence
+        evidence = adjacent_role_evidence(job.description)
+        job.raw["adjacent_role_evidence"] = evidence
+        supported_adjacent = evidence["compatible_functions"] and not evidence["high_experience_minimum"]
+    if include and not _first_match(tokens, include) and not supported_adjacent:
         wanted = ", ".join(sorted(include)[:6])
         return _Check(
             False,
@@ -515,48 +522,22 @@ def _language_detector(allowed: frozenset[str]) -> Any | None:
 
 
 def _check_language(job: Job, config: Any) -> _Check:
-    """Drop postings not written in a language the user reads.
+    """Gate only explicit work-language requirements against known proficiency.
 
-    Runs on the description only: EU ads routinely pair a German title with an
-    English body (that is an English ad), and titles are too short to judge.
-    An empty `filters.languages` disables the gate entirely.
+    Advertisement language is recorded separately and never proves a mandatory
+    spoken language. A requirement or candidate level not stated stays unknown.
     """
-    allowed = {
-        str(code).strip().lower()
-        for code in (_cfg(config, "filters.languages", []) or [])
-        if str(code).strip()
-    }
-    if not allowed:
-        return _Check(True, "")
-
-    text = str(job.description or "").strip()
-    try:
-        min_chars = int(_cfg(config, "filters.language_min_chars",
-                             DEFAULT_LANGUAGE_MIN_CHARS))
-    except (TypeError, ValueError):
-        min_chars = DEFAULT_LANGUAGE_MIN_CHARS
-    if len(text) < max(0, min_chars):
-        return _Check(True, "")
-
-    detector = _language_detector(frozenset(allowed))
-    if detector is None:
-        return _Check(True, "")
-
-    # 2000 chars decide as well as 20000 and cost a tenth of the time.
-    values = detector.compute_language_confidence_values(text[:2000])
-    if not values:
-        return _Check(True, "")
-    top = values[0]
-    code = top.language.iso_code_639_1.name.lower()
-    if code in allowed or top.value < LANGUAGE_MIN_CONFIDENCE:
-        return _Check(True, "")
-    return _Check(
-        False,
-        f"description reads as {top.language.name.title()} "
-        f"(confidence {top.value:.2f}), not one of filters.languages "
-        f"({', '.join(sorted(allowed))})",
-        "language",
-    )
+    from .requirements import language_requirements
+    levels = _cfg(config, "filters.language_levels", {}) or {}
+    required = language_requirements(job.description)
+    job.raw["language_requirements"] = required
+    job.raw["work_language_status"] = "explicit" if required else "unknown"
+    for requirement in required:
+        level = str(levels.get(requirement["language"], "unknown")).lower()
+        if requirement["requirement"] == "professional" and level in {"a1", "a2", "b1", "beginner", "none"}:
+            return _Check(False, "explicit work-language requirement incompatible with known "
+                          f"{requirement['language']} level {level}: {requirement['evidence']}", "language_requirement")
+    return _Check(True, "")
 
 
 def is_fresh(
@@ -712,7 +693,7 @@ def apply_filters(
         result.rejected.append((job, failure.reason))
         category = failure.category or "filter_error"
         result.counts[category] = result.counts.get(category, 0) + 1
-        if category == "language":
+        if category == "language_requirement":
             source = (job.source or "unknown").lower()
             language_drops[source] = language_drops.get(source, 0) + 1
 

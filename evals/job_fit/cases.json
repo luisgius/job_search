@@ -170,7 +170,7 @@
         "expected": {
           "value": 0,
           "error": true,
-          "error_contains": "no numeric"
+          "error_contains": "response.score has wrong type"
         }
       }
     },

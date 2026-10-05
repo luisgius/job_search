@@ -541,13 +541,14 @@ def test_a_zero_epoch_dates_a_posting_to_1970_instead_of_leaving_it_undated():
     assert ok is False
 
 
-def test_a_corrupt_first_published_falls_back_to_updated_at():
+def test_a_corrupt_publication_date_stays_unknown_despite_update():
     """A date the parser cannot read must not poison the posting: Greenhouse's
     `first_published` is preferred, but when it is junk the job has to fall
     back to `updated_at` rather than becoming undated and being dropped."""
     job = fetch_greenhouse("acme", session=gh_session({"jobs": [gh_posting(
         first_published="0000-00-00", updated_at="2026-08-04T07:00:00Z")]}))[0]
-    assert job.posted_at == datetime(2026, 8, 4, 7, 0, tzinfo=UTC)
+    assert job.posted_at is None
+    assert job.raw["updated_at"] == "2026-08-04T07:00:00Z"
 
 
 def test_a_summer_offset_is_converted_rather_than_read_as_utc():

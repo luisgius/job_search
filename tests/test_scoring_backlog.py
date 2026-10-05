@@ -171,7 +171,7 @@ def test_exhaustion_is_durable_and_does_not_reset_on_observation(scenario, tmp_p
             assert row["expires_at"] == (NOW + timedelta(days=7)).isoformat()
     with Tracker(path) as tracker:
         row = tracker.get_scoring(job.key)
-        assert row["state"] == "exhausted" and row["job_json"] is None
+        assert row["state"] == "exhausted" and row["job_json"] is not None
         assert "retry limit" in row["detail"]
         client = Scorer()
         run(cfg, tracker, client, hours=8)
@@ -188,7 +188,7 @@ def test_queue_expiry_is_distinct_from_closure_and_visible(scenario):
         client = Scorer()
         _, stats = run(cfg, tracker, client, hours=7 * 24)
         row = tracker.get_scoring(job.key)
-        assert row["state"] == "expired" and row["job_json"] is None
+        assert row["state"] == "expired" and row["job_json"] is not None
         assert "not confirmed closed" in row["detail"]
         assert any("queue lifetime expired" in error for error in stats.errors)
         assert client.calls == [] and tracker.get_status(job.key) is None
@@ -622,7 +622,7 @@ def test_transient_language_detector_failure_retains_evidence_and_recovers_after
     job = posting(1)
     source["jobs"] = [job]
     path = tmp_path / "revalidate.sqlite3"
-    original_detector = main.filters._language_detector
+    original_detector = main.filters._check_language
 
     class BrokenDetector:
         def compute_language_confidence_values(self, text):
@@ -631,7 +631,7 @@ def test_transient_language_detector_failure_retains_evidence_and_recovers_after
     with Tracker(path) as tracker:
         run(cfg, tracker, skip_llm=True)
         admitted = tracker.get_scoring(job.key)
-        monkeypatch.setattr(main.filters, "_language_detector", lambda allowed: BrokenDetector())
+        monkeypatch.setattr(main.filters, "_check_language", lambda job, config: BrokenDetector().compute_language_confidence_values(job.description))
         client = Scorer()
         scored, stats = run(cfg, tracker, client, hours=26)
         assert scored == [] and client.calls == []
@@ -644,7 +644,7 @@ def test_transient_language_detector_failure_retains_evidence_and_recovers_after
         assert any("language detector unavailable" in error for error in stats.errors)
         assert "language detector unavailable" in Path(stats.digest_path).read_text()
         assert tracker.get_application(job.key) is None
-    monkeypatch.setattr(main.filters, "_language_detector", original_detector)
+    monkeypatch.setattr(main.filters, "_check_language", original_detector)
     with Tracker(path) as tracker:
         client = Scorer()
         recovered, _ = run(cfg, tracker, client, hours=27)

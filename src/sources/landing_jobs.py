@@ -67,7 +67,7 @@ DS_TITLE_RE = re.compile(
     r"data scien(?:ce|tist)s?|machine[- ]learning|deep learning|"
     r"ml|ai|nlp|llm|computer vision|mlops|"
     r"applied scien(?:ce|tist)s?|decision scien(?:ce|tist)s?|"
-    r"analytics|data analyst"
+    r"product analyst|experimentation|causal inference|analytics|data analyst"
     r")\b",
     re.IGNORECASE,
 )

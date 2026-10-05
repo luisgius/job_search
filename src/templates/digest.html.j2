@@ -645,9 +645,11 @@ footer code {
 {% endmacro %}
 
 {% macro judgment(item) %}
+<p class="note">Source update: {{ item.source_updated_at }} · First detected: {{ item.first_seen_at }} · Work-language requirement: {{ item.work_language_status }}</p>
+{% if item.language_requirements %}<ul class="note">{% for requirement in item.language_requirements %}<li>{{ requirement.language }} ({{ requirement.requirement }}): {{ requirement.evidence }}</li>{% endfor %}</ul>{% endif %}
 {% if item.verdict %}<p class="verdict">{{ item.verdict }}</p>{% endif %}
 {% if item.score_error %}
-<p class="alert">Scorer failed: {{ item.score_error }} — this one is unscored, judge it yourself.</p>
+<p class="alert">Scorer failed: {{ item.score_error }} — evaluation pending; this is not a validated match.</p>
 {% endif %}
 {% if item.reasons or item.strengths or item.gaps %}
 <div class="cols">
@@ -692,10 +694,11 @@ footer code {
   <div class="wrap">
     <div class="brand">
       <h1>Job Hunter{% if applicant.name %} — {{ applicant.name }}{% endif %}</h1>
-      <div class="sub">{{ weekday }} {{ date_str }} · generated {{ generated_at_str }}</div>
+      <div class="sub">{{ weekday }} {{ date_str }} · {{ timestamp_label }} {{ generated_at_str }}</div>
     </div>
     <div class="counts">
       <a class="pill hot" href="#needs-click"><b>{{ totals.needs_click }}</b> need your click</a>
+      <a class="pill" href="#pending"><b>{{ totals.pending }}</b> pending evaluation</a>
       <a class="pill" href="#auto-applied"><b>{{ totals.auto_applied }}</b> applied</a>
       <a class="pill" href="#dry-run"><b>{{ totals.dry_run }}</b> dry run</a>
       <a class="pill" href="#failed"><b>{{ totals.failed }}</b> skipped</a>
@@ -706,7 +709,10 @@ footer code {
 
 <main class="wrap">
 
-{% if totals.all == 0 %}
+{% if evaluation_failed %}
+<div class="banner"><h2>Evaluation failed — no opportunities could be selected</h2>
+<p>Every attempted evaluation failed. Pending postings are unassessed, not validated matches.</p></div>
+{% elif totals.all == 0 %}
 <div class="banner">
   <h2>Nothing new today</h2>
   <p>No posting made it through to a decision. Check the funnel at the bottom before assuming
@@ -752,6 +758,15 @@ footer code {
 </section>
 {% endif %}
 
+<section id="pending">
+  <div class="sec-head"><h2>Pending evaluation — not validated matches</h2><span class="n">{{ totals.pending }}</span></div>
+  <p class="note">These {{ totals.pending }} cards are pending evaluations from this run. A failed evaluation does not authorize an application; availability remains unknown. See the separate backlog totals below.</p>
+  {% for item in pending %}
+  <article class="card">{{ card_head(item) }}{{ judgment(item) }}{{ links(item, 'Review source posting →') }}
+  {% if item.status_detail %}<p class="note">{{ item.status_detail }}</p>{% endif %}</article>
+  {% endfor %}
+</section>
+
 {# ---------------- 1. needs your click ---------------- #}
 <section id="needs-click">
   <div class="sec-head">
@@ -770,7 +785,11 @@ footer code {
     </article>
     {% endfor %}
   {% else %}
-    <p class="empty">Nothing above the threshold today.</p>
+    {% if stats.matches | default(0) %}
+    <p class="empty">No validated matches awaiting your click; check the other outcome sections.</p>
+    {% else %}
+    <p class="empty">No validated matches in this run. Pending or failed evaluations cannot establish whether those postings meet the threshold.</p>
+    {% endif %}
   {% endif %}
 </section>
 
@@ -901,7 +920,10 @@ footer code {
               {% endif %}
             </td>
             <td>{{ item.location or '—' }}</td>
-            <td>{{ item.verdict or item.status_detail or '—' }}</td>
+            <td>{{ item.verdict or item.status_detail or '—' }}
+              {% if item.reasons %}<details><summary>Saved evaluation reasons</summary>
+              <ul>{% for reason in item.reasons %}<li>{{ reason }}</li>{% endfor %}</ul></details>{% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -909,7 +931,7 @@ footer code {
     </div>
   </details>
   {% else %}
-    <p class="empty">Nothing scored below the threshold.</p>
+    <p class="empty">No below-threshold evaluations are included in this digest.</p>
   {% endif %}
 </section>
 
@@ -956,7 +978,7 @@ footer code {
   </div>
 
   <div class="funnel">
-    {% for step in funnel %}
+    {% for step in funnel[:3] %}
     <div class="step">
       <div class="v">{{ step.value }}</div>
       <div class="k">{{ step.label }}</div>
@@ -964,6 +986,21 @@ footer code {
     {% if not loop.last %}<div class="arrow">→</div>{% endif %}
     {% endfor %}
   </div>
+
+  <h3>Evaluation outcomes this run</h3>
+  <div class="funnel">
+    {% for step in funnel[3:] %}
+    <div class="step"><div class="v">{{ step.value }}</div><div class="k">{{ step.label }}</div></div>
+    {% endfor %}
+  </div>
+
+  <section id="backlog">
+    <h3>Backlog totals — across runs</h3>
+    <p>{{ backlog.pending }} pending in the queue; {{ backlog.paused }} paused at retry or age limits.</p>
+    {% if backlog.current_evidence_needed is defined %}<p>{{ backlog.current_evidence_needed }} pending entries need current source evidence.</p>{% endif %}
+    <p class="note">Use saved posting evidence where available for retry or review. Older paused entries may lack saved posting data; availability remains unknown.</p>
+    {% if backlog.missing_paused_evidence is defined %}<p>{{ backlog.missing_paused_evidence }} historical paused entry has no retained posting data.</p>{% endif %}
+  </section>
 
   <div class="grid2">
     <div>
@@ -984,7 +1021,8 @@ footer code {
     </div>
 
     <div>
-      <h3>Filter rejections</h3>
+      <h3>First filter rejection</h3>
+      <p class="note">One first failing reason per posting; these counts do not measure every possible rejection.</p>
       <div class="scroll">
         <table>
           <tbody>

@@ -73,6 +73,7 @@ RELATIVE_DAYS_LIMIT = 60
 SECTIONS: tuple[tuple[str, ApplyStatus], ...] = (
     ("unconfirmed", ApplyStatus.SUBMITTED_UNCONFIRMED),
     ("needs_click", ApplyStatus.DIGEST),
+    ("pending", ApplyStatus.SCORING_PENDING),
     ("auto_applied", ApplyStatus.APPLIED),
     ("dry_run", ApplyStatus.DRY_RUN),
     ("failed", ApplyStatus.APPLY_FAILED),
@@ -436,7 +437,7 @@ def _item(
     # status_detail quotes that same error, and printing it twice makes a
     # one-line problem look like two.
     if failed and score.error and score.error in detail:
-        detail = ""
+        detail = detail.replace(score.error, "see evaluation error")
 
     artifacts = scored.artifacts
     cv_md = _artifact_href(getattr(artifacts, "cv_md", None), digest_dir)
@@ -482,6 +483,12 @@ def _item(
     else:
         posted_label = f"posted {relative}"
 
+    first_seen = None
+    try:
+        if tracker is not None and hasattr(tracker, "first_seen"):
+            first_seen = tracker.first_seen(job.key)
+    except Exception:
+        pass  # Missing history is unknown; it must not hide the posting.
     safe_url, url_host = _safe_url(job.url)
     return {
         "key": job.key,
@@ -499,6 +506,10 @@ def _item(
         "posted_at_iso": job.posted_at.isoformat() if job.posted_at else "",
         "posted_relative": relative,
         "posted_label": posted_label,
+        "source_updated_at": str(job.raw.get("updated_at") or job.raw.get("updatedAt") or "unknown"),
+        "first_seen_at": _format_datetime(first_seen) if first_seen else "unknown",
+        "work_language_status": job.raw.get("work_language_status", "unknown"),
+        "language_requirements": job.raw.get("language_requirements", []),
         # None, not 0: an undated posting has no age, and an unknown age is
         # not evidence of an old posting. The card says "no posting date".
         "posted_age_days": age_label,
@@ -793,7 +804,12 @@ def build_context(
         # "new today" never exceeds what the page shows.
         source_name = (item.get("source") or "unknown").lower()
         new_by_source[source_name] = new_by_source.get(source_name, 0) + 1
-        buckets[by_status.get(item["status"], "other")].append(item)
+        bucket = by_status.get(item["status"], "other")
+        # Also classify historical DIGEST+error records truthfully, without
+        # moving protected submission outcomes or rewriting their history.
+        if item["status"] in {ApplyStatus.DIGEST.value, ApplyStatus.SCORING_PENDING.value} and (item["unscored"] or item["score_error"]):
+            bucket = "pending"
+        buckets[bucket].append(item)
 
     for name in _SCORE_SORTED:
         # Stable: equal scores keep the order scoring produced, so two runs over
@@ -824,10 +840,17 @@ def build_context(
         "funnel": [
             {"label": "fetched", "value": _int(stats_data.get("fetched"), 0)},
             {"label": "deduped", "value": _int(stats_data.get("after_dedupe"), 0)},
-            {"label": "filtered", "value": _int(stats_data.get("after_filters"), 0)},
-            {"label": "scored", "value": _int(stats_data.get("scored"), 0)},
+            {"label": "eligible / retries", "value": _int(stats_data.get("after_filters"), 0)},
+            {"label": "attempted", "value": _int(stats_data.get("scoring_attempted", stats_data.get("scored")), 0)},
+            {"label": "completed", "value": _int(stats_data.get("scoring_completed"), 0)},
+            {"label": "failed", "value": _int(stats_data.get("scoring_failed"), 0)},
             {"label": "matched", "value": _int(stats_data.get("matches"), 0)},
         ],
+        "backlog": {
+            "pending": _int(stats_data.get("scoring_pending"), totals["pending"]),
+            "paused": _int(stats_data.get("scoring_blocked"), 0),
+        },
+        "evaluation_failed": bool(stats_data.get("scoring_attempted") and not stats_data.get("scoring_completed")),
         "source_counts": source_counts,
         "source_health": _source_health(
             stats, stats_data, errors, new_by_source, tracker, moment
@@ -894,6 +917,8 @@ def _skeleton() -> dict[str, Any]:
         "config_summary": _config_summary(None),
         "stats": {},
         "funnel": [],
+        "backlog": {"pending": 0, "paused": 0},
+        "timestamp_label": "generated",
         "source_counts": {},
         "source_health": [],
         "llm_usage": None,
@@ -929,7 +954,7 @@ def _fallback_html(context: Mapping[str, Any], error: Exception) -> str:
         esc(str(error)),
         ". Below is the raw list so nothing from this run is lost.</p>",
     ]
-    for section in ("needs_click", "auto_applied", "dry_run", "failed", "below", "other"):
+    for section in ("unconfirmed", "needs_click", "pending", "auto_applied", "dry_run", "failed", "below", "other"):
         items = context.get(section) or []
         parts.append(f"<h2>{esc(section)} ({len(items)})</h2><ul>")
         for item in items:
@@ -938,7 +963,7 @@ def _fallback_html(context: Mapping[str, Any], error: Exception) -> str:
             parts.append(
                 "<li>{score} — <a href=\"{url}\" target=\"_blank\" rel=\"noopener\">"
                 "{company} — {title}</a> ({location})</li>".format(
-                    score=esc(str(item.get("score", ""))),
+                    score=esc(str(item.get("score_label", ""))),
                     url=esc(str(item.get("url", ""))),
                     company=esc(str(item.get("company", ""))),
                     title=esc(str(item.get("title", ""))),

@@ -249,8 +249,9 @@ class Tracker:
         if state not in {"expired", "exhausted", "ineligible", "protected"}:
             raise ValueError(f"invalid scoring stop state: {state}")
         self.conn.execute(
-            "UPDATE scoring_backlog SET state = ?, detail = ?, job_json = NULL "
-            "WHERE key = ?", (state, detail[:2000], key),
+            "UPDATE scoring_backlog SET state = ?, detail = ?, "
+            "job_json = CASE WHEN ? IN ('expired', 'exhausted') THEN job_json ELSE NULL END "
+            "WHERE key = ?", (state, detail[:2000], state, key),
         )
         self.conn.commit()
 

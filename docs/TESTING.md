@@ -291,8 +291,8 @@ to the real internet. It asserts the specific things the parsers bet on:
 - the fields each parser reads are still present, for all eight boards;
 - Greenhouse `content` is still *double* entity-escaped (we unescape exactly
   once — if they stop, that unescape starts corrupting real text);
-- `first_published` still exists, so freshness does not silently fall back to
-  the inflated `updated_at`;
+- `first_published` still exists; if it disappears publication age is unknown,
+  rather than silently using the inflated `updated_at`;
 - Lever `createdAt` is still a **millisecond** epoch (seconds would date every
   posting to 1970 and drop them all as stale, silently);
 - Lever still splits requirements into `lists`;

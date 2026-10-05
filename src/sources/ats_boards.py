@@ -487,9 +487,7 @@ def _parse_greenhouse_posting(
 
     # `updated_at` moves every time anyone touches the posting, so it overstates
     # freshness badly; `first_published` is the real publication date.
-    posted_at = parse_datetime(posting.get("first_published")) or parse_datetime(
-        posting.get("updated_at")
-    )
+    posted_at = parse_datetime(posting.get("first_published"))
 
     location = _greenhouse_location(posting)
     departments = [

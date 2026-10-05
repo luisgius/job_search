@@ -618,7 +618,7 @@ def test_handled_statuses_cover_every_non_new_outcome():
     # re-showing jobs forever. This test is the tripwire.
     unclassified = {
         s.value for s in ApplyStatus
-        if s not in (ApplyStatus.NEW, ApplyStatus.SKIPPED_DUPLICATE)
+        if s not in (ApplyStatus.NEW, ApplyStatus.SKIPPED_DUPLICATE, ApplyStatus.SCORING_PENDING)
     } - set(HANDLED_STATUSES)
     assert unclassified == set(), f"unclassified statuses: {unclassified}"
 

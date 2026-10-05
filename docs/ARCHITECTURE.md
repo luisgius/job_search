@@ -206,10 +206,12 @@ states as structured data (Lever `categories.commitment`, Adzuna
 `filters.countries_if_sponsorship`: those countries pass only when the posting
 itself offers visa sponsorship (offer-shaped phrasings; "must have a valid
 work visa" is the opposite sentence). The language stage
-(`filters.languages`, ISO-639-1; empty = off) judges the *description only*
-with lingua, keeps anything under `language_min_chars` or under 0.70
-confidence, logs its drops per source, and degrades to keep-everything when
-lingua is not installed.
+uses explicit work-language requirements against `filters.language_levels`.
+The ad language never rejects a job. Ambiguous, optional or missing requirements
+remain unknown; recognized incompatible professional requirements retain their
+quoted evidence. `filters.languages` and `language_min_chars` are legacy settings.
+Adjacent product/experimentation titles use `filters.title_adjacent` and require
+compatible quantitative duties; broad analyst titles are not implicitly allowed.
 
 ### `src/sources/ats_boards.py`
 ```python
@@ -272,7 +274,8 @@ slug so one dead board costs that company and nothing else, and never raises.
 `util.http_get_json`.
 
 - **Greenhouse**: `?content=true`, description in `content` (HTML-escaped),
-  date in `updated_at` / `first_published`, location in `location.name`,
+  publication in `first_published` (unknown if absent); `updated_at` is only
+  an update timestamp. Location in `location.name`,
   id in `id`, url in `absolute_url`. Company = the slug (title-cased) unless
   the payload carries a better name.
 - **Lever**: list of postings; `text`, `hostedUrl`, `categories.location`,

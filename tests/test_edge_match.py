@@ -321,8 +321,8 @@ def test_a_capitalised_score_key_is_unusable_and_the_job_is_still_shown(tmp_path
     scored = score_jobs([make_job()], BASE_CV, cfg,
                         client=llm_client(['{"Score": 88, "Verdict": "good"}']))
     assert scored[0].score.ok is False
-    assert scored[0].status is ApplyStatus.DIGEST
-    assert "scorer failed" in scored[0].status_detail
+    assert scored[0].status is ApplyStatus.SCORING_PENDING
+    assert "pending" in scored[0].status_detail
 
 
 def test_a_result_envelope_is_unusable_and_the_job_is_still_shown(tmp_path: Path):
@@ -333,17 +333,17 @@ def test_a_result_envelope_is_unusable_and_the_job_is_still_shown(tmp_path: Path
     scored = score_jobs([make_job()], BASE_CV, cfg,
                         client=llm_client(['{"result": {"score": 88}}']))
     assert scored[0].score.ok is False
-    assert scored[0].status is ApplyStatus.DIGEST
+    assert scored[0].status is ApplyStatus.SCORING_PENDING
 
 
-def test_a_reply_cut_off_by_max_tokens_degrades_to_the_digest(tmp_path: Path):
+def test_a_reply_cut_off_by_max_tokens_remains_pending(tmp_path: Path):
     """`scoring.max_tokens` is 1500 and a chatty model can run out mid-object.
     An unbalanced `{` must not be half-parsed into a confident number."""
     cfg = write_config(tmp_path, {"scoring": {"concurrency": 1}})
     truncated = '{"score": 82, "verdict": "strong", "reasons": ["8y Python", "Postg'
     scored = score_jobs([make_job()], BASE_CV, cfg, client=llm_client([truncated]))
     assert scored[0].score.ok is False
-    assert scored[0].status is ApplyStatus.DIGEST
+    assert scored[0].status is ApplyStatus.SCORING_PENDING
 
 
 def test_an_answer_wrapped_in_a_one_element_array_is_still_scored(tmp_path: Path):
@@ -648,7 +648,7 @@ def test_a_total_outage_puts_one_error_line_in_the_digest_per_job(tmp_path: Path
     scored = score_jobs(jobs, BASE_CV, cfg, client=llm_client(["not json at all"]),
                         errors=errors)
     assert len(errors) == 5
-    assert all(s.status is ApplyStatus.DIGEST for s in scored)
+    assert all(s.status is ApplyStatus.SCORING_PENDING for s in scored)
 
 
 def test_the_threshold_is_applied_after_the_cap_not_before(tmp_path: Path):

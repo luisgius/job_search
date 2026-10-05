@@ -335,6 +335,7 @@ class ApplyStatus(str, Enum):
     NEW = "new"                          # seen, nothing decided yet
     FILTERED = "filtered"                # dropped by hard filters
     SCORED_BELOW = "scored_below"        # scored under threshold
+    SCORING_PENDING = "scoring_pending"  # no valid assessment; never an application decision
     DIGEST = "digest"                    # needs a human click
     DRY_RUN = "dry_run"                  # form filled + screenshotted, not submitted
     APPLIED = "applied"                  # auto-submitted, confirmation seen
@@ -382,6 +383,11 @@ class RunStats:
     after_filters: int = 0
     already_seen: int = 0
     scored: int = 0
+    scoring_attempted: int = 0
+    scoring_completed: int = 0
+    scoring_failed: int = 0
+    scoring_pending: int = 0
+    scoring_blocked: int = 0
     matches: int = 0
     tailored: int = 0
     auto_applied: int = 0
@@ -408,6 +414,11 @@ class RunStats:
             "after_filters": self.after_filters,
             "already_seen": self.already_seen,
             "scored": self.scored,
+            "scoring_attempted": self.scoring_attempted,
+            "scoring_completed": self.scoring_completed,
+            "scoring_failed": self.scoring_failed,
+            "scoring_pending": self.scoring_pending,
+            "scoring_blocked": self.scoring_blocked,
             "matches": self.matches,
             "tailored": self.tailored,
             "auto_applied": self.auto_applied,

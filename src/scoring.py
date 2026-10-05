@@ -24,7 +24,7 @@ from collections.abc import Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from .llm import LLMError, chain_from_config, structured_mode
+from .llm import LLMError, chain_from_config, structured_mode, validate_json_result
 from .models import ApplyStatus, Job, Score, ScoredJob
 from .util import get_logger, truncate
 
@@ -103,7 +103,13 @@ convert. A 70 means "yes, spend an hour tailoring this"; you give it only \
 when you would defend that hour to the candidate afterwards.
 
 You never flatter, never hedge to be nice, and never invent facts about the \
-candidate that are not written in their CV. You answer with JSON only."""
+candidate that are not written in their CV. The language of an advertisement
+is not a required working language. Quote explicit language and experience
+requirements; if unstated, report them as unknown, never as satisfied or absent.
+Do not infer work authorization from nationality, address or language.
+Keep mandatory requirements separate from bonuses and preferences. Missing
+optional domain experience is not a hard requirement failure.
+You answer with JSON only."""
 
 
 # --------------------------------------------------------------------------
@@ -464,6 +470,7 @@ def score_job(job: Job, cv_markdown: str, config: Any, *, client: Any = None) ->
             schema=RESPONSE_SCHEMA,
             structured=structured_mode(config),
         )
+        validate_json_result(payload, require_keys=RESPONSE_KEYS, schema=RESPONSE_SCHEMA)
     except LLMError as exc:
         logger.warning("scoring %s failed: %s", job.label, exc)
         return Score(value=0, model=model, error=str(exc))
@@ -483,11 +490,10 @@ def score_job(job: Job, cv_markdown: str, config: Any, *, client: Any = None) ->
 def _classify(score: Score, threshold: int) -> tuple[ApplyStatus, str]:
     """Map a `Score` onto a status + the sentence the digest shows."""
     if score.error:
-        # Deliberately DIGEST: a job we failed to judge is a job the human
-        # has to judge. Dropping it would hide a real match behind an outage.
+        # A failed assessment retains its posting, but is not a valid match.
         return (
-            ApplyStatus.DIGEST,
-            f"scorer failed ({score.error}) — shown unscored, judge it yourself",
+            ApplyStatus.SCORING_PENDING,
+            f"evaluation pending after scorer failure: {score.error}",
         )
     if score.value >= threshold:
         return ApplyStatus.DIGEST, ""
@@ -547,8 +553,8 @@ def score_jobs(
             ScoredJob(
                 job=job,
                 score=Score(value=0, error=str(exc)),
-                status=ApplyStatus.DIGEST,
-                status_detail=f"scorer failed ({exc}) — shown unscored, judge it yourself",
+                status=ApplyStatus.SCORING_PENDING,
+                status_detail=f"evaluation pending after scorer failure: {exc}",
             )
             for job in batch
         ]

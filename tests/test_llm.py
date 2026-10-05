@@ -234,9 +234,10 @@ def test_complete_handles_dict_shaped_blocks():
     assert llm.complete(model="m", system="s", prompt="p", max_tokens=10) == "dict shaped"
 
 
-def test_empty_content_is_returned_rather_than_raising():
+def test_empty_content_is_an_explicit_failure():
     llm, _ = client([FakeMessage(content=[])])
-    assert llm.complete(model="m", system="s", prompt="p", max_tokens=10) == ""
+    with pytest.raises(LLMError, match="empty final response"):
+        llm.complete(model="m", system="s", prompt="p", max_tokens=10)
 
 
 # ==========================================================================

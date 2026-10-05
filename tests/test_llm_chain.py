@@ -204,7 +204,7 @@ def test_resolving_an_already_built_chain_returns_it_untouched():
     fallbacks after the inner chain had already exhausted them — and built
     fresh REAL clients around an injected fake, the seam-routing failure the
     provider/seam cross-check exists to prevent."""
-    dead, ok = DeadClient(), OkClient({"score": 88})
+    dead, ok = DeadClient(), OkClient({"score": 88, "verdict": "Good fit", "reasons": ["Evidence"], "strengths": [], "gaps": []})
     chain = chain_from_config(cfg(["backup/model"]), "scoring",
                               clients=[dead, ok])
     assert chain_from_config(cfg(["backup/model"]), "scoring",

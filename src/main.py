@@ -621,6 +621,7 @@ def _count_outcomes(scored_jobs: list[ScoredJob], stats: RunStats) -> None:
     )
     stats.digest_items = sum(
         1 for s in scored_jobs if _status_of(s) == ApplyStatus.DIGEST.value
+        and s.score is not None and s.score.ok
     )
     # Carried as a dynamic attribute. Without it the jobs that most need a human look were
     # the only ones missing from the summary line cron writes to the log.
@@ -801,6 +802,7 @@ def run_pipeline(
     # first. Persisting before both caps prevents overflow aging out unseen.
     if not durable:
         fresh = _newest_first(fresh)
+    ready_count = len(fresh)
     if limit is not None and 0 <= limit < len(fresh):
         logger.info("--limit %d: scoring %d of %d jobs", limit, limit, len(fresh))
         fresh = fresh[:limit]
@@ -833,6 +835,7 @@ def run_pipeline(
                     continue
                 started.append(job)
             fresh = started
+        stats.scoring_attempted = min(len(fresh), max(0, _int(_cfg(config, "scoring.max_jobs", 40), 40)))
         try:
             scored_jobs = scoring.score_jobs(
                 fresh, cv_markdown, config, client=llm_client, errors=stats.errors
@@ -846,17 +849,13 @@ def run_pipeline(
             except Exception as exc:
                 queue_failed = True
                 stats.errors.append(f"scoring backlog result recording failed: {exc}")
-    # Honest funnel: with --no-llm nothing was scored, however many jobs the
-    # digest ends up showing.
-    stats.scored = 0 if skip_llm else len(scored_jobs)
-    # A "match" is anything the human now has to deal with: at or above the
-    # threshold, plus anything the scorer could not judge (those reach the
-    # digest unscored rather than being dropped). The apply stage only ever
-    # moves jobs *within* this set, so `matches` stays the sum of the
-    # auto-applied / dry-run / needs-a-click counters below.
-    stats.matches = sum(
-        1 for s in scored_jobs if _status_of(s) == ApplyStatus.DIGEST.value
-    )
+    stats.scoring_completed = sum(1 for item in scored_jobs if item.score and item.score.ok)
+    stats.scored = stats.scoring_completed  # legacy alias now means completed evaluations
+    stats.scoring_failed = max(0, stats.scoring_attempted - stats.scoring_completed)
+    stats.scoring_pending = max(0, ready_count - stats.scoring_completed)
+    threshold = _int(_cfg(config, "scoring.threshold", 65), 65)
+    stats.matches = sum(1 for item in scored_jobs
+                        if item.score and item.score.ok and item.score.value >= threshold)
 
     queued_notes: dict[str, str] = {}
     if durable and not queue_failed:
@@ -929,6 +928,10 @@ def run_pipeline(
     if durable:
         try:
             pending = tracker.pending_scoring()
+            stats.scoring_pending = len(pending)
+            stats.scoring_blocked = tracker.conn.execute(
+                "SELECT count(*) FROM scoring_backlog WHERE state IN ('expired', 'exhausted')"
+            ).fetchone()[0]
         except Exception as exc:
             pending = []
             stats.errors.append(f"scoring backlog diagnostics unavailable: {exc}")
@@ -982,17 +985,19 @@ def _arrow() -> str:
 
 
 def format_summary(stats: RunStats) -> str:
-    """The three-line human summary `main` prints when a run finishes."""
+    """Summarize this run separately from the accumulated scoring backlog."""
     glyph = _arrow()
     arrow = f" {glyph} "
     dot = " · " if glyph == "→" else " | "
-    new = max(0, stats.after_filters - stats.already_seen)
     funnel = arrow.join([
         f"fetched {stats.fetched}",
         f"deduped {stats.after_dedupe}",
-        f"filtered {stats.after_filters}",
-        f"new {new}",
-        f"scored {stats.scored}",
+        f"eligible / retries {stats.after_filters}",
+    ])
+    evaluations = "Evaluation outcomes this run: " + dot.join([
+        f"attempted {stats.scoring_attempted}",
+        f"completed {stats.scoring_completed}",
+        f"failed {stats.scoring_failed}",
         f"matched {stats.matches}",
     ])
     outcomes = dot.join([
@@ -1008,7 +1013,13 @@ def format_summary(stats: RunStats) -> str:
         # from a retry. They are the ones a human has to go and look at.
         outcomes += f"{dot}UNCONFIRMED — CHECK BY HAND {unconfirmed}"
 
-    lines = [funnel, outcomes]
+    backlog = (f"Backlog totals across runs: pending {stats.scoring_pending}"
+               f"{dot}paused at retry/age limits {stats.scoring_blocked}")
+    lines = [funnel, evaluations, backlog, outcomes]
+    if stats.scoring_attempted and not stats.scoring_completed:
+        lines.append("Evaluation failed for every attempted job — this run could not select opportunities.")
+    if stats.scoring_blocked:
+        lines.append(f"{stats.scoring_blocked} unresolved evaluations paused at retry/age limits; evidence retained where available")
     path = getattr(stats, "digest_path", None)
     lines.append(f"digest: {path}" if path else "digest: not written — see the errors above")
     if stats.errors:
@@ -1059,7 +1070,7 @@ def _run_cli(args: argparse.Namespace) -> int:
             skip_apply=bool(args.skip_apply),
             skip_llm=bool(args.no_llm),
         )
-        tracker.finish_run(run_id, stats.to_dict(), now=now)
+        tracker.finish_run(run_id, stats.to_dict(), now=utcnow())
 
     print(format_summary(stats))
 

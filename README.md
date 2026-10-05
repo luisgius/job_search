@@ -544,7 +544,8 @@ not once per job.
 
 **Freshness is the weakest claim here.** A stated window is not something
 these sources can guarantee. Greenhouse's `updated_at` moves when anything
-changes, so a typo fix on a three-month-old req can look brand new. LinkedIn
+changes, so the parser uses only `first_published` for publication age and
+keeps a missing publication date unknown. LinkedIn
 alert emails carry no per-posting date at all — every job in one email
 inherits the email's arrival time. `freshness.skip_undated: true` is the
 honest default and it *will* silently discard real jobs; watch the `undated`
