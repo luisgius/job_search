@@ -1,0 +1,61 @@
+{
+  "offers": [
+    {
+      "id": "3117",
+      "url": "https://careers.allegro.eu/job-invite/3117?locale=en_US",
+      "name": "Machine Learning Engineer - Allegro Pay",
+      "team": "IT - Machine Learning",
+      "location": "Warszawa, Fabryka Norblina",
+      "brand": "Allegro Pay sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1784100732
+    },
+    {
+      "id": "3667",
+      "url": "https://careers.allegro.eu/job-invite/3667?locale=en_US",
+      "name": "Senior Product Analyst - Allegro Pay (Machine Learning and Analytics)",
+      "team": "IT - Analytics & Consulting",
+      "location": "Warszawa, Fabryka Norblina",
+      "brand": "Allegro Pay sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1787729839
+    },
+    {
+      "id": "3677",
+      "url": "https://careers.allegro.eu/job-invite/3677?locale=en_US",
+      "name": "Data Scientist - Logistics AI & ML",
+      "team": "Data & AI",
+      "location": "Warszawa, Fabryka Norblina",
+      "brand": "Allegro sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1787901792
+    },
+    {
+      "id": "3784",
+      "url": "https://careers.allegro.eu/job-invite/3784?locale=en_US",
+      "name": "Data Scientist",
+      "team": "Data & AI",
+      "location": "Warszawa, Fabryka Norblina",
+      "brand": "Allegro sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1787898200
+    },
+    {
+      "id": "3775",
+      "url": "https://careers.allegro.eu/job-invite/3775?locale=en_US",
+      "name": "Junior Data Scientist",
+      "team": "IT - Analytics & Consulting",
+      "location": "Warszawa, Fabryka Norblina",
+      "brand": "Allegro sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1789467185
+    }
+  ],
+  "max_pages": 1,
+  "results_count": 5
+}

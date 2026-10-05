@@ -1,0 +1,276 @@
+{
+  "note": "Bounded read-only collection; 20 HTTP attempts including redirects. Full response bodies remain in private local evidence. See source docs for observed versus inferred semantics.",
+  "requests": [
+    {
+      "n": 1,
+      "label": "allegro-listing-p1",
+      "url": "https://jobs.allegro.eu//wp-json/api/v1/offer",
+      "params": {
+        "lang": "en",
+        "page": 1
+      },
+      "started_utc": "2026-10-05T10:21:20+00:00",
+      "status": 200,
+      "final_url": "https://jobs.allegro.eu//wp-json/api/v1/offer?lang=en&page=1",
+      "bytes": 2909,
+      "sha256": "2143fccb71e9cd09ec4646eae5f817b0676a735e7dd059e04ad89815ddb04e4d",
+      "elapsed_s": 1.1
+    },
+    {
+      "n": 2,
+      "label": "allegro-invite-3609",
+      "url": "https://careers.allegro.eu/job-invite/3609?locale=en_US",
+      "params": null,
+      "started_utc": "2026-10-05T10:21:42+00:00",
+      "status": 302,
+      "final_url": "https://careers.allegro.eu/job-invite/3609?locale=en_US",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "elapsed_s": 1.23
+    },
+    {
+      "n": 3,
+      "label": "allegro-detail-1363037255",
+      "url": "https://careers.allegro.eu/job/Warszawa-Senior-Data-Analyst-%28Risk-Management%29-00-841/1363037255/",
+      "params": null,
+      "started_utc": "2026-10-05T10:21:50+00:00",
+      "status": 200,
+      "final_url": "https://careers.allegro.eu/job/Warszawa-Senior-Data-Analyst-%28Risk-Management%29-00-841/1363037255/",
+      "bytes": 56986,
+      "sha256": "bf08ca075c7042acf8ab6afac2e9c457dc9530424333b54b92d37579d551feea",
+      "elapsed_s": 1.2
+    },
+    {
+      "n": 4,
+      "label": "allegro-invite-3509",
+      "url": "https://careers.allegro.eu/job-invite/3509?locale=en_US",
+      "params": null,
+      "started_utc": "2026-10-05T10:22:15+00:00",
+      "status": 302,
+      "final_url": "https://careers.allegro.eu/job-invite/3509?locale=en_US",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "elapsed_s": 0.97
+    },
+    {
+      "n": 5,
+      "label": "allegro-detail-1366343655",
+      "url": "https://careers.allegro.eu/job/Warszawa-Product-Manager-AdTech-00-841/1366343655/",
+      "params": null,
+      "started_utc": "2026-10-05T10:22:21+00:00",
+      "status": 200,
+      "final_url": "https://careers.allegro.eu/job/Warszawa-Product-Manager-AdTech-00-841/1366343655/",
+      "bytes": 73280,
+      "sha256": "3d03f13a41f72d44942fe1e2b024cc4c3eabe0a223d39b1118d49bbb764fa2f3",
+      "elapsed_s": 1.37
+    },
+    {
+      "n": 6,
+      "label": "justjoin-api-pipeline-headers",
+      "url": "https://api.justjoin.it/v2/user-panel/offers",
+      "params": {
+        "page": 1,
+        "perPage": 100,
+        "experienceLevels[]": [
+          "junior",
+          "mid"
+        ]
+      },
+      "started_utc": "2026-10-05T10:22:48+00:00",
+      "status": 503,
+      "final_url": "https://api.justjoin.it/v2/user-panel/offers?page=1&perPage=100&experienceLevels%5B%5D=junior&experienceLevels%5B%5D=mid",
+      "bytes": 592,
+      "sha256": "32f4c1e4c036d78d5bce0ddad05acdba6da51f8ccacf6deec8bb3fe529ec6ea7",
+      "elapsed_s": 0.85
+    },
+    {
+      "n": 7,
+      "label": "justjoin-robots",
+      "url": "https://justjoin.it/robots.txt",
+      "params": null,
+      "started_utc": "2026-10-05T10:23:30+00:00",
+      "status": 200,
+      "final_url": "https://justjoin.it/robots.txt",
+      "bytes": 696,
+      "sha256": "9433aae074215fe2d8a19c74fef32ad6a89401c4ffdb279b74e10d0a341141bd",
+      "elapsed_s": 0.78
+    },
+    {
+      "n": 8,
+      "label": "justjoin-api-root-control",
+      "url": "https://api.justjoin.it/",
+      "params": null,
+      "started_utc": "2026-10-05T10:23:31+00:00",
+      "status": 503,
+      "final_url": "https://api.justjoin.it/",
+      "bytes": 551,
+      "sha256": "d6b99f08a0121faa00c7a588bdeca9d8712bb3c020972e95e657bbd2f0838556",
+      "elapsed_s": 1.07
+    },
+    {
+      "n": 9,
+      "label": "justjoin-frontend-home",
+      "url": "https://justjoin.it/",
+      "params": null,
+      "started_utc": "2026-10-05T10:23:49+00:00",
+      "status": 200,
+      "final_url": "https://justjoin.it/",
+      "bytes": 1650448,
+      "sha256": "62cb7a35e9e36b17b6e6531ad70cdfa65ed5147aea90eb8e65342a2205e822b9",
+      "elapsed_s": 2.77
+    },
+    {
+      "n": 10,
+      "label": "justjoin-frontend-data-junior-mid",
+      "url": "https://justjoin.it/job-offers/all-locations/data",
+      "params": {
+        "experience-level": "junior,mid"
+      },
+      "started_utc": "2026-10-05T10:25:28+00:00",
+      "status": 200,
+      "final_url": "https://justjoin.it/job-offers/all-locations/data?experience-level=junior%2Cmid",
+      "bytes": 1545909,
+      "sha256": "2fcefe8172be981de608b420c65b575292f23e1c277481381ed6ca5d4f5d9895",
+      "elapsed_s": 2.7
+    },
+    {
+      "n": 11,
+      "label": "justjoin-frontend-ai-junior-mid",
+      "url": "https://justjoin.it/job-offers/all-locations/ai",
+      "params": {
+        "experience-levels": "junior,mid"
+      },
+      "started_utc": "2026-10-05T10:26:04+00:00",
+      "status": 200,
+      "final_url": "https://justjoin.it/job-offers/all-locations/ai?experience-levels=junior%2Cmid",
+      "bytes": 1557838,
+      "sha256": "bfa58820cce8817446e639299721dce0ad1c3859aa217edb6afca8f9a08d907d",
+      "elapsed_s": 2.7
+    },
+    {
+      "n": 12,
+      "label": "justjoin-frontend-data-junior-mid-p2",
+      "url": "https://justjoin.it/job-offers/all-locations/data",
+      "params": {
+        "experience-levels": "junior,mid",
+        "page": 2
+      },
+      "started_utc": "2026-10-05T10:26:07+00:00",
+      "status": 200,
+      "final_url": "https://justjoin.it/job-offers/all-locations/data?experience-levels=junior%2Cmid&page=2",
+      "bytes": 1529384,
+      "sha256": "ec45780c7e0a056278d9c99a35365256565c4bebb06bfa7e7234815ad3f510fb",
+      "elapsed_s": 2.66
+    },
+    {
+      "n": 13,
+      "label": "allegro-offer-listing-html",
+      "url": "https://jobs.allegro.eu/offer/",
+      "params": null,
+      "started_utc": "2026-10-05T10:26:40+00:00",
+      "status": 200,
+      "final_url": "https://jobs.allegro.eu/offer/",
+      "bytes": 42990,
+      "sha256": "bd83161e8d363351266a77b834a5617225ae1ee6738aa7a8fec31ff23de2259e",
+      "elapsed_s": 1.21
+    },
+    {
+      "n": 14,
+      "label": "allegro-main-min-js",
+      "url": "https://jobs.allegro.eu/wp-content/themes/allegro-jobs/public/dist/main.min.js?ver=2026-09-10",
+      "params": null,
+      "started_utc": "2026-10-05T10:26:57+00:00",
+      "status": 200,
+      "final_url": "https://jobs.allegro.eu/wp-content/themes/allegro-jobs/public/dist/main.min.js?ver=2026-09-10",
+      "bytes": 633710,
+      "sha256": "90c23a9efb16e70022cf7d16c1c2e9449b1f1aaa2e150f5625ae0e1e5bb3be7c",
+      "elapsed_s": 1.58
+    },
+    {
+      "n": 15,
+      "label": "allegro-listing-team-filter-p1",
+      "url": "https://jobs.allegro.eu//wp-json/api/v1/offer",
+      "params": {
+        "lang": "en",
+        "page": 1,
+        "team[]": [
+          "Data & AI",
+          "IT - Machine Learning",
+          "IT - Analytics & Consulting"
+        ]
+      },
+      "started_utc": "2026-10-05T10:27:23+00:00",
+      "status": 200,
+      "final_url": "https://jobs.allegro.eu//wp-json/api/v1/offer?lang=en&page=1&team%5B%5D=Data+%26+AI&team%5B%5D=IT+-+Machine+Learning&team%5B%5D=IT+-+Analytics+%26+Consulting",
+      "bytes": 1522,
+      "sha256": "c7af4d4c5ca2bb58f13c70aa142d818c8f66d536faf085395329a4f26a44b591",
+      "elapsed_s": 0.98
+    },
+    {
+      "n": 16,
+      "label": "allegro-fixed-adapter-run",
+      "url": "https://jobs.allegro.eu//wp-json/api/v1/offer",
+      "params": {
+        "lang": "en",
+        "page": 1,
+        "team[]": [
+          "Data & AI"
+        ]
+      },
+      "started_utc": "2026-10-05T10:38:06+00:00",
+      "status": 200,
+      "final_url": "https://jobs.allegro.eu//wp-json/api/v1/offer?lang=en&page=1&team%5B%5D=Data+%26+AI",
+      "bytes": 590,
+      "sha256": "74f76dda94b5d4fe56028e964252a8707a8c7f50457540d4cd107f80ed939769",
+      "elapsed_s": 1.17
+    },
+    {
+      "n": 17,
+      "label": "allegro-fixed-adapter-run",
+      "url": "https://careers.allegro.eu/job/Warszawa-Data-Scientist-Allegro-AI-Hub-00-841/1365885255/",
+      "params": null,
+      "started_utc": "2026-10-05T10:38:07+00:00",
+      "status": 200,
+      "final_url": "https://careers.allegro.eu/job/Warszawa-Data-Scientist-Allegro-AI-Hub-00-841/1365885255/",
+      "bytes": 73581,
+      "sha256": "e8f663fa8a18d47f36c815b4799445bd3c7f141cb85644905bed5cb4a20c17b0",
+      "elapsed_s": 1.61
+    },
+    {
+      "n": 18,
+      "label": "allegro-fixed-adapter-run",
+      "url": "https://careers.allegro.eu/job-invite/3677?locale=en_US",
+      "params": null,
+      "started_utc": "2026-10-05T10:38:08+00:00",
+      "status": 302,
+      "final_url": "https://careers.allegro.eu/job-invite/3677?locale=en_US",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "elapsed_s": 0.22
+    },
+    {
+      "n": 19,
+      "label": "allegro-fixed-adapter-run",
+      "url": "https://careers.allegro.eu/job/Warszawa-Data-Scientist-Logistics-AI-&-ML-00-841/1365890855/",
+      "params": null,
+      "started_utc": "2026-10-05T10:38:09+00:00",
+      "status": 200,
+      "final_url": "https://careers.allegro.eu/job/Warszawa-Data-Scientist-Logistics-AI-&-ML-00-841/1365890855/",
+      "bytes": 76044,
+      "sha256": "00ae128cb52a1582ed06b4a50ad56d4d33cdb1b2675b5076b22b4aec1d1a7117",
+      "elapsed_s": 0.38
+    },
+    {
+      "n": 20,
+      "label": "allegro-fixed-adapter-run",
+      "url": "https://careers.allegro.eu/job-invite/3784?locale=en_US",
+      "params": null,
+      "started_utc": "2026-10-05T10:38:09+00:00",
+      "status": 302,
+      "final_url": "https://careers.allegro.eu/job-invite/3784?locale=en_US",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "elapsed_s": 0.22
+    }
+  ]
+}

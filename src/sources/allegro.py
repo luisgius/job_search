@@ -2,6 +2,11 @@
 
 No SAP administrative API, guessed search endpoint, or application requests.
 See docs/ALLEGRO_SOURCE.md for evidence and the deliberately separate ID domains.
+
+Feed shape observed 2026-10-05 (frontend build 2026-09-10): the original
+requisition number moved from `uid` to a string `id`, `url` became the
+cross-origin `careers.allegro.eu/job-invite/<id>` link, and `releaseDate`
+became epoch seconds. Both shapes are read; nothing else is inferred.
 """
 from __future__ import annotations
 
@@ -26,6 +31,8 @@ CAREERS_ORIGIN = "https://careers.allegro.eu"
 _MAX_BODY = 2_000_000
 _VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 _CLOSED = re.compile(r"(?:this (?:job|position|vacancy|requisition) (?:is |has been )?(?:no longer available|closed|filled|expired)|job (?:is )?no longer available|position has been filled)", re.I)
+_INVITE = re.compile(r"/job-invite/(\d+)/?")
+_CAREER = re.compile(r"/job/[^/]+/(\d+)/")
 _MIGRATION = re.compile(r"\b(?:we (?:have |are )?mov(?:ed|ing)|new career(?:s)? (?:site|website))\b|^test(?: job)?$", re.I)
 
 
@@ -34,6 +41,10 @@ def _text(value: Any) -> str:
 
 
 def _date(value: Any):
+    # Epoch seconds, as the feed has published `releaseDate` since 2026-09-10.
+    # Milliseconds, numeric strings and implausible years stay unknown.
+    if type(value) is int:
+        return datetime.fromtimestamp(value, timezone.utc) if 946684800 <= value < 4102444800 else None
     # Partial dates parsed by dateutil borrow today's year: never allow that.
     if not isinstance(value, str) or not re.search(
         r"\b(?:19|20)\d{2}-\d{2}-\d{2}(?=T|\b)|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}\b.*\b(?:19|20)\d{2}\b", value, re.I
@@ -49,12 +60,21 @@ def _safe_url(value: Any, base: str, kind: str) -> str | None:
     try:
         p = urlsplit(urljoin(base, value))
         origin = urlsplit(base)
-        if p.scheme != "https" or p.netloc != origin.netloc or p.username or p.password:
+        if p.scheme != "https" or p.username or p.password:
+            return None
+        if kind == "offer" and p.netloc == "careers.allegro.eu":
+            # The only cross-origin link the feed may supply: the employer's
+            # own numeric invite route, with at most its published locale.
+            if not _INVITE.fullmatch(p.path):
+                return None
+            query = p.query if re.fullmatch(r"locale=[a-z]{2}_[A-Z]{2}", p.query) else ""
+            return urlunsplit((p.scheme, p.netloc, p.path, query, ""))
+        if p.netloc != origin.netloc:
             return None
         if kind == "listing":
             valid = p.path == urlsplit(LISTING_URL).path
         elif p.netloc == "careers.allegro.eu":
-            valid = bool(re.fullmatch(r"/job/[^/]+/\d+/", p.path))
+            valid = bool(_CAREER.fullmatch(p.path))
         else:
             valid = bool(re.fullmatch(r"/offer/[^/]+/", p.path))
         if not valid:
@@ -62,6 +82,25 @@ def _safe_url(value: Any, base: str, kind: str) -> str | None:
         return urlunsplit((p.scheme, p.netloc, p.path, p.query if kind == "listing" else "", ""))
     except ValueError:
         return None
+
+
+def _settle_dates(job: Job) -> None:
+    """Pick the freshness date from the two employer date fields, keeping both.
+
+    The feed's `releaseDate` and the career page's `datePosted` disagreed on
+    every posting where both were read (page later by weeks), and one page's
+    `datePosted` changed between two captures. What either field means is not
+    established, so the earliest complete one is used as a conservative
+    freshness date, not as a proven first publication, and the other is kept
+    as a conflicting source date, never as an update time.
+    """
+    stated = {"feed releaseDate": _date(job.raw.get("releaseDate")),
+              "page datePosted": _date(job.raw.get("datePosted"))}
+    known = sorted((moment, name) for name, moment in stated.items() if moment)
+    job.posted_at = known[0][0] if known else None
+    job.raw["posted_at_source"] = known[0][1] if known else None
+    job.raw["source_dates"] = {name: moment.isoformat() for moment, name in known}
+    job.raw["date_conflict"] = len(known) == 2 and known[0][0] != known[1][0]
 
 
 class _Page(HTMLParser):
@@ -183,7 +222,6 @@ def parse_detail(body: str, url: str, *, listing: Job | None = None,
     job.company = company or page.value("dept") or job.company
     job.location = location or job.location
     job.description = description
-    job.posted_at = _date(data.get("datePosted") or page.value("datePosted")) or job.posted_at
     # Occasional remote days and hybrid wording do not establish a remote role.
     job.remote = True if (data.get("jobLocationType") or page.value("jobLocationType")) == "TELECOMMUTE" else None
     job.raw.update({"description_status": "full" if description else "missing",
@@ -191,27 +229,58 @@ def parse_detail(body: str, url: str, *, listing: Job | None = None,
                     "datePosted": data.get("datePosted") or page.value("datePosted") or None,
                     "employment_type": _text(data.get("employmentType")) or page.value("shift") or job.raw.get("employment_type"),
                     "platform": "SAP SuccessFactors" if sap_page else None})
+    _settle_dates(job)
     return job
 
 
-def parse_offer(value: Any) -> Job | None:
-    if not isinstance(value, Mapping):
-        return None
-    title, company = _text(value.get("name")), _text(value.get("brand"))
-    uid = value.get("uid")
+def _uid(value: Mapping) -> tuple[str, str]:
+    """Original requisition number and the field that carried it."""
+    field = "uid" if value.get("uid") is not None else "id"
+    uid = value.get(field)
+    # A bare integer `id` was the WordPress post number, a different domain.
+    if field == "id" and not isinstance(uid, str):
+        return "", field
     uid = str(uid) if isinstance(uid, (str, int)) and not isinstance(uid, bool) else ""
-    url = _safe_url(value.get("url"), LISTING_URL, "detail")
-    if not title or not company or not uid.isdigit() or not url or _MIGRATION.search(title):
-        return None
-    if _CLOSED.search(title):
-        return None
-    return Job(source="allegro", company=company, title=title, url=url,
-               location=_text(value.get("location")), posted_at=_date(value.get("releaseDate")),
-               # Source-owned identity namespace; the feed vendor is unverified.
-               ats="allegro_public", ats_job_id="allegro:uid:" + uid,
-               raw={"uid": uid, "platform": None, "wordpress_id": value.get("id"), "team": _text(value.get("team")),
-                    "employment_type": _text(value.get("contract")), "releaseDate": value.get("releaseDate"),
-                    "description_status": "missing", "snippet_only": True, "detail_status": "not_fetched"})
+    return (uid if uid.isdigit() else ""), field
+
+
+def _offer(value: Any) -> tuple[Job | None, str]:
+    """A listing record as a job, or the reason it is not one."""
+    if not isinstance(value, Mapping):
+        return None, "not an object"
+    title, company = _text(value.get("name")), _text(value.get("brand"))
+    uid, field = _uid(value)
+    url = _safe_url(value.get("url"), LISTING_URL, "offer")
+    if not title or not company:
+        return None, "missing title or brand"
+    if not uid:
+        return None, "missing original id"
+    if not url:
+        return None, "unsafe or unrecognized url"
+    invite = _INVITE.fullmatch(urlsplit(url).path)
+    if invite and invite.group(1) != uid:
+        return None, "invite url disagrees with original id"
+    # A string `id` is only known to be the requisition number where the
+    # invite link repeats it.
+    if field == "id" and not invite:
+        return None, "missing original id"
+    if _MIGRATION.search(title) or _CLOSED.search(title):
+        return None, "non-job or closed notice"
+    job = Job(source="allegro", company=company, title=title, url=url,
+              location=_text(value.get("location")),
+              # Source-owned identity namespace; the feed vendor is unverified.
+              ats="allegro_public", ats_job_id="allegro:uid:" + uid,
+              raw={"uid": uid, "uid_field": field, "platform": None,
+                   "wordpress_id": value.get("id") if field == "uid" else None, "team": _text(value.get("team")),
+                   "employment_type": _text(value.get("contract")), "releaseDate": value.get("releaseDate"),
+                   "listing_url": url,
+                   "description_status": "missing", "snippet_only": True, "detail_status": "not_fetched"})
+    _settle_dates(job)
+    return job, ""
+
+
+def parse_offer(value: Any) -> Job | None:
+    return _offer(value)[0]
 
 
 def _report(message, errors):
@@ -236,10 +305,19 @@ def fetch(config: Any, *, session: Any = None, errors: list[str] | None = None,
         return []
     settings = config.watchlist.get("allegro", {})
     settings = settings if isinstance(settings, Mapping) else {}
-    pages = _cap(settings, "max_pages", 2, 5)
+    # Ceilings sized for the 16-page feed observed on 2026-10-05: the whole
+    # listing plus the detail slice, every redirect hop charged to `limit`.
+    pages = _cap(settings, "max_pages", 2, 20)
     details = _cap(settings, "max_details", 8, 20, 0)
-    limit = _cap(settings, "max_requests", 12, 30)
+    limit = _cap(settings, "max_requests", 12, 40)
     timeout = _cap(settings, "timeout_seconds", 20, 30)
+    # Optional `team[]` values, exactly as the public listing page offers and
+    # sends them. Unset keeps the unfiltered walk.
+    teams = settings.get("teams") or []
+    if not isinstance(teams, list) or not all(isinstance(t, str) and 0 < len(t.strip()) <= 80 for t in teams):
+        _report("teams must be a list of team names; filter ignored", errors)
+        teams = []
+    teams = [t.strip() for t in teams[:10]]
     client = session if session is not None else requests.Session()
     requests_used = 0
     jobs: dict[str, Job] = {}
@@ -247,6 +325,7 @@ def fetch(config: Any, *, session: Any = None, errors: list[str] | None = None,
     listing_uids: set[str] = set()
     page_fingerprints: set[str] = set()
     first_metadata = None
+    pages_read: dict[str, str] = {}
 
     def read(url, kind, params=None):
         nonlocal requests_used
@@ -260,11 +339,15 @@ def fetch(config: Any, *, session: Any = None, errors: list[str] | None = None,
                 target = _safe_url(response.headers.get("Location"), original, kind)
                 if not target or target == url:
                     raise ValueError("unsafe or looping redirect")
-                if kind == "detail" and urlsplit(original).netloc == "careers.allegro.eu" and target.split("/")[-2] != original.split("/")[-2]:
+                # An invite link resolves once to its career page (already
+                # route-checked above); after that the page number is fixed.
+                if kind == "detail" and _CAREER.fullmatch(urlsplit(url).path) and target.split("/")[-2] != url.split("/")[-2]:
                     raise ValueError("redirect changed original career job ID")
                 if kind == "detail" and urlsplit(original).netloc == "jobs.allegro.eu" and urlsplit(target).path != urlsplit(original).path:
                     raise ValueError("redirect changed original offer path")
                 url, params = target, None
+                if kind == "detail" and url in pages_read:
+                    return pages_read[url], url
                 continue
             if kind == "detail" and response.status_code in {404, 410}:
                 return None
@@ -273,13 +356,18 @@ def fetch(config: Any, *, session: Any = None, errors: list[str] | None = None,
                 raise ValueError(f"unexpected HTTP {response.status_code}")
             if len(response.text) > _MAX_BODY:
                 raise ValueError("response body limit exceeded")
-            return response.text
+            if kind == "detail":
+                pages_read[url] = response.text
+            return response.text, url
         raise ValueError("redirect cap reached")
 
     try:
         for page in range(1, pages + 1):
             try:
-                body = read(LISTING_URL, "listing", {"lang": "en", "page": page})
+                query: dict[str, Any] = {"lang": "en", "page": page}
+                if teams:
+                    query["team[]"] = teams
+                body, _ = read(LISTING_URL, "listing", query)
                 data = json.loads(body)
                 if not isinstance(data, Mapping) or not isinstance(data.get("offers"), list):
                     raise ValueError("not the offers envelope (migration/non-listing page)")
@@ -300,18 +388,24 @@ def fetch(config: Any, *, session: Any = None, errors: list[str] | None = None,
                 page_fingerprints.add(fingerprint)
                 raw_count += len(offers)
                 for entry in offers:
-                    uid = entry.get("uid") if isinstance(entry, Mapping) else None
-                    if isinstance(uid, (str, int)) and not isinstance(uid, bool) and str(uid).isdigit():
-                        listing_uids.add(str(uid))
-                malformed = 0
+                    uid = _uid(entry)[0] if isinstance(entry, Mapping) else ""
+                    if uid:
+                        listing_uids.add(uid)
+                reasons: dict[str, int] = {}
                 for entry in offers[:100]:
-                    job = parse_offer(entry)
+                    job, reason = _offer(entry)
                     if job:
                         jobs.setdefault(job.ats_job_id, job)
                     else:
-                        malformed += 1
+                        reasons[reason] = reasons.get(reason, 0) + 1
+                malformed = sum(reasons.values())
                 if malformed:
-                    _report(f"page {page}: skipped {malformed} malformed/non-job records", errors)
+                    why = ", ".join(f"{reason}: {n}" for reason, n in sorted(reasons.items()))
+                    # A page where nothing parses is a changed feed, not ten bad rows.
+                    drift = "; every record rejected, feed shape drift suspected" if malformed == len(offers[:100]) and malformed > 1 else ""
+                    _report(f"page {page}: skipped {malformed} malformed/non-job records ({why}){drift}", errors)
+                if teams and any(isinstance(e, Mapping) and _text(e.get("team")) not in teams for e in offers):
+                    _report(f"page {page}: team filter not honoured by the feed; unfiltered records retained", errors)
                 if len(offers) > 100:
                     _report(f"page {page}: record cap reached; coverage partial", errors)
                 if page >= total:
@@ -330,11 +424,13 @@ def fetch(config: Any, *, session: Any = None, errors: list[str] | None = None,
             seeds = []
         pending: list[tuple[str, Job | None]] = []
         seen_urls = set()
+        seed_pages: set[str] = set()
         for seed in seeds[:20]:
             safe = _safe_url(seed, CAREERS_ORIGIN, "detail")
             if safe and safe not in seen_urls:
                 pending.append((safe, None))
                 seen_urls.add(safe)
+                seed_pages.add(_CAREER.fullmatch(urlsplit(safe).path).group(1))
             elif not safe:
                 _report("unsafe career detail seed skipped", errors)
         ranked = sorted(jobs.values(), key=lambda j: (
@@ -347,16 +443,45 @@ def fetch(config: Any, *, session: Any = None, errors: list[str] | None = None,
                 seen_urls.add(job.url)
         if len(pending) > details or len(seeds) > 20:
             _report("detail cap reached; description coverage partial", errors)
+        page_owner: dict[str, str] = {}
         for url, listing in pending[:details]:
             try:
-                body = read(url, "detail")
-                job = parse_detail(body, url, listing=listing, now=now) if body is not None else None
+                found = read(url, "detail")
+                body, final = found if found is not None else (None, url)
+                career = _CAREER.fullmatch(urlsplit(final).path)
+                page = career.group(1) if career else final
+                owner = jobs.get(page_owner.get(page, ""))
+                # A configured seed owns its page's identity whenever the
+                # employer's redirect proves a listing record is that page,
+                # whether or not the seed's own request succeeded this run.
+                if listing and body is not None and owner is None and page in seed_pages:
+                    owner = parse_detail(body, final, now=now)
+                    if owner is not None:
+                        owner.raw["career_page_id"] = page
+                        jobs[owner.ats_job_id] = owner
+                        page_owner[page] = owner.ats_job_id
+                        body = None  # already consumed; the listing only adds its facts below
+                if listing and owner is not None and owner is not listing:
+                    # One posting: the identity emitted for the page is kept
+                    # and the listing record contributes what only it knows.
+                    jobs.pop(listing.ats_job_id, None)
+                    for key in ("uid", "uid_field", "team", "releaseDate", "listing_url"):
+                        owner.raw.setdefault(key, listing.raw[key])
+                    _settle_dates(owner)
+                    logger.info("allegro: listing %s is career page %s; one job kept", listing.ats_job_id, final)
+                    continue
+                job = parse_detail(body, final, listing=listing, now=now) if body is not None else None
                 if job is None:
                     if listing:
                         jobs.pop(listing.ats_job_id, None)
                     logger.info("allegro: closed/unavailable job removed: %s", url)
                 else:
+                    if final != url:
+                        job.url = final
+                    if career:
+                        job.raw["career_page_id"] = page
                     jobs[job.ats_job_id] = job
+                    page_owner[page] = job.ats_job_id
                     if not job.description:
                         _report(f"detail {url}: missing description", errors)
             except Exception as exc:
@@ -368,7 +493,9 @@ def fetch(config: Any, *, session: Any = None, errors: list[str] | None = None,
     finally:
         if session is None:
             client.close()
-    logger.info("allegro: %d jobs, %d full, %d missing; %d requests", len(jobs),
+    logger.info("allegro: %d jobs, %d full, %d missing, %d dated; %d requests%s", len(jobs),
                 sum(j.raw.get("description_status") == "full" for j in jobs.values()),
-                sum(not j.description for j in jobs.values()), requests_used)
+                sum(not j.description for j in jobs.values()),
+                sum(j.posted_at is not None for j in jobs.values()), requests_used,
+                f"; team filter {teams}" if teams else "")
     return list(jobs.values())

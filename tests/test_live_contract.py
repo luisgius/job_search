@@ -1607,14 +1607,14 @@ JUSTJOIN_EXPECTED = ("city", "workplaceType", "experienceLevel", "publishedAt",
 
 
 def _skip_if_justjoin_blocks(exc_or_message) -> None:
-    """503 from api.justjoin.it even with browser-shaped headers (verified
-    2026-09-01) — the block is TLS-fingerprint-level, below anything plain
-    `requests` can spoof. The source self-reports as degraded in the digest's
-    health table; these tests skip rather than paint the suite red over an
-    accepted degradation. Re-scout the endpoint in the site's devtools
-    (Network tab -> the offers request -> Copy as cURL) to revive it."""
+    """The API returned 503 repeatedly through 2026-10-05; cause is unknown.
+
+    A TLS-fingerprint restriction was previously asserted without evidence.
+    API-only probes may skip this external failure; usable public-page
+    fallback results must still satisfy the normalization contract.
+    """
     if "503" in str(exc_or_message):
-        pytest.skip("justjoin.it 503s non-browser TLS — accepted degradation")
+        pytest.skip("justjoin.it API returned 503; external cause unverified")
 
 
 def test_justjoin_feed_still_answers_and_parses():
@@ -1622,7 +1622,7 @@ def test_justjoin_feed_still_answers_and_parses():
 
     errors: list[str] = []
     jobs = fetch(None, errors=errors)
-    if errors:
+    if errors and not jobs:
         _skip_if_justjoin_blocks(errors[0])
     if not jobs:
         pytest.skip("no junior/mid DS-ML offers on the board right now")

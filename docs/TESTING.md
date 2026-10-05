@@ -41,7 +41,7 @@ pytest --cov=src --cov-report=term-missing
 | `test_teamtailor.py` | 22 | RSS + custom-domain tenants; "hybrid" is not remote |
 | `test_arbeitnow.py` | 13 | the keyless German-market feed; honest pagination |
 | `test_landing_jobs.py` | 25 | the second global feed; its client-side DS/ML gate |
-| `test_justjoin_it.py` | 15 | Tier 2: internal JSON, degrade-not-crash |
+| `test_justjoin_it.py` | See pytest collection | API failure, bounded public listing fallback, source dates and partial coverage |
 | `test_nofluffjobs.py` | 12 | Tier 2: internal JSON, degrade-not-crash |
 | `test_digest.py` | 72 | escaping, legibility of failure, the source-health rows |
 | `test_adzuna.py` | 32 | snippets, duplicates, key redaction |
@@ -373,3 +373,9 @@ looking:
 4. Say *why* in the docstring when the case is non-obvious. "This is the
    substring bug that deletes every International Sales role" is worth more
    to the next reader than the assertion itself.
+
+### Reliability follow-up (5 October 2026)
+
+`tests/test_provider_limits.py` covers scoped provider cooldowns, actual attempt counts, malformed retry hints and concurrent recovery. `tests/test_real_job_fit.py` exercises frozen real-job evidence, the production scorer contract, explicit local-request budgets, traceability and label-aware metrics without network. Model-backed evidence is separate under [`evals/real_job_fit/results`](../evals/real_job_fit/results/README.md); passing scripted tests does not establish ranking quality.
+
+Source fixtures recorded on 5 October distinguish live captures from synthetic pagination and failure controls. Full body/redirect budgets, seeded identity after transient failures, partial-date rejection and date conflicts are regression-tested. See the [follow-up report](RELIABILITY_FOLLOWUP_2026-10-05.md).

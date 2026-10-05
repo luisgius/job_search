@@ -17,11 +17,14 @@ Everything that talks to the API raises `LLMError` and nothing else: callers
 
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 import re
 import threading
 import time
 from collections.abc import Mapping
+from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Iterable, Iterator
 
 from .util import get_logger
@@ -204,10 +207,151 @@ class LLMError(RuntimeError):
     """
 
     def __init__(self, message: Any = "", *, status_code: int | None = None,
-                 transient: bool | None = None) -> None:
+                 transient: bool | None = None, headers: Mapping | None = None,
+                 error: Mapping | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.transient = transient
+        self.headers = dict(headers) if isinstance(headers, Mapping) else {}
+        self.error = dict(error) if isinstance(error, Mapping) else {}
+
+
+class ProviderLimits:
+    """In-memory cooldowns shared by one chain, never a process-wide quota guess.
+
+    Healthy requests run concurrently. Once a limit is observed, new requests
+    fail fast; one probe is admitted after expiry. Already in-flight requests
+    cannot be recalled. Clocks are injectable, and credentials are only hashed.
+    Finite server hints are never capped: they last for this registry's lifetime
+    (normally one chain), without sleeping or blocking a different endpoint.
+    """
+
+    def __init__(self, *, clock: Callable[[], float] = time.monotonic,
+                 wall_clock: Callable[[], float] = time.time) -> None:
+        self.clock = clock
+        self.wall_clock = wall_clock
+        self._lock = threading.Lock()
+        self._states: dict[tuple, dict] = {}
+
+    def acquire(self, identity: tuple, model: str) -> list[tuple]:
+        scopes = [("model", model), ("account", "")]
+        if model.endswith(":free"):
+            scopes.append(("free", ""))
+        with self._lock:
+            now = self.clock()
+            matches = [(identity + scope, self._states.get(identity + scope))
+                       for scope in scopes]
+            for _, state in matches:
+                if state and (self._remaining(state, now) > 0 or state["probing"]):
+                    raise LLMError(
+                        f"{model}: provider cooldown ({state['scope']}; "
+                        f"HTTP {state['status']}); retry in "
+                        f"{math.ceil(self._remaining(state, now))}s",
+                        status_code=state["status"], transient=False,
+                        headers=state["headers"], error=state["error"],
+                    )
+            claimed = [(key, state) for key, state in matches if state]
+            for _, state in claimed:
+                state["probing"] = True
+            return claimed
+
+    @staticmethod
+    def _remaining(state: Mapping, now: float) -> float:
+        # Subtract elapsed time instead of adding a potentially huge finite
+        # server delay to the clock (which can overflow or round away delay).
+        return max(0.0, state["delay"] - (now - state["started"]))
+
+    def release(self, claimed: list[tuple], *, success: bool) -> None:
+        with self._lock:
+            for key, state in claimed:
+                # A newer rejection must survive an older request's success.
+                if self._states.get(key) is state:
+                    if success:
+                        del self._states[key]
+                    else:
+                        # A timeout/5xx/empty reply does not prove recovery.
+                        # Release the probe slot, keeping serial admission.
+                        state["probing"] = False
+
+    def reject(self, identity: tuple, model: str, exc: LLMError,
+               *, openrouter: bool) -> bool:
+        status = _status_code(exc)
+        metadata = exc.error.get("metadata")
+        metadata = metadata if isinstance(metadata, Mapping) else {}
+        source = metadata.get("limit_source")
+        source = source if isinstance(source, str) else None
+        if status != 429 and not (openrouter and status == 402 and source in {
+            "openrouter_key_limit", "openrouter_in_flight_budget",
+        }):
+            return False
+        scope = ("model", model)
+        # A generic 429 (including upstream shared pools) proves nothing about
+        # other models. Broaden only for explicit platform free-quota evidence
+        # or the documented per-key spending cap, on the official endpoint.
+        message = str(exc.error.get("message", "")).lower()
+        if openrouter and status == 402 and source == "openrouter_key_limit":
+            scope = ("account", "")
+        elif (openrouter and status == 429 and model.endswith(":free")
+              and not metadata.get("provider_name")
+              and not metadata.get("provider_code")
+              and not str(source or "").startswith("upstream")
+              and re.search(r"\bfree-models-per-(?:day|min)\b", message)):
+            scope = ("free", "")
+        # Older OpenRouter errors also carry hints inside metadata.headers.
+        # Actual HTTP headers win; never interpret another gateway's reset
+        # field using OpenRouter's epoch convention.
+        hints = metadata.get("headers") if openrouter else None
+        hints = {str(k).lower(): str(v) for k, v in hints.items()
+                 if str(k).lower() in {"retry-after", "x-ratelimit-reset"}} \
+            if isinstance(hints, Mapping) else {}
+        hints.update({str(k).lower(): str(v) for k, v in exc.headers.items()})
+        default_delay = 60.0
+        if scope[0] == "free" and "free-models-per-day" in message:
+            # The documented free daily counter is a UTC-day allowance. A
+            # daily-exhaustion response without hints need not be probed every
+            # minute; explicit server hints still take precedence.
+            default_delay = 86400.0 - self.wall_clock() % 86400.0
+        delay = self._delay(hints, openrouter=openrouter, default=default_delay)
+        with self._lock:
+            now = self.clock()
+            key = identity + scope
+            old = self._states.get(key)
+            self._states[key] = {
+                "started": now,
+                "delay": max(delay, self._remaining(old, now) if old else 0),
+                "probing": False, "scope": scope[0], "status": status,
+                "headers": dict(exc.headers), "error": dict(exc.error),
+            }
+        return True
+
+    def _delay(self, headers: Mapping, *, openrouter: bool, default: float) -> float:
+        headers = {str(k).lower(): str(v) for k, v in headers.items()}
+        delays = []
+        raw = headers.get("retry-after", "")
+        try:
+            delay = float(raw)
+        except ValueError:
+            try:
+                delay = parsedate_to_datetime(raw).timestamp() - self.wall_clock()
+            except (ValueError, TypeError, OverflowError, IndexError):
+                delay = float("nan")
+        if math.isfinite(delay) and delay >= 0:
+            delays.append(delay)
+        if openrouter:
+            try:
+                reset = float(headers.get("x-ratelimit-reset", ""))
+                # Accept Unix seconds or milliseconds, never treat this
+                # absolute reset as a relative delay.
+                if reset >= 1e12:
+                    reset /= 1000
+                delay = reset - self.wall_clock()
+                if math.isfinite(delay) and delay >= 0:
+                    delays.append(delay)
+            except (ValueError, OverflowError):
+                pass
+        # No sleeps inside a job: let the chain fall back immediately. Invalid
+        # hints get a short finite cooldown, never a permanent circuit.
+        return max(1.0, max(delays)) if delays else default
 
 
 # --------------------------------------------------------------------------
@@ -215,9 +359,7 @@ class LLMError(RuntimeError):
 # --------------------------------------------------------------------------
 
 
-#: Last resort for statuses that only exist in an error's text — which is the
-#: case for every OpenRouter failure, since those arrive as an `HttpError`
-#: whose message embeds "-> HTTP 429" rather than an attribute.
+#: Compatibility fallback for legacy/injected exceptions without status metadata.
 _TEXT_STATUS_RE = re.compile(r"\bHTTP[: ]+(\d{3})\b")
 
 
@@ -288,7 +430,13 @@ def _openrouter_text(payload: Any) -> str:
     error = payload.get("error")
     if isinstance(error, Mapping) and error:
         message = error.get("message") or error
-        raise LLMError(f"openrouter error: {message}")
+        code = error.get("code")
+        try:
+            status = int(code) if not isinstance(code, bool) else None
+        except (TypeError, ValueError):
+            status = None
+        raise LLMError(f"openrouter error: {message}", status_code=status,
+                       error=error)
 
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices:
@@ -364,6 +512,7 @@ class LLMClient:
         timeout: int | None = None,
         reasoning_effort: str | None = None,
         generation_max_tokens: int | None = None,
+        limits: ProviderLimits | None = None,
     ) -> None:
         # Each provider speaks through exactly one seam: `client=` is the
         # Anthropic SDK object, `session=` is the openrouter HTTP session.
@@ -416,6 +565,13 @@ class LLMClient:
         self.base_url = str(
             base_url or (OPENROUTER_BASE_URL if self.provider == "openrouter" else "")
         ).rstrip("/")
+        self._limits = limits if limits is not None else ProviderLimits()
+        # Include all extra headers: gateways may select a tenant with a custom
+        # header or override Authorization. Keep their values out of diagnostics.
+        credentials = json.dumps([self.api_key, sorted(
+            (str(k).lower(), str(v)) for k, v in self._extra_headers.items())])
+        self._limit_identity = (self.provider, self.base_url,
+                                hashlib.sha256(credentials.encode()).hexdigest())
 
         # A key is only dispensable when a seam replaces the transport — or
         # when the OpenAI dialect points at a non-OpenRouter gateway: a local
@@ -566,7 +722,8 @@ class LLMClient:
             if status is None:
                 raise LLMError(f"openrouter request failed: {exc}",
                                transient=True) from exc
-            raise LLMError(str(exc), status_code=status) from exc
+            raise LLMError(str(exc), status_code=status,
+                           headers=exc.headers, error=exc.error) from exc
         self._record_usage(model, data.get("usage")
                            if isinstance(data, Mapping) else None)
         text = _openrouter_text(data)
@@ -589,6 +746,28 @@ class LLMClient:
 
     # -- calls ------------------------------------------------------------
 
+    def _call_with_limits(self, **kwargs: Any) -> str:
+        # The confirmed failures are on the OpenAI HTTP path. Do not change
+        # Anthropic SDK retry semantics without provider-specific evidence.
+        if self.provider != "openrouter":
+            return self._call_anthropic(**kwargs)
+        model = kwargs["model"]
+        claimed = self._limits.acquire(self._limit_identity, model)
+        success = False
+        try:
+            text = self._call_openrouter(**kwargs)
+            success = bool(text.strip())
+            return text
+        except LLMError as exc:
+            if self._limits.reject(self._limit_identity, model, exc,
+                                   openrouter=self.base_url == OPENROUTER_BASE_URL):
+                # A rejected call advances the chain now; retrying within the
+                # same job wastes quota and ignores the provider's reset hint.
+                exc.transient = False
+            raise
+        finally:
+            self._limits.release(claimed, success=success)
+
     def complete(
         self,
         *,
@@ -603,8 +782,12 @@ class LLMClient:
         """One completion, returned as plain text.
 
         Retries transient failures up to `max_retries` times with exponential
-        backoff; auth and 4xx errors are re-raised immediately as `LLMError`
-        because they will never succeed. Never raises anything but `LLMError`.
+        backoff. HTTP rate/quota limits install a cooldown and fail immediately
+        so a chain can use its next entry. Never raises anything but `LLMError`.
+        Embedded HTTP-200 error codes use the same status classification as
+        HTTP failures: 5xx gets at most max_retries + 1 attempts (one at zero).
+        Separately, complete_json may retry an unsupported native schema once
+        in prompt mode, including for an embedded 400 response_format error.
 
         `schema_native` asks the provider for grammar-constrained JSON
         (`complete_json` decides when — callers wanting text never set it).
@@ -619,8 +802,7 @@ class LLMClient:
             if attempt:
                 sleeper(RETRY_BASE_DELAY * (2 ** (attempt - 1)))
             try:
-                call = (self._call_openrouter if self.provider == "openrouter"
-                        else self._call_anthropic)
+                call = self._call_with_limits
                 text = call(model=model, system=system, prompt=prompt,
                             max_tokens=max_tokens, temperature=temperature,
                             schema_native=schema_native)
@@ -654,7 +836,10 @@ class LLMClient:
                 raise LLMError(f"{model}: empty final response")
             return text
 
-        raise LLMError(f"{model} call failed after {attempts} attempts: {last}")
+        raise LLMError(f"{model} call failed after {attempts} attempts: {last}",
+                       status_code=_status_code(last),
+                       headers=getattr(last, "headers", None),
+                       error=getattr(last, "error", None)) from last
 
     def complete_json(
         self,
@@ -1285,6 +1470,7 @@ def chain_from_config(
     if len(entries) <= 1 and not overrides:
         return client if client is not None else client_from_config(config, **kwargs)
     pairs: list[tuple[Callable[[], Any], str]] = []
+    kwargs.setdefault("limits", ProviderLimits())
     for index, entry in enumerate(entries):
         injected = None
         if index < len(overrides) and overrides[index] is not None:

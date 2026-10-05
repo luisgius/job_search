@@ -1,0 +1,877 @@
+{
+  "version": "real-europe-2026-10-05.v1",
+  "created_at": "2026-10-05T10:27:13.402229+00:00",
+  "label_authority": "AI proposed, not human gold",
+  "selection": "Purposive convenience cohort: every usable retained backlog job plus five selected public details; NOT representative recall sample. One selected Grafana detail returned 404 and is excluded. No ranking-model output used to label.",
+  "split_policy": "Employer and dedup groups disjoint; employer-month time groups retained. Same collection window: not an out-of-time generalization test. Heldout frozen before model calls, not blind to label author.",
+  "public_http_requests": 6,
+  "http_ledger": [
+    {
+      "url": "https://boards-api.greenhouse.io/v1/boards/cabify/jobs/8549431002",
+      "retrieved_at": "2026-10-05T10:23:46.217588+00:00",
+      "requests": 1,
+      "status": 200,
+      "sha256": "20b7c105f0f2ef93d56157b2ee458c50dbdedc79fbec4a9bcb2150acbbe56c28"
+    },
+    {
+      "url": "https://boards-api.greenhouse.io/v1/boards/hellofresh/jobs/7653269",
+      "retrieved_at": "2026-10-05T10:23:47.127457+00:00",
+      "requests": 1,
+      "status": 200,
+      "sha256": "aa62cfa068c910e7f7271423d5572823ac4807ba012b15b77bc2680605510234"
+    },
+    {
+      "url": "https://boards-api.greenhouse.io/v1/boards/grafanalabs/jobs/6107540004",
+      "retrieved_at": "2026-10-05T10:23:47.803571+00:00",
+      "requests": 1,
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "url": "https://boards-api.greenhouse.io/v1/boards/stripe/jobs/8018297",
+      "retrieved_at": "2026-10-05T10:23:48.439358+00:00",
+      "requests": 1,
+      "status": 200,
+      "sha256": "ea6d6c8451b2efa7f29664d10ef7094588250cee0540adb02834d8366ec1bf4a"
+    },
+    {
+      "url": "https://boards-api.greenhouse.io/v1/boards/intercom/jobs/7749323",
+      "retrieved_at": "2026-10-05T10:23:49.100178+00:00",
+      "requests": 1,
+      "status": 200,
+      "sha256": "78903b154f3b89b8009b74851a5febbb5ecdc6929f520560765f25540633ce2b"
+    },
+    {
+      "url": "https://boards-api.greenhouse.io/v1/boards/datadog/jobs/6652564",
+      "retrieved_at": "2026-10-05T10:25:30.666982+00:00",
+      "requests": 1,
+      "status": 200,
+      "sha256": "39b957fdf9333779e11fa320e9574c9ae818a706a5f139fa8bcc925aeeaf540c"
+    }
+  ],
+  "snapshot_sha256": "a6fd82ab3f9b7b4d5eed70c79918000ea0822cbbe07b708e0c11b5525689bc0d",
+  "candidate_facts": {
+    "experience": {
+      "summary": "Config states approximately 1.5 years DS; CV dates: Uber March 2026–present and Buynomics July 2025–January 2026; earlier roles are internships, not additional full-time DS years.",
+      "refs": [
+        "cv/base_cv.md:PROFESSIONAL EXPERIENCE",
+        "config.yaml:scoring.candidate_context"
+      ],
+      "uncertainty": "Config estimate and exact dates differ slightly; neither establishes 2–3 full years DS."
+    },
+    "experiments": {
+      "summary": "CV documents hypothesis formulation, causal inference, experimental design and SQL over Presto/Spark; large-scale online A/B ownership is not explicit.",
+      "refs": [
+        "cv/base_cv_product.md:Uber",
+        "cv/base_cv.md:SKILLS"
+      ]
+    },
+    "deployment": {
+      "summary": "CV documents deployed LightGBM forecasting with shadow-to-live rollout and commercial prediction/clustering models.",
+      "refs": [
+        "cv/base_cv_ml.md:Uber",
+        "cv/base_cv_ml.md:Buynomics"
+      ]
+    },
+    "languages": {
+      "summary": "English C1, Spanish native, German A2, Polish beginner.",
+      "refs": [
+        "cv/base_cv.md:LANGUAGES",
+        "config.yaml:filters.language_levels"
+      ]
+    },
+    "education": {
+      "summary": "Dual bachelors in Computer Science and Business; no masters or PhD listed.",
+      "refs": [
+        "cv/base_cv.md:EDUCATION"
+      ]
+    },
+    "commercial": {
+      "summary": "Commercial revenue prediction and clustering for a CPG client; explicit GTM sales-process ownership and React are not evidenced.",
+      "refs": [
+        "cv/base_cv.md:Buynomics",
+        "cv/base_cv.md:SKILLS"
+      ]
+    },
+    "research": {
+      "summary": "Config explicitly states no deep NLP/LLM research, no transformer fine-tuning and no publications; thesis RAG is application work.",
+      "refs": [
+        "config.yaml:scoring.candidate_context",
+        "cv/base_cv.md:PROJECTS"
+      ]
+    }
+  },
+  "candidate_source_sha256": {
+    "cv/base_cv_ml.md": "ba0c4d082d61f601f6fdfdfa0d8003adb725fd106d01b82a5b73e295c9fb2442",
+    "cv/base_cv_product.md": "0f770d60e152be8fe6466c5318f8203c5e10c15c7b051fbcf13f84586d559806",
+    "cv/base_cv.md": "9bf37c7d991e56286ddf36e66f6cd054fb881778921ec9b3511a366977649779"
+  },
+  "config_sha256": "552083c8947bd2824b23f6e92057bdd579f15530d34b4e879ed67599af436254",
+  "jobs": [
+    {
+      "id": "real-01",
+      "job": {
+        "source": "arbeitnow",
+        "company": "gravity9",
+        "title": "Forward Deployed AI Engineer",
+        "url": "https://www.arbeitnow.co.uk/jobs/companies/gravity9/remote-forward-deployed-ai-engineer-birmingham-460033",
+        "location": "Remote job",
+        "posted_at": "2026-10-01T03:30:18+00:00",
+        "remote": true,
+        "salary": null,
+        "country": null,
+        "ats": null,
+        "ats_job_id": "remote-forward-deployed-ai-engineer-birmingham-460033",
+        "description": "FDE (mid): 3+ years software engineering, 1+ years hands-on LLM / agentic work",
+        "raw": {
+          "snippet_only": true,
+          "evaluation_excerpt": true
+        }
+      },
+      "tracker_job_key": "740d97ce30a89618",
+      "dedup_group": "47be546037888f93",
+      "employer_group": "gravity9",
+      "time_group": "gravity9:2026-10",
+      "split": "tuning",
+      "category": "below_threshold",
+      "provenance": {
+        "origin": "retained_backlog",
+        "source_url": "https://www.arbeitnow.co.uk/jobs/companies/gravity9/remote-forward-deployed-ai-engineer-birmingham-460033",
+        "retrieval_url": "https://www.arbeitnow.co.uk/jobs/companies/gravity9/remote-forward-deployed-ai-engineer-birmingham-460033",
+        "retrieved_at": "2026-10-01T06:04:20.203458+00:00",
+        "published_at": "2026-10-01T03:30:18+00:00",
+        "publication_basis": "retained source posted_at; board timestamp, not independently employer-verified",
+        "updated_at": null,
+        "original_description_completeness": "retained_full_description_unverified",
+        "distributed_description_completeness": "selected_excerpt",
+        "description_sha256": "8e8959f4b4631d8a49e5256c8e30b76d7c348c7bc08728dafb7ebb64eaa614af",
+        "normalized_description_sha256": "8e8959f4b4631d8a49e5256c8e30b76d7c348c7bc08728dafb7ebb64eaa614af",
+        "job_payload_sha256": "9b01af5945fe6517c6298e093e55f809869b193c600a90f2095ae362a76be273",
+        "raw_response_sha256": null,
+        "current_availability": "not_rechecked"
+      },
+      "historical_outcome": null,
+      "proposed_label": {
+        "decision": "decline",
+        "authority": "AI-proposed; awaiting human review",
+        "mandatory_requirement_quote": "FDE (mid): 3+ years software engineering, 1+ years hands-on LLM / agentic work",
+        "candidate_fact_ids": [
+          "experience"
+        ],
+        "reason": "Professional tenure falls short; thesis RAG does not establish a year of production agent work. UK sponsorship unknown.",
+        "uncertainties": [
+          "Human pursue/decline preference not confirmed"
+        ]
+      },
+      "human_label": null,
+      "rules": {
+        "expected_cap": null,
+        "cap_basis": null,
+        "exclusion_expected": false,
+        "exclusion_basis": null
+      }
+    },
+    {
+      "id": "real-02",
+      "job": {
+        "source": "arbeitnow",
+        "company": "Wheely",
+        "title": "Data Scientist",
+        "url": "https://www.arbeitnow.co.uk/jobs/companies/wheely/data-scientist-london-98109",
+        "location": "London",
+        "posted_at": "2026-10-01T00:55:14+00:00",
+        "remote": false,
+        "salary": null,
+        "country": "GB",
+        "ats": null,
+        "ats_job_id": "data-scientist-london-98109",
+        "description": "2+ years of experience in Data Science or Machine Learning for mid-level",
+        "raw": {
+          "snippet_only": true,
+          "evaluation_excerpt": true
+        }
+      },
+      "tracker_job_key": "ee1128d13cd2df09",
+      "dedup_group": "ee1128d13cd2df09",
+      "employer_group": "wheely",
+      "time_group": "wheely:2026-10",
+      "split": "heldout",
+      "category": "potential_fit",
+      "provenance": {
+        "origin": "retained_backlog",
+        "source_url": "https://www.arbeitnow.co.uk/jobs/companies/wheely/data-scientist-london-98109",
+        "retrieval_url": "https://www.arbeitnow.co.uk/jobs/companies/wheely/data-scientist-london-98109",
+        "retrieved_at": "2026-10-01T06:04:20.203458+00:00",
+        "published_at": "2026-10-01T00:55:14+00:00",
+        "publication_basis": "retained source posted_at; board timestamp, not independently employer-verified",
+        "updated_at": null,
+        "original_description_completeness": "retained_full_description_unverified",
+        "distributed_description_completeness": "selected_excerpt",
+        "description_sha256": "7cdf5bfd233a97b6e5965b488276626173e63382ee7ac3363ddd087767489bed",
+        "normalized_description_sha256": "84ef0a79d9e7eb5f1fa4b7fe80ee1d058e7a6ea91f592077a538383d55d5e25b",
+        "job_payload_sha256": "36f08a4950b815955280911d4029f21b6c5bccb35ecf87da029905a67c911baa",
+        "raw_response_sha256": null,
+        "current_availability": "not_rechecked"
+      },
+      "historical_outcome": null,
+      "proposed_label": {
+        "decision": "unknown",
+        "authority": "AI-proposed; awaiting human review",
+        "mandatory_requirement_quote": "2+ years of experience in Data Science or Machine Learning for mid-level",
+        "candidate_fact_ids": [
+          "experience"
+        ],
+        "reason": "Marketplace overlap and explicit visa support; whether projects count toward the two-year minimum is unresolved.",
+        "uncertainties": [
+          "Human pursue/decline preference not confirmed"
+        ]
+      },
+      "human_label": null,
+      "rules": {
+        "expected_cap": null,
+        "cap_basis": null,
+        "exclusion_expected": false,
+        "exclusion_basis": null
+      }
+    },
+    {
+      "id": "real-03",
+      "job": {
+        "source": "arbeitnow",
+        "company": "Monzo",
+        "title": "Data Scientist, L30",
+        "url": "https://www.arbeitnow.co.uk/jobs/companies/monzo/data-scientist-l30-cardiff-406689",
+        "location": "Cardiff",
+        "posted_at": "2026-09-30T18:55:33+00:00",
+        "remote": false,
+        "salary": null,
+        "country": "GB",
+        "ats": null,
+        "ats_job_id": "data-scientist-l30-cardiff-406689",
+        "description": "You have experience in conducting large scale A/B experiments",
+        "raw": {
+          "snippet_only": true,
+          "evaluation_excerpt": true
+        }
+      },
+      "tracker_job_key": "06247cb0340d431e",
+      "dedup_group": "06247cb0340d431e",
+      "employer_group": "monzo",
+      "time_group": "monzo:2026-09",
+      "split": "heldout",
+      "category": "product_experimentation",
+      "provenance": {
+        "origin": "retained_backlog",
+        "source_url": "https://www.arbeitnow.co.uk/jobs/companies/monzo/data-scientist-l30-cardiff-406689",
+        "retrieval_url": "https://www.arbeitnow.co.uk/jobs/companies/monzo/data-scientist-l30-cardiff-406689",
+        "retrieved_at": "2026-10-01T06:04:20.203458+00:00",
+        "published_at": "2026-09-30T18:55:33+00:00",
+        "publication_basis": "retained source posted_at; board timestamp, not independently employer-verified",
+        "updated_at": null,
+        "original_description_completeness": "retained_full_description_unverified",
+        "distributed_description_completeness": "selected_excerpt",
+        "description_sha256": "cdb692c9f6c4021ecc623a0380581f56b9fc6a967f6b0823c694388b25e77dfc",
+        "normalized_description_sha256": "b847a7a15bc228a4703c675075835a50a25779d743ce05f15887dd301eec2c49",
+        "job_payload_sha256": "98f40352a1a2336d31dddd0a7a4891515fa5b233251ca172b42bcfd5793c6bbd",
+        "raw_response_sha256": null,
+        "current_availability": "not_rechecked"
+      },
+      "historical_outcome": null,
+      "proposed_label": {
+        "decision": "pursue",
+        "authority": "AI-proposed; awaiting human review",
+        "mandatory_requirement_quote": "You have experience in conducting large scale A/B experiments",
+        "candidate_fact_ids": [
+          "experiments"
+        ],
+        "reason": "SQL and experimental-design evidence supports reviewing this role; CV does not establish ownership of large-scale online A/B tests. Explicit visa sponsorship is present.",
+        "uncertainties": [
+          "Human pursue/decline preference not confirmed"
+        ]
+      },
+      "human_label": null,
+      "rules": {
+        "expected_cap": null,
+        "cap_basis": null,
+        "exclusion_expected": false,
+        "exclusion_basis": null
+      }
+    },
+    {
+      "id": "real-04",
+      "job": {
+        "source": "arbeitnow",
+        "company": "Predium",
+        "title": "Associate Data Scientist (f/m/d)",
+        "url": "https://www.arbeitnow.com/jobs/companies/predium/associate-data-scientist-munich-18247",
+        "location": "Munich",
+        "posted_at": "2026-09-30T17:09:48+00:00",
+        "remote": false,
+        "salary": null,
+        "country": "DE",
+        "ats": null,
+        "ats_job_id": "associate-data-scientist-munich-18247",
+        "description": "Confident communication in English and German.",
+        "raw": {
+          "snippet_only": true,
+          "evaluation_excerpt": true
+        }
+      },
+      "tracker_job_key": "c850573c1f1e9d30",
+      "dedup_group": "c850573c1f1e9d30",
+      "employer_group": "predium",
+      "time_group": "predium:2026-09",
+      "split": "tuning",
+      "category": "exclusion_language",
+      "provenance": {
+        "origin": "retained_backlog",
+        "source_url": "https://www.arbeitnow.com/jobs/companies/predium/associate-data-scientist-munich-18247",
+        "retrieval_url": "https://www.arbeitnow.com/jobs/companies/predium/associate-data-scientist-munich-18247",
+        "retrieved_at": "2026-10-05T06:00:03.643383+00:00",
+        "published_at": "2026-09-30T17:09:48+00:00",
+        "publication_basis": "retained source posted_at; board timestamp, not independently employer-verified",
+        "updated_at": null,
+        "original_description_completeness": "retained_full_description_unverified",
+        "distributed_description_completeness": "selected_excerpt",
+        "description_sha256": "a9552be5958be6a5bd96226342013a4fee78bcf0330171e707c5c039f9928c1e",
+        "normalized_description_sha256": "a9552be5958be6a5bd96226342013a4fee78bcf0330171e707c5c039f9928c1e",
+        "job_payload_sha256": "2fea927b49c93c1a4f3b79dd0de494e722985285f69af2e9231f0ad902e7bcd6",
+        "raw_response_sha256": null,
+        "current_availability": "not_rechecked"
+      },
+      "historical_outcome": null,
+      "proposed_label": {
+        "decision": "decline",
+        "authority": "AI-proposed; awaiting human review",
+        "mandatory_requirement_quote": "Confident communication in English and German.",
+        "candidate_fact_ids": [
+          "languages"
+        ],
+        "reason": "German A2 is below confident professional communication; strong junior technical overlap does not remove this requirement.",
+        "uncertainties": [
+          "Human pursue/decline preference not confirmed"
+        ]
+      },
+      "human_label": null,
+      "rules": {
+        "expected_cap": null,
+        "cap_basis": null,
+        "exclusion_expected": true,
+        "exclusion_basis": "exclusion_language"
+      }
+    },
+    {
+      "id": "real-05",
+      "job": {
+        "source": "arbeitnow",
+        "company": "F H Bertling",
+        "title": "Machine Learning Engineer (m/f/x)",
+        "url": "https://www.arbeitnow.com/jobs/companies/f-h-bertling/machine-learning-engineer-hamburg-410491",
+        "location": "Hamburg",
+        "posted_at": "2026-09-30T17:09:36+00:00",
+        "remote": false,
+        "salary": null,
+        "country": "DE",
+        "ats": null,
+        "ats_job_id": "machine-learning-engineer-hamburg-410491",
+        "description": "Professional experience developing and deploying machine learning solutions",
+        "raw": {
+          "snippet_only": true,
+          "evaluation_excerpt": true
+        }
+      },
+      "tracker_job_key": "498f7b63d4e3376d",
+      "dedup_group": "498f7b63d4e3376d",
+      "employer_group": "f-h-bertling",
+      "time_group": "f-h-bertling:2026-09",
+      "split": "heldout",
+      "category": "potential_fit",
+      "provenance": {
+        "origin": "retained_backlog",
+        "source_url": "https://www.arbeitnow.com/jobs/companies/f-h-bertling/machine-learning-engineer-hamburg-410491",
+        "retrieval_url": "https://www.arbeitnow.com/jobs/companies/f-h-bertling/machine-learning-engineer-hamburg-410491",
+        "retrieved_at": "2026-10-01T06:04:20.203458+00:00",
+        "published_at": "2026-09-30T17:09:36+00:00",
+        "publication_basis": "retained source posted_at; board timestamp, not independently employer-verified",
+        "updated_at": null,
+        "original_description_completeness": "retained_full_description_unverified",
+        "distributed_description_completeness": "selected_excerpt",
+        "description_sha256": "8996eb2e8195c48708dd0efd9ab406b584f9de7852f92c3459021ff141282399",
+        "normalized_description_sha256": "8996eb2e8195c48708dd0efd9ab406b584f9de7852f92c3459021ff141282399",
+        "job_payload_sha256": "cc1da854a08da1f3e96e0b1aa69058cbd09b80321ecd4b987a68fb1b8e58b661",
+        "raw_response_sha256": null,
+        "current_availability": "not_rechecked"
+      },
+      "historical_outcome": null,
+      "proposed_label": {
+        "decision": "pursue",
+        "authority": "AI-proposed; awaiting human review",
+        "mandatory_requirement_quote": "Professional experience developing and deploying machine learning solutions",
+        "candidate_fact_ids": [
+          "deployment"
+        ],
+        "reason": "Deployed forecasting and commercial ML match this requirement; English C1 matches fluent-English requirement.",
+        "uncertainties": [
+          "Human pursue/decline preference not confirmed"
+        ]
+      },
+      "human_label": null,
+      "rules": {
+        "expected_cap": null,
+        "cap_basis": null,
+        "exclusion_expected": false,
+        "exclusion_basis": null
+      }
+    },
+    {
+      "id": "real-06",
+      "job": {
+        "source": "arbeitnow",
+        "company": "Nucs AI",
+        "title": "Data Scientist / Data Engineer",
+        "url": "https://www.arbeitnow.com/jobs/companies/nucs-ai/data-scientist-data-engineer-berlin-449467",
+        "location": "Berlin, Berlin, Germany",
+        "posted_at": "2026-10-01T20:30:04+00:00",
+        "remote": false,
+        "salary": null,
+        "country": "DE",
+        "ats": null,
+        "ats_job_id": "data-scientist-data-engineer-berlin-449467",
+        "description": "A master's degree or PhD in computer science",
+        "raw": {
+          "snippet_only": true,
+          "evaluation_excerpt": true
+        }
+      },
+      "tracker_job_key": "9f5c0d6b347528eb",
+      "dedup_group": "518a180f4c9ea5eb",
+      "employer_group": "nucs-ai",
+      "time_group": "nucs-ai:2026-10",
+      "split": "heldout",
+      "category": "below_threshold",
+      "provenance": {
+        "origin": "retained_backlog",
+        "source_url": "https://www.arbeitnow.com/jobs/companies/nucs-ai/data-scientist-data-engineer-berlin-449467",
+        "retrieval_url": "https://www.arbeitnow.com/jobs/companies/nucs-ai/data-scientist-data-engineer-berlin-449467",
+        "retrieved_at": "2026-10-02T06:14:34.054807+00:00",
+        "published_at": "2026-10-01T20:30:04+00:00",
+        "publication_basis": "retained source posted_at; board timestamp, not independently employer-verified",
+        "updated_at": null,
+        "original_description_completeness": "retained_full_description_unverified",
+        "distributed_description_completeness": "selected_excerpt",
+        "description_sha256": "7e49e9c74baa944b9c1ef0d0170c32da4b2649a665d0147e28b08ffd204d81a6",
+        "normalized_description_sha256": "7e49e9c74baa944b9c1ef0d0170c32da4b2649a665d0147e28b08ffd204d81a6",
+        "job_payload_sha256": "46e3ba6eff057f90d6b0ff6b5c1e0ef30913a4442282110d4666daf5299a1562",
+        "raw_response_sha256": null,
+        "current_availability": "not_rechecked"
+      },
+      "historical_outcome": null,
+      "proposed_label": {
+        "decision": "decline",
+        "authority": "AI-proposed; awaiting human review",
+        "mandatory_requirement_quote": "A master's degree or PhD in computer science",
+        "candidate_fact_ids": [
+          "education"
+        ],
+        "reason": "Dual bachelors are not a masters/PhD; three-year minimum and medical imaging tooling also lack sufficient evidence.",
+        "uncertainties": [
+          "Human pursue/decline preference not confirmed"
+        ]
+      },
+      "human_label": null,
+      "rules": {
+        "expected_cap": null,
+        "cap_basis": null,
+        "exclusion_expected": false,
+        "exclusion_basis": null
+      }
+    },
+    {
+      "id": "real-07",
+      "job": {
+        "source": "arbeitnow",
+        "company": "Lemrock",
+        "title": "AI Engineer",
+        "url": "https://www.arbeitnow.fr/jobs/companies/lemrock/ai-engineer-paris-365273",
+        "location": "Paris (hybrid)",
+        "posted_at": "2026-10-04T16:40:11+00:00",
+        "remote": false,
+        "salary": null,
+        "country": "FR",
+        "ats": null,
+        "ats_job_id": "ai-engineer-paris-365273",
+        "description": "2+ years of experience in AI, Agentic Systems, ML / Deep Learning, statistics or NLP",
+        "raw": {
+          "snippet_only": true,
+          "evaluation_excerpt": true
+        }
+      },
+      "tracker_job_key": "7e2c9b9fa360749e",
+      "dedup_group": "c7e72975df2368ad",
+      "employer_group": "lemrock",
+      "time_group": "lemrock:2026-10",
+      "split": "tuning",
+      "category": "potential_fit",
+      "provenance": {
+        "origin": "retained_backlog",
+        "source_url": "https://www.arbeitnow.fr/jobs/companies/lemrock/ai-engineer-paris-365273",
+        "retrieval_url": "https://www.arbeitnow.fr/jobs/companies/lemrock/ai-engineer-paris-365273",
+        "retrieved_at": "2026-10-05T06:00:03.643383+00:00",
+        "published_at": "2026-10-04T16:40:11+00:00",
+        "publication_basis": "retained source posted_at; board timestamp, not independently employer-verified",
+        "updated_at": null,
+        "original_description_completeness": "retained_full_description_unverified",
+        "distributed_description_completeness": "selected_excerpt",
+        "description_sha256": "e60034f2292723a7c89a048a2ea63ad6d8d7137cc0250c1bc99a8622fc30e704",
+        "normalized_description_sha256": "e60034f2292723a7c89a048a2ea63ad6d8d7137cc0250c1bc99a8622fc30e704",
+        "job_payload_sha256": "938db743b695eec9c28eda1d223134ecae547e086769c905c40fedbb9c5d6a6d",
+        "raw_response_sha256": null,
+        "current_availability": "not_rechecked"
+      },
+      "historical_outcome": null,
+      "proposed_label": {
+        "decision": "unknown",
+        "authority": "AI-proposed; awaiting human review",
+        "mandatory_requirement_quote": "2+ years of experience in AI, Agentic Systems, ML / Deep Learning, statistics or NLP",
+        "candidate_fact_ids": [
+          "experience"
+        ],
+        "reason": "Production ML and RAG overlap; qualifying duration and recommendation fine-tuning depth are uncertain. French is a plus, not mandatory.",
+        "uncertainties": [
+          "Human pursue/decline preference not confirmed"
+        ]
+      },
+      "human_label": null,
+      "rules": {
+        "expected_cap": null,
+        "cap_basis": null,
+        "exclusion_expected": false,
+        "exclusion_basis": null
+      }
+    },
+    {
+      "id": "real-08",
+      "job": {
+        "source": "greenhouse",
+        "company": "Cabify",
+        "title": "Data Scientist, Applied Science",
+        "url": "https://job-boards.greenhouse.io/cabify/jobs/8549431002",
+        "location": "Madrid",
+        "country": "ES",
+        "posted_at": null,
+        "ats": "greenhouse",
+        "ats_job_id": "8549431002",
+        "description": "At least 3 years of professional experience working as a data scientist or equivalent research role.",
+        "raw": {
+          "snippet_only": true,
+          "evaluation_excerpt": true
+        }
+      },
+      "tracker_job_key": "4346be9306699238",
+      "dedup_group": "45521e7c9200fa39",
+      "employer_group": "cabify",
+      "time_group": "cabify:2026-10",
+      "split": "heldout",
+      "category": "below_threshold",
+      "provenance": {
+        "origin": "public_single_job_api",
+        "source_url": "https://job-boards.greenhouse.io/cabify/jobs/8549431002",
+        "retrieval_url": "https://boards-api.greenhouse.io/v1/boards/cabify/jobs/8549431002",
+        "retrieved_at": "2026-10-05T10:23:46.217588+00:00",
+        "published_at": null,
+        "publication_basis": "unknown; API updated_at is not publication",
+        "updated_at": "2026-09-24T05:54:45-04:00",
+        "original_description_completeness": "complete_api_content",
+        "distributed_description_completeness": "selected_excerpt",
+        "description_sha256": "e64452cff5d8e4f7faf563a0e135665011e6748facaa693261c4593fe20574ea",
+        "normalized_description_sha256": "e64452cff5d8e4f7faf563a0e135665011e6748facaa693261c4593fe20574ea",
+        "job_payload_sha256": "6a4d7c57ce155f99fb793f254b40a34f38da233cddf30a3fb98a70c45aae7b24",
+        "raw_response_sha256": "20b7c105f0f2ef93d56157b2ee458c50dbdedc79fbec4a9bcb2150acbbe56c28",
+        "current_availability": "detail_endpoint_returned_200"
+      },
+      "historical_outcome": {
+        "status": "filtered",
+        "score": null,
+        "detail": "posted 3451.8h ago, older than the 72h limit"
+      },
+      "proposed_label": {
+        "decision": "decline",
+        "authority": "AI-proposed; awaiting human review",
+        "mandatory_requirement_quote": "At least 3 years of professional experience working as a data scientist or equivalent research role.",
+        "candidate_fact_ids": [
+          "experience"
+        ],
+        "reason": "Marketplace/forecasting fit is strong, but professional experience is below the explicit minimum. Masters is an example, not treated as a mandatory degree.",
+        "uncertainties": [
+          "Human pursue/decline preference not confirmed"
+        ]
+      },
+      "human_label": null,
+      "rules": {
+        "expected_cap": null,
+        "cap_basis": null,
+        "exclusion_expected": false,
+        "exclusion_basis": null
+      }
+    },
+    {
+      "id": "real-09",
+      "job": {
+        "source": "greenhouse",
+        "company": "HelloFresh",
+        "title": "Senior Product Analyst, Consumer Analytics",
+        "url": "https://careers.hellofresh.com/global/en/job/7653269?gh_jid=7653269",
+        "location": "Warszawa, Masovian Voivodeship, Poland",
+        "country": "PL",
+        "posted_at": null,
+        "ats": "greenhouse",
+        "ats_job_id": "7653269",
+        "description": "A minimum of 5 years’ experience analyzing complex data in a business context",
+        "raw": {
+          "snippet_only": true,
+          "evaluation_excerpt": true
+        }
+      },
+      "tracker_job_key": "4f21c648c1f709be",
+      "dedup_group": "ec4357bb52b41f4a",
+      "employer_group": "hellofresh",
+      "time_group": "hellofresh:2026-10",
+      "split": "heldout",
+      "category": "exclusion_seniority",
+      "provenance": {
+        "origin": "public_single_job_api",
+        "source_url": "https://careers.hellofresh.com/global/en/job/7653269?gh_jid=7653269",
+        "retrieval_url": "https://boards-api.greenhouse.io/v1/boards/hellofresh/jobs/7653269",
+        "retrieved_at": "2026-10-05T10:23:47.127457+00:00",
+        "published_at": null,
+        "publication_basis": "unknown; API updated_at is not publication",
+        "updated_at": "2026-08-13T06:48:15-04:00",
+        "original_description_completeness": "complete_api_content",
+        "distributed_description_completeness": "selected_excerpt",
+        "description_sha256": "a068c4c679a8c24cefa2398a908518d62ef47b569d9a9fe4deb23da41f56afde",
+        "normalized_description_sha256": "a068c4c679a8c24cefa2398a908518d62ef47b569d9a9fe4deb23da41f56afde",
+        "job_payload_sha256": "6408b503aa34ce94217860f96b294ea42a494b3fafe8ecc769e51b8c5f302a1b",
+        "raw_response_sha256": "aa62cfa068c910e7f7271423d5572823ac4807ba012b15b77bc2680605510234",
+        "current_availability": "detail_endpoint_returned_200"
+      },
+      "historical_outcome": {
+        "status": "filtered",
+        "score": null,
+        "detail": "title contains excluded term 'senior'"
+      },
+      "proposed_label": {
+        "decision": "decline",
+        "authority": "AI-proposed; awaiting human review",
+        "mandatory_requirement_quote": "A minimum of 5 years’ experience analyzing complex data in a business context",
+        "candidate_fact_ids": [
+          "experience"
+        ],
+        "reason": "Experimentation tasks overlap, but five years and expert event-tracking requirements are not established; senior title is excluded by current config.",
+        "uncertainties": [
+          "Human pursue/decline preference not confirmed"
+        ]
+      },
+      "human_label": null,
+      "rules": {
+        "expected_cap": null,
+        "cap_basis": null,
+        "exclusion_expected": true,
+        "exclusion_basis": "exclusion_seniority"
+      }
+    },
+    {
+      "id": "real-10",
+      "job": {
+        "source": "greenhouse",
+        "company": "Stripe",
+        "title": "Data Scientist, Payments",
+        "url": "https://stripe.com/jobs/search?gh_jid=8018297",
+        "location": "Dublin",
+        "country": "IE",
+        "posted_at": null,
+        "ats": "greenhouse",
+        "ats_job_id": "8018297",
+        "description": "BS or BA with 3 years of data science or quantitative modeling experience",
+        "raw": {
+          "snippet_only": true,
+          "evaluation_excerpt": true
+        }
+      },
+      "tracker_job_key": "889a0d1e0ea70f9e",
+      "dedup_group": "dce77fca1c4abeec",
+      "employer_group": "stripe",
+      "time_group": "stripe:2026-10",
+      "split": "heldout",
+      "category": "below_threshold",
+      "provenance": {
+        "origin": "public_single_job_api",
+        "source_url": "https://stripe.com/jobs/search?gh_jid=8018297",
+        "retrieval_url": "https://boards-api.greenhouse.io/v1/boards/stripe/jobs/8018297",
+        "retrieved_at": "2026-10-05T10:23:48.439358+00:00",
+        "published_at": null,
+        "publication_basis": "unknown; API updated_at is not publication",
+        "updated_at": "2026-09-25T16:44:47-04:00",
+        "original_description_completeness": "complete_api_content",
+        "distributed_description_completeness": "selected_excerpt",
+        "description_sha256": "41e3c973226e1c4cedd4233311648ebc14755c9444424f5f00d8fa826e8bcf71",
+        "normalized_description_sha256": "41e3c973226e1c4cedd4233311648ebc14755c9444424f5f00d8fa826e8bcf71",
+        "job_payload_sha256": "c6b170cc57d16fe6c8e23a088ad846491f3d6a252e7ca89e6d6e52457efc0885",
+        "raw_response_sha256": "ea6d6c8451b2efa7f29664d10ef7094588250cee0540adb02834d8366ec1bf4a",
+        "current_availability": "detail_endpoint_returned_200"
+      },
+      "historical_outcome": {
+        "status": "filtered",
+        "score": null,
+        "detail": "posted 2585.3h ago, older than the 72h limit"
+      },
+      "proposed_label": {
+        "decision": "decline",
+        "authority": "AI-proposed; awaiting human review",
+        "mandatory_requirement_quote": "BS or BA with 3 years of data science or quantitative modeling experience",
+        "candidate_fact_ids": [
+          "experience"
+        ],
+        "reason": "Relevant causal-inference/forecasting skills, but bachelors route requires three years; project duration cannot silently become professional tenure.",
+        "uncertainties": [
+          "Human pursue/decline preference not confirmed"
+        ]
+      },
+      "human_label": null,
+      "rules": {
+        "expected_cap": null,
+        "cap_basis": null,
+        "exclusion_expected": false,
+        "exclusion_basis": null
+      }
+    },
+    {
+      "id": "real-11",
+      "job": {
+        "source": "greenhouse",
+        "company": "Fin",
+        "title": "Senior Data Scientist (GTM)",
+        "url": "https://job-boards.greenhouse.io/intercom/jobs/7749323",
+        "location": "Dublin, Ireland; London, England",
+        "country": "IE",
+        "posted_at": null,
+        "ats": "greenhouse",
+        "ats_job_id": "7749323",
+        "description": "Proven track record of applied data science with measurable GTM impact",
+        "raw": {
+          "snippet_only": true,
+          "evaluation_excerpt": true
+        }
+      },
+      "tracker_job_key": "d5ebb3675c24b9f2",
+      "dedup_group": "e1c47e7853b32657",
+      "employer_group": "fin",
+      "time_group": "fin:2026-10",
+      "split": "tuning",
+      "category": "exclusion_seniority",
+      "provenance": {
+        "origin": "public_single_job_api",
+        "source_url": "https://job-boards.greenhouse.io/intercom/jobs/7749323",
+        "retrieval_url": "https://boards-api.greenhouse.io/v1/boards/intercom/jobs/7749323",
+        "retrieved_at": "2026-10-05T10:23:49.100178+00:00",
+        "published_at": null,
+        "publication_basis": "unknown; API updated_at is not publication",
+        "updated_at": "2026-09-23T06:23:13-04:00",
+        "original_description_completeness": "complete_api_content",
+        "distributed_description_completeness": "selected_excerpt",
+        "description_sha256": "486f00e80fccd022b771ece3b9fee96f2a387a0905d6c35f5d036c44d53dc436",
+        "normalized_description_sha256": "486f00e80fccd022b771ece3b9fee96f2a387a0905d6c35f5d036c44d53dc436",
+        "job_payload_sha256": "5373c9fd5cfd29f4f1f401728751c260a188d274900ce7bee768499215720a62",
+        "raw_response_sha256": "78903b154f3b89b8009b74851a5febbb5ecdc6929f520560765f25540633ce2b",
+        "current_availability": "detail_endpoint_returned_200"
+      },
+      "historical_outcome": {
+        "status": "filtered",
+        "score": null,
+        "detail": "title contains excluded term 'senior'"
+      },
+      "proposed_label": {
+        "decision": "unknown",
+        "authority": "AI-proposed; awaiting human review",
+        "mandatory_requirement_quote": "Proven track record of applied data science with measurable GTM impact",
+        "candidate_fact_ids": [
+          "commercial"
+        ],
+        "reason": "Commercial ML overlaps; direct GTM ownership, React and orchestration depth are unproven. Senior title is excluded regardless of semantic uncertainty.",
+        "uncertainties": [
+          "Human pursue/decline preference not confirmed"
+        ]
+      },
+      "human_label": null,
+      "rules": {
+        "expected_cap": null,
+        "cap_basis": null,
+        "exclusion_expected": true,
+        "exclusion_basis": "exclusion_seniority"
+      }
+    },
+    {
+      "id": "real-12",
+      "job": {
+        "source": "greenhouse",
+        "company": "Datadog",
+        "title": "AI Research Scientist - Datadog AI Research (DAIR)",
+        "url": "https://careers.datadoghq.com/detail/6652564/?gh_jid=6652564",
+        "location": "Paris, France",
+        "country": "FR",
+        "posted_at": null,
+        "ats": "greenhouse",
+        "ats_job_id": "6652564",
+        "description": "You have a track record of impactful publications at top-tier venues",
+        "raw": {
+          "snippet_only": true,
+          "evaluation_excerpt": true
+        }
+      },
+      "tracker_job_key": "26e2f0e8382fa82e",
+      "dedup_group": "ad0ea4a8fd107680",
+      "employer_group": "datadog",
+      "time_group": "datadog:2026-10",
+      "split": "heldout",
+      "category": "exclusion_research",
+      "provenance": {
+        "origin": "public_single_job_api",
+        "source_url": "https://careers.datadoghq.com/detail/6652564/?gh_jid=6652564",
+        "retrieval_url": "https://boards-api.greenhouse.io/v1/boards/datadog/jobs/6652564",
+        "retrieved_at": "2026-10-05T10:25:30.666982+00:00",
+        "published_at": null,
+        "publication_basis": "unknown; API updated_at is not publication",
+        "updated_at": "2026-09-29T13:18:57-04:00",
+        "original_description_completeness": "complete_api_content",
+        "distributed_description_completeness": "selected_excerpt",
+        "description_sha256": "d22797af9207fce88f1f8ceb234803dfda1f34df35e7ed7e219b65f62c9ebe74",
+        "normalized_description_sha256": "d22797af9207fce88f1f8ceb234803dfda1f34df35e7ed7e219b65f62c9ebe74",
+        "job_payload_sha256": "d1f23c47d2e3a61f5cf7121930c9ae09ea384f07687a69371e59902a6f43d319",
+        "raw_response_sha256": "39b957fdf9333779e11fa320e9574c9ae818a706a5f139fa8bcc925aeeaf540c",
+        "current_availability": "detail_endpoint_returned_200"
+      },
+      "historical_outcome": {
+        "status": "filtered",
+        "score": null,
+        "detail": "title contains excluded term 'research scientist'"
+      },
+      "proposed_label": {
+        "decision": "decline",
+        "authority": "AI-proposed; awaiting human review",
+        "mandatory_requirement_quote": "You have a track record of impactful publications at top-tier venues",
+        "candidate_fact_ids": [
+          "research"
+        ],
+        "reason": "No publications or deep foundation-model training in candidate facts; research scientist title excluded and configured research cap applies.",
+        "uncertainties": [
+          "Human pursue/decline preference not confirmed"
+        ]
+      },
+      "human_label": null,
+      "rules": {
+        "expected_cap": 60,
+        "cap_basis": "Configured research/fine-tuning cap; mandatory foundation-model training and publications in retained description",
+        "exclusion_expected": true,
+        "exclusion_basis": "exclusion_research"
+      }
+    }
+  ]
+}

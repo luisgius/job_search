@@ -377,13 +377,10 @@ scoring:
   # id, outage). The last entry is the local Qwen through Ollama's
   # OpenAI-compatible endpoint: no key, no quota, no rotating id — the floor
   # under the chain, reached only when every hosted id has failed.
-  # Conditions: the Ollama app must be running at 08:00 (menu-bar icon), and
-  # the model thinks before it answers, so at ~18 tok/s one scoring takes
-  # minutes, not seconds — hence its own `timeout` (seconds; the 120 s
-  # default would read a slow answer as a failure) and no retries (a slow
-  # answer does not get faster the second time; the default two retries
-  # would turn one wedged Ollama into half an hour per offer). 40 scorings
-  # on it is an hour-plus of laptop: right for a floor, wrong for a primary.
+  # Ollama must be running and the model installed. Scoring disables reasoning
+  # after the Oct5 local diagnosis (1500 tokens could end before final JSON).
+  # Model alternatives can help with upstream capacity, but do not multiply an
+  # account-wide free quota. Retry/cooldown handling must honor provider hints.
   fallback_models:
     - google/gemma-4-26b-a4b-it:free
     - nvidia/nemotron-3-super-120b-a12b:free
@@ -397,10 +394,10 @@ scoring:
   #     - google/gemma-3-27b-it                          # $0.08/M in · $0.45/M out
   #     - google/gemma-4-31b-it:free
   threshold: 65            # 65 medium · 75 strict
-  max_jobs: 40             # hard cap on LLM calls per run — your cost ceiling
+  max_jobs: 40             # evaluated jobs; model attempts/retries have separate limits
   max_tokens: 1500
   temperature: 0.0
-  concurrency: 1           # free tier is 20 req/min — bursts get 429s
+  concurrency: 1           # serialize evaluations; provider rate/quota limits still apply
 
   # --- Phase 5: who is being scored, beyond what the CV says ---------------
   # All three are PROMPT-ONLY: they shape the model's judgement and never

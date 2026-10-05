@@ -204,10 +204,9 @@ def test_complete_json_works_end_to_end():
 # ==========================================================================
 
 
-@pytest.mark.parametrize("status", [429, 500, 502, 503, 504, 520, 529])
+@pytest.mark.parametrize("status", [500, 502, 503, 504, 520, 529])
 def test_transient_http_failures_are_retried(status):
-    """The status only exists in the error text for this transport, so this is
-    also the regression test for parsing it out of the message."""
+    """Server failures retain bounded retries; 429 cooldowns have dedicated tests."""
     responses = [FakeResponse(status_code=status, text="upstream busy"),
                  FakeResponse(_json=completion("recovered"))]
     llm, session = client(responses)

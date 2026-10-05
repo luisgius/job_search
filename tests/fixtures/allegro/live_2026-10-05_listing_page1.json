@@ -1,0 +1,116 @@
+{
+  "offers": [
+    {
+      "id": "3506",
+      "url": "https://careers.allegro.eu/job-invite/3506?locale=en_US",
+      "name": "Operations Process Leader",
+      "team": "Warehouses",
+      "location": "Lublin, Ślusarska, Depot",
+      "brand": "Allegro sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1784721682
+    },
+    {
+      "id": "3381",
+      "url": "https://careers.allegro.eu/job-invite/3381?locale=en_US",
+      "name": "Operations Process Leader",
+      "team": "Warehouses",
+      "location": "Gdańsk, Budowlanych, Depot",
+      "brand": "Allegro sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1783606039
+    },
+    {
+      "id": "2929",
+      "url": "https://careers.allegro.eu/job-invite/2929?locale=en_US",
+      "name": "Depot Manager",
+      "team": "Delivery Experience",
+      "location": "Tarnów/Lisia Góra, Tarnowska, Depot",
+      "brand": "Allegro sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1778257841
+    },
+    {
+      "id": "3515",
+      "url": "https://careers.allegro.eu/job-invite/3515?locale=en_US",
+      "name": "Depot Manager",
+      "team": "Delivery Experience",
+      "location": "Opole, Zawada, Depot",
+      "brand": "Allegro sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1784550003
+    },
+    {
+      "id": "3153",
+      "url": "https://careers.allegro.eu/job-invite/3153?locale=en_US",
+      "name": "Depot Transport Coordinator",
+      "team": "Warehouses",
+      "location": "Gdańsk, Budowlanych, Depot",
+      "brand": "Allegro sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1781182589
+    },
+    {
+      "id": "2931",
+      "url": "https://careers.allegro.eu/job-invite/2931?locale=en_US",
+      "name": "Manager, Allegro Business - Selection and pricing innovation",
+      "team": "Commerce",
+      "location": "Warszawa, Fabryka Norblina",
+      "brand": "Allegro sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1778682074
+    },
+    {
+      "id": "3609",
+      "url": "https://careers.allegro.eu/job-invite/3609?locale=en_US",
+      "name": "Senior Data Analyst (Risk Management)",
+      "team": "Finance",
+      "location": "Warszawa, Fabryka Norblina",
+      "brand": "Allegro Pay sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1785930776
+    },
+    {
+      "id": "3783",
+      "url": "https://careers.allegro.eu/job-invite/3783?locale=en_US",
+      "name": "Project Manager (One Fulfillment Acquisition)",
+      "team": "Commerce",
+      "location": "Warszawa, Fabryka Norblina",
+      "brand": "Allegro sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1788252389
+    },
+    {
+      "id": "2867",
+      "url": "https://careers.allegro.eu/job-invite/2867?locale=en_US",
+      "name": "Loss Prevention Specialist",
+      "team": "Legal and Public Affairs",
+      "location": "Mobile employee",
+      "brand": "Allegro sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1787142533
+    },
+    {
+      "id": "3509",
+      "url": "https://careers.allegro.eu/job-invite/3509?locale=en_US",
+      "name": "Product Manager - AdTech",
+      "team": "IT - Product/Project Management",
+      "location": "Warszawa, Fabryka Norblina",
+      "brand": "Allegro sp. z o.o.",
+      "contract": "Employee",
+      "defaultLang": "en_US",
+      "releaseDate": 1788349814
+    }
+  ],
+  "max_pages": 16,
+  "results_count": 156
+}

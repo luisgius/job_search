@@ -12,6 +12,7 @@ import os
 import re
 import sys
 import time
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, TypeVar
@@ -61,6 +62,21 @@ DEFAULT_RETRIES = 3
 
 class HttpError(RuntimeError):
     """Raised after retries are exhausted."""
+
+    def __init__(self, message: str = "", *, status_code: int | None = None,
+                 headers: Any = None, error: Any = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        # Only response limit metadata; never retain authorization/cookies.
+        headers = headers if isinstance(headers, Mapping) else {}
+        self.headers = {
+            str(key).lower(): str(value) for key, value in headers.items()
+            if str(key).lower() in {
+                "retry-after", "x-ratelimit-limit", "x-ratelimit-remaining",
+                "x-ratelimit-reset",
+            }
+        }
+        self.error = error if isinstance(error, dict) else {}
 
 
 def http_get(
@@ -157,7 +173,13 @@ def http_post_json(
                 detail = f" — {str(response.text)[:300]}"
             except Exception:
                 pass
-            raise HttpError(f"{url} -> HTTP {status}{detail}")
+            try:
+                body = response.json()
+                error = body.get("error") if isinstance(body, dict) else None
+            except Exception:
+                error = None
+            raise HttpError(f"{url} -> HTTP {status}{detail}", status_code=status,
+                            headers=getattr(response, "headers", None), error=error)
         try:
             return response.json()
         except Exception as exc:

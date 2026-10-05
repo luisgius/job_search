@@ -1,0 +1,27 @@
+{
+  "checked_at_utc": "2026-10-05T10:32:49.506784+00:00",
+  "endpoint": "GET /api/v1/key",
+  "requests": 1,
+  "http_status": 200,
+  "status": "ok",
+  "credit_aggregates": {
+    "limit": {
+      "state": "null"
+    },
+    "limit_remaining": {
+      "state": "null"
+    },
+    "usage": 0,
+    "usage_daily": 0,
+    "usage_weekly": 0,
+    "usage_monthly": 0
+  },
+  "free_model_daily_requests": {
+    "used": 3,
+    "limit": 50,
+    "remaining": 47
+  },
+  "deprecated_rate_limit": {
+    "requests": -1
+  }
+}

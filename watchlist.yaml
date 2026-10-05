@@ -209,12 +209,21 @@ teamtailor:
 allegro:
   # Official public careers pages; no SAP credentials or application actions.
   # Collection is bounded and may be partial. Undated jobs remain undated.
-  max_pages: 4
+  #
+  # The employer feed had 16 pages (156 postings) on 2026-10-05, so the whole
+  # listing is walked: data roles sit under several teams (Finance among
+  # them), and a `teams:` filter would drop those. 40 requests cover the 16
+  # pages, the seed below and 7 listing details at two requests each (31),
+  # with room for a longer feed or an extra redirect. Library ceilings are
+  # 20 pages / 20 details / 40 requests; a feed that outgrows them is reported
+  # as partial in the digest, never read as complete.
+  max_pages: 16
   max_details: 8
-  max_requests: 12
+  max_requests: 40
   timeout_seconds: 20
   # Explicitly discovered official detail; fetched again, never assumed open.
-  # Its original date remains unchanged and it may be outside daily freshness.
+  # Its page date has changed between visits; the earliest date the employer
+  # states is used for freshness, so it may be outside the daily window.
   detail_urls:
     - https://careers.allegro.eu/job/Warszawa-Data-Scientist-Allegro-AI-Hub-00-841/1365885255/
 
