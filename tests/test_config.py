@@ -244,6 +244,7 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         # free countries plus GB-with-sponsorship, DS/ML mid-level titles,
         # English postings.
         "filters.countries": "Phase 4 search shape (see comment above)",
+        "filters.allow_remote_worldwide": "Luis explicitly added worldwide remote; library remains opt-in",
         "filters.title_include": "Phase 4 search shape (see comment above)",
         "filters.title_exclude": "Phase 4 search shape (see comment above)",
         "filters.languages": "legacy setting; ad language no longer gates eligibility",

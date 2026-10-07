@@ -431,13 +431,22 @@ def _check_location(job: Job, config: Any) -> _Check:
                 "is false",
                 "location_outside_eu",
             )
-        if require_hint and not resolved.eu_hint:
+        worldwide_evidence = None
+        if bool(_cfg(config, "filters.allow_remote_worldwide", False)):
+            worldwide_evidence = geo.worldwide_remote_evidence(
+                job.location, job.title, job.description or ""
+            )
+        if require_hint and not resolved.eu_hint and not worldwide_evidence:
             return _Check(
                 False,
                 f"remote posting with no European hint in location {job.location!r}, "
                 "title or description (filters.remote_requires_eu_hint)",
                 "location_outside_eu",
             )
+        if worldwide_evidence and not resolved.eu_hint:
+            # Evidence explains the added search scope; it makes no claim
+            # about authorization, tax, payroll, or timezone eligibility.
+            job.raw["remote_worldwide_evidence"] = worldwide_evidence
         return _Check(True, "")
 
     return _Check(
@@ -449,7 +458,9 @@ def _check_location(job: Job, config: Any) -> _Check:
 
 def passes_location(job: Job, config: Any) -> tuple[bool, str]:
     """Country / remote gate honouring `filters.countries`,
-    `filters.allow_remote` and `filters.remote_requires_eu_hint`.
+    `filters.allow_remote` and `filters.remote_requires_eu_hint`. Opting into
+    `filters.allow_remote_worldwide` also accepts explicit worldwide remote
+    work evidence at the hint gate, after country/US/sponsorship checks.
 
     Stamps `job.country` (and `job.remote`, when the source left it unknown)
     as a side effect — the geo resolution is not worth doing twice.

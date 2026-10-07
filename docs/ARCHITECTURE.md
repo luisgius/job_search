@@ -162,6 +162,7 @@ EU_COUNTRIES: dict[str, str]          # ISO alpha-2 -> English name
 def country_of(location: str) -> str | None      # ISO alpha-2 or None
 def countries_of(location: str) -> list[str]     # all of them, best first
 def is_remote(location: str, title: str = "", description: str = "") -> bool
+def worldwide_remote_evidence(location, title="", description="") -> str | None
 def mentions_eu(text: str) -> bool     # "Remote (EU)", "EMEA", "Europe" ...
 ```
 `countries_of` exists because "Remote (Portugal, Spain, Poland)" is one job
@@ -205,7 +206,11 @@ states as structured data (Lever `categories.commitment`, Adzuna
 `contract_type`), never the title. The location stage honours
 `filters.countries_if_sponsorship`: those countries pass only when the posting
 itself offers visa sponsorship (offer-shaped phrasings; "must have a valid
-work visa" is the opposite sentence). The language stage
+work visa" is the opposite sentence). After country, sponsorship and US checks,
+`filters.allow_remote_worldwide` can supply explicit worldwide-work evidence to
+the remote branch without a European hint. It records
+`raw["remote_worldwide_evidence"]`; it does not establish work authorization.
+The language stage
 uses explicit work-language requirements against `filters.language_levels`.
 The ad language never rejects a job. Ambiguous, optional or missing requirements
 remain unknown; recognized incompatible professional requirements retain their

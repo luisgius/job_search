@@ -849,6 +849,101 @@ def is_remote(location: str | None, title: str = "", description: str = "") -> b
     return _remote_word_hit(surface)
 
 
+_WORLDWIDE_REMOTE_RE = re.compile(
+    r"\b(?:remote(?:ly)? (?:worldwide|global|globally|anywhere)|"
+    r"home based worldwide|anywhere in the world|"
+    r"(?:worldwide|global) remote(?: work| role| position| job)?|"
+    r"work(?:ing)? (?:remotely )?from anywhere(?: in the world)?|"
+    r"work(?:ing)? remotely from (?:any country|anywhere in the world))\b"
+)
+_WORLDWIDE_RESTRICTION_RE = re.compile(
+    r"\b(?:hybrid|on site|onsite|in office|office attendance|"
+    r"not remote|no remote|not (?:a )?(?:fully )?remote|"
+    r"must (?:be |live |reside |work |have )|required to (?:be |live |reside )|"
+    r"(?:based|located|reside|resident|residents|residency|citizenship|citizens) (?:in|of)|"
+    r"(?:work |working )?authori[sz]ation|authori[sz]ed to work|right to work|"
+    r"(?:candidates|applicants|residents) (?:only|must)|"
+    r"only (?:hire|hiring|employ|candidates|applicants|available|open|in|from|for)|"
+    r"(?:us|usa|canada|uk|australia|india) only|"
+    r"(?:remote|remotely) in|remotely from (?!anywhere\b|any country\b)|"
+    r"(?:remote|remotely|anywhere) (?:within|across)|"
+    r"anywhere in (?!the world\b)|"
+    r"(?:eligible|approved|selected|specific|certain|supported) countries|"
+    r"(?:except|excluding|restricted|restriction|restrictions|limited to))\b"
+)
+_WORLDWIDE_BOILERPLATE_RE = re.compile(
+    r"\b(?:company|companies|team|teams|customers?|clients?|products?|"
+    r"platform|software|tools?|benefits?|perks?|policy|travel|vacation|"
+    r"days?|weeks?|months?|not|never|cannot)\b"
+)
+
+# Descriptions contain skill requirements, company addresses and technical
+# terms such as "hybrid search" or "OAuth authorization". Only wording about
+# the hire's work arrangement or geographic eligibility can veto evidence.
+_WORLDWIDE_DESCRIPTION_RESTRICTION_RE = re.compile(
+    r"\b(?:"
+    r"(?:must|required to|need to) (?:live|reside|be based|be located|work) in|"
+    r"(?:candidates?|applicants?|employees?|you) (?:must be |are |should be )?"
+    r"(?:based|located|resident) in|"
+    r"(?:residents?|citizens) of|"
+    r"(?:[a-z]+ ){1,4}based (?:candidates?|applicants?|residents?|employees?)|"
+    r"(?:work |working )?authori[sz]ation to work in|"
+    r"authori[sz]ed to work in|right to work in|"
+    r"must have (?:[a-z]+ ){0,4}(?:citizenship|residency|work authori[sz]ation)|"
+    r"(?:us|usa|canada|uk|australia|india|europe|eu|latam|apac) (?:residents? )?only|"
+    r"only (?:hire|hiring|employ|candidates|applicants) (?:in|from)|"
+    r"only (?:available|open) (?:in|to)|"
+    r"(?:remote|remotely) in|remotely from (?!anywhere\b|any country\b)|"
+    r"(?:remote|remotely|anywhere) (?:within|across)|"
+    r"anywhere in (?!the world\b)|"
+    r"(?:eligible|approved|selected|specific|certain|supported) countries|"
+    r"(?:limited|restricted) to (?:[a-z]+ ){0,3}(?:countries|residents|citizens)|"
+    r"(?:limited|restricted) to (?:the )?(?:us|usa|united states|canada|uk|australia|india|europe|eu|latam|apac)|"
+    r"(?:except|excluding) (?:the )?(?:us|usa|united states|canada|uk|europe|eu|asia)|"
+    r"(?:role|position|job|work|arrangement) (?:is |requires |will be )?(?:hybrid|onsite|on site|in office)|"
+    r"(?:hybrid|onsite|on site|in office) (?:role|position|job|work|arrangement)|"
+    r"office attendance|not remote|no remote|not (?:a )?(?:fully )?remote"
+    r")\b"
+)
+
+
+def worldwide_remote_evidence(location: str | None, title: str = "",
+                              description: str = "") -> str | None:
+    """Explicit unrestricted remote-work wording, never work authorization.
+
+    Used only by the opt-in filter. Concrete locations and conflicting or
+    conditional wording are deliberately left to the existing country gate;
+    unknown restrictions are not interpreted as permission. This recognizer
+    favors clear job wording over recall and is not a legal eligibility parser.
+    """
+    loc = normalize_text(location)
+    # Do not reinterpret an office/country/location label as worldwide based
+    # on weaker prose, including places the European resolver cannot name.
+    if set(loc.split()) - {
+        "remote", "remotely", "fully", "100", "worldwide", "world", "wide",
+        "global", "globally", "anywhere", "work", "from", "in", "the",
+        "location", "home", "based",
+    }:
+        return None
+    fields = (location or "", title, description)
+    if any(_WORLDWIDE_RESTRICTION_RE.search(normalize_text(text)) for text in fields[:2]):
+        return None
+    if _WORLDWIDE_DESCRIPTION_RESTRICTION_RE.search(normalize_text(description)):
+        return None
+    if loc in {"worldwide", "anywhere", "global"}:
+        return f"location: {location}"
+    for source, text in zip(("location", "title", "description"), fields):
+        # Keep unrelated sentences separate: a company's global footprint or
+        # temporary travel benefit is not this role's permitted work location.
+        for clause in re.split(r"[.!?;\n]+", text):
+            normalized = normalize_text(clause)
+            if _WORLDWIDE_BOILERPLATE_RE.search(normalized):
+                continue
+            if _WORLDWIDE_REMOTE_RE.search(normalized):
+                return f"{source}: {clause.strip()}"
+    return None
+
+
 # --------------------------------------------------------------------------
 # "is Europe mentioned at all?"
 # --------------------------------------------------------------------------

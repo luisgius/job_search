@@ -1,13 +1,13 @@
 # Job Hunter roadmap: user actions and AI delivery
 
-Updated 9 September 2026. The goal is to find more distinct, relevant Poland opportunities, beginning with Kraków, while preserving the normal pipeline and application history. This roadmap follows the [Astra coverage review](COVERAGE_FUTURE_2026-09-09.md). It does not promise coverage of every company.
+Updated 7 October 2026 (worldwide preference; earlier batch history retained). The goal is to find more distinct, relevant Poland opportunities, beginning with Kraków, while preserving the normal pipeline and application history. This roadmap follows the [Astra coverage review](COVERAGE_FUTURE_2026-09-09.md). It does not promise coverage of every company.
 
 ## Your actions
 
 | Action | Why your input matters | When needed | Current state |
 |---|---|---|---|
 | Confirm Polish proficiency and permission to work in Poland | These are personal facts; the AI must not infer them from an English CV or current address. | Before declaring eligibility or preparing an application | Asked; unknown until answered |
-| Set acceptable locations and attendance | Kraków is a candidate location. Warsaw hybrid, relocation and Poland-remote roles need your preference. | Before final shortlist decisions | Kraków included; other preferences pending |
+| Set acceptable locations and attendance | Kraków is a candidate location. Warsaw hybrid, relocation and Poland-remote roles need your preference. | Before final shortlist decisions | Europe and explicit worldwide remote included (5 October request); office attendance/relocation preferences otherwise unchanged |
 | Set salary floor and contract preferences | Hourly B2B and monthly employment offers cannot be treated as equivalent. | Before ranking compensation | Pending |
 | Mark a small sample “pursue”, “stretch”, or “dismiss”, with a reason | This supplies real relevance labels beyond synthetic parser tests. | First explorer review, then weekly | Pending first review |
 | Connect Adzuna credentials or authorize alert-mail access if that experiment is selected | Account access belongs to you. Put secrets in the existing credential mechanism, never in this roadmap or chat. | Only for those later integrations | Optional; not required for current build |

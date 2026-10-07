@@ -199,8 +199,9 @@ filters:
     - CZ   # Czechia
     - LU   # Luxembourg
   allow_remote: true
-  # "Remote" with no European hint anywhere is usually a US role.
+  # Keep bare "Remote" ambiguous; explicit worldwide eligibility is separate.
   remote_requires_eu_hint: true
+  allow_remote_worldwide: true  # explicit worldwide remote roles, alongside Europe
 
   # Reachable only with the employer's help (Spanish national, UK needs a
   # sponsored visa): these pass ONLY when the posting explicitly offers
@@ -413,6 +414,11 @@ scoring:
     and experimental design. Real gap: no deep NLP or LLM *research*
     experience — one production RAG project (thesis), no transformer
     fine-tuning, no publications.
+    Search preference: European roles plus fully remote roles explicitly open
+    worldwide. Worldwide remote is an accepted work arrangement, not proof of
+    work authorization or an available employment/contractor arrangement.
+    Report explicit residence, hiring-country and time-zone restrictions; keep
+    unstated eligibility requirements unknown.
   # Themes that should pull a score UP when the posting matches them.
   positive_signals:
     - time-series forecasting or demand planning

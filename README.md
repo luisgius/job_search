@@ -1,9 +1,14 @@
 # Job Hunter
 
+The configured search includes European opportunities and explicitly worldwide
+remote roles. Generic “Remote” is not proof of worldwide eligibility. See
+[remote search scope](docs/WORLDWIDE_REMOTE.md) for restrictions and coverage.
+
+
 A daily job-search pipeline for one person. Every weekday morning it pulls
 fresh postings from the company boards you name plus (optionally) Adzuna and
-your LinkedIn job-alert emails, throws away everything outside your countries,
-your languages, your title rules and your freshness window, asks Claude to
+your LinkedIn job-alert emails, filters by your countries (plus enabled worldwide remote),
+your languages, your title rules and your freshness window, asks the configured model to
 score what is left against your actual CV, writes a tailored CV and cover
 letter for each match, optionally fills simple Greenhouse/Lever forms — and
 puts everything else in a single HTML page with a link per job so your part
@@ -98,7 +103,9 @@ option (`ANTHROPIC_API_KEY` instead if you switch `llm.provider: anthropic`):
 export OPENROUTER_API_KEY=sk-or-...
 ```
 
-Then trim `filters.countries` to the countries you can actually work in, and
+Then trim `filters.countries` to the countries you can actually work in.
+`filters.allow_remote_worldwide` separately admits explicit worldwide remote roles
+(the shipped configuration enables it; other configurations default to false), and
 set `scoring.threshold` (65 is medium, 75 is strict). Every other key has a
 working default in `src/config.py`.
 

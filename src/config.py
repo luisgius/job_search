@@ -139,6 +139,7 @@ DEFAULTS: dict[str, Any] = {
         ],
         "allow_remote": True,
         "remote_requires_eu_hint": True,
+        "allow_remote_worldwide": False,
         "title_include": [],
         # Whole-word, accent-folded and case-insensitive (`filters._matches`),
         # so "intern" cannot reject "International Sales" — which is why this
