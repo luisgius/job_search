@@ -1,0 +1,217 @@
+#
+# robots.txt
+#
+# This file is to prevent the crawling and indexing of certain parts
+# of your site by web crawlers and spiders run by sites like Yahoo!
+# and Google. By telling these "robots" where not to go on your site,
+# you save bandwidth and server resources.
+#
+# This file will be ignored unless it is at the root of your host:
+# Used:    http://example.com/robots.txt
+# Ignored: http://example.com/site/robots.txt
+#
+# For more information about the robots.txt standard, see:
+# http://www.robotstxt.org/robotstxt.html
+
+User-agent: *
+# CSS, JS, Images
+Allow: /core/*.css$
+Allow: /core/*.css?
+Allow: /core/*.js$
+Allow: /core/*.js?
+Allow: /core/*.gif
+Allow: /core/*.jpg
+Allow: /core/*.jpeg
+Allow: /core/*.png
+Allow: /core/*.svg
+Allow: /profiles/*.css$
+Allow: /profiles/*.css?
+Allow: /profiles/*.js$
+Allow: /profiles/*.js?
+Allow: /profiles/*.gif
+Allow: /profiles/*.jpg
+Allow: /profiles/*.jpeg
+Allow: /profiles/*.png
+Allow: /profiles/*.svg
+# Directories
+Disallow: /core/
+Disallow: /profiles/
+# Files
+Disallow: /README.md
+Disallow: /composer/Metapackage/README.txt
+Disallow: /composer/Plugin/ProjectMessage/README.md
+Disallow: /composer/Plugin/Scaffold/README.md
+Disallow: /composer/Plugin/VendorHardening/README.txt
+Disallow: /composer/Template/README.txt
+Disallow: /modules/README.txt
+Disallow: /sites/README.txt
+Disallow: /themes/README.txt
+Disallow: /web.config
+# Paths (clean URLs)
+Disallow: /admin/
+Disallow: /comment/reply/
+Disallow: /filter/tips
+Disallow: /node/add/
+Disallow: /search/
+Disallow: /user/register
+Disallow: /user/password
+Disallow: /user/login
+Disallow: /user/logout
+Disallow: /user/activation
+Disallow: /user/activate/*/*/*
+Disallow: /activate/user/*
+Disallow: /user/activate/*/*/*/login
+Disallow: /activatesuccess/*
+Disallow: /media/oembed
+Disallow: /*/media/oembed
+# Paths (no clean URLs)
+Disallow: /index.php/admin/
+Disallow: /index.php/comment/reply/
+Disallow: /index.php/filter/tips
+Disallow: /index.php/node/add/
+Disallow: /index.php/search/
+Disallow: /index.php/user/password
+Disallow: /index.php/user/register
+Disallow: /index.php/user/login
+Disallow: /index.php/user/logout
+Disallow: /index.php/user/activation
+Disallow: /index.php/media/oembed
+Disallow: /index.php/*/media/
+
+#
+# Custom rules
+#
+
+Disallow: /*/search/
+Disallow: /job-apply/
+Disallow: /*/job-apply/
+Disallow: /job-apply-external/
+Disallow: /*/job-apply-external/
+Disallow: /*?*salary_range*=
+Disallow: /*?*field_job_salary_min=
+Disallow: /*?*field_job_salary_max=
+Disallow: /*?*contract=temp
+Disallow: /*?*contract=permanent
+Disallow: /*?*brand=MP
+Disallow: /*?*brand=MPI
+Disallow: /*?*brand=PE
+Disallow: /*?*brand=PP
+Disallow: /*?*brand=PT
+Disallow: /*?*item_per_pages
+Disallow: /*?*company-type*=
+Disallow: /*?*start-month*=
+Disallow: /*?*placement-duration*=
+Disallow: /*thank-you*
+Disallow: /job_alert-anon
+Disallow: /anon-user-flow/
+Disallow: */data-incident-faqs
+Disallow: */data-privacy-update
+Disallow: */nojs/*
+Disallow: /*?*cts=true
+Disallow: /cts-jobs
+Disallow: /cts-jobs/*
+Disallow: /google-cts-set-event
+Disallow: /candidate-consent-request-form
+Disallow: /candidate-consent-request-form/*
+Disallow: /en/candidate-consent-request-form
+Disallow: /en/candidate-consent-request-form/*
+Disallow: /sites/*/files/protected-documents/
+Disallow: /taxonomy/term/*/*
+Disallow: /*/taxonomy/term/*/*
+
+# Disallow standalone URLs.
+Disallow: */standalone/*
+
+# Allow legacy job browse URLs, but disallow search URLs with too many facets.
+Allow: */browse/jobs/*/*/*/
+Disallow: */jobs/*/*/*/
+
+# Exclude any files uploaded via webforms.
+Disallow: /sites/*/files/webform/
+Disallow: /system/files/webform/
+
+# Custom rules explicitly for Googlebot.
+User-agent: AdsBot-Google
+Disallow: /sites/*/files/webform/
+Disallow: /system/files/webform/
+Disallow: */data-incident-faqs
+Disallow: */data-privacy-update
+
+# Rate-limit BingBot to 1 page every 1 seconds.
+User-Agent: bingbot
+Crawl-delay: 1
+
+# Repeat all other directives for BingBot
+Disallow: /CHANGELOG.txt
+Disallow: /cron.php
+Disallow: /INSTALL.mysql.txt
+Disallow: /INSTALL.pgsql.txt
+Disallow: /INSTALL.sqlite.txt
+Disallow: /install.php
+Disallow: /INSTALL.txt
+Disallow: /LICENSE.txt
+Disallow: /MAINTAINERS.txt
+Disallow: /update.php
+Disallow: /UPGRADE.txt
+Disallow: /xmlrpc.php
+Disallow: /sites/*/files/webform/
+Disallow: /admin/
+Disallow: /comment/reply/
+Disallow: /filter/tips/
+Disallow: /node/add/
+Disallow: /search/
+Disallow: /user/register/
+Disallow: /user/password
+Disallow: /user/login/
+Disallow: /user/logout/
+Disallow: /user/activation/
+Disallow: /user/activate/*/*/*/
+Disallow: /activate/user/*/
+Disallow: /user/activate/*/*/*/login/
+Disallow: /activatesuccess/*
+Disallow: /?q=admin/
+Disallow: /?q=comment/reply/
+Disallow: /?q=filter/tips/
+Disallow: /?q=node/add/
+Disallow: /?q=search/
+Disallow: /?q=user/password/
+Disallow: /?q=user/register/
+Disallow: /?q=user/login/
+Disallow: /?q=user/logout/
+Disallow: /?q=user/activation/
+Disallow: /*/search/
+Disallow: /job-apply/
+Disallow: /*/job-apply/
+Disallow: /job-apply-external/
+Disallow: /*/job-apply-external/
+Disallow: /*?*salary_range*=
+Disallow: /*?*field_job_salary_min=
+Disallow: /*?*field_job_salary_max=
+Disallow: /*?*contract=temp
+Disallow: /*?*contract=permanent
+Disallow: /*?*brand=MP
+Disallow: /*?*brand=MPI
+Disallow: /*?*brand=PE
+Disallow: /*?*brand=PP
+Disallow: /*?*brand=PT
+Disallow: /*?*item_per_pages
+Disallow: /*thank-you*
+Disallow: /anon-user-flow/
+Disallow: /job_alert-anon
+Disallow: */data-incident-faqs
+Disallow: */data-privacy-update
+Disallow: */nojs/*
+Disallow: */standalone/*
+Allow: */browse/jobs/*/*/*/
+Disallow: */jobs/*/*/*/
+Disallow: /sites/*/files/webform/
+Disallow: /system/files/webform/
+Disallow: /*?*cts=true
+Disallow: /cts-jobs
+Disallow: /cts-jobs/*
+Disallow: /candidate-consent-request-form
+Disallow: /candidate-consent-request-form/*
+Disallow: /en/candidate-consent-request-form
+Disallow: /en/candidate-consent-request-form/*
+Disallow: /taxonomy/term/*/*
+Disallow: /*/taxonomy/term/*/*

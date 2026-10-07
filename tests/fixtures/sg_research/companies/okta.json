@@ -1,0 +1,32 @@
+{
+ "company_key": "okta",
+ "ats": "greenhouse",
+ "identifiers": {
+  "token": "okta"
+ },
+ "checked_at": "2026-10-07T15:05:15+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://boards-api.greenhouse.io/robots.txt",
+  "http_status": 200,
+  "path_checked": "/v1/boards/okta/jobs",
+  "allowed": true,
+  "body_excerpt": "# See http://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file\n\nUser-agent: *\nDisallow: /embed/"
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://boards-api.greenhouse.io/v1/boards/okta/jobs"
+ },
+ "http_status": 200,
+ "board_name": "Okta",
+ "total_jobs": 372,
+ "sg_jobs": 5,
+ "sg_ds_matches": [],
+ "sg_sample_titles": [
+  "Associate Customer Success Manager, Asia (Singapore)",
+  "Director, APJ Deal Strategy",
+  "Principal Forward Deployed Engineer",
+  "Principal Recruiter, APJ ",
+  "Senior Director of Marketing - APJ"
+ ]
+}

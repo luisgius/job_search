@@ -1,0 +1,9 @@
+{
+  "url": "https://api.ashbyhq.com/robots.txt",
+  "checked_at": "2026-10-07T15:49:00Z",
+  "http_status": 401,
+  "content_type": "text/plain; charset=utf-8",
+  "body": "Unauthorized",
+  "www_authenticate": null,
+  "policy": "RFC 9309 section 2.3.1.3; documented unauthenticated public job-posting API only"
+}

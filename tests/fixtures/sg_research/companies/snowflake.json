@@ -1,0 +1,31 @@
+{
+ "company_key": "snowflake",
+ "ats": "ashby",
+ "identifiers": {
+  "board": "snowflake"
+ },
+ "checked_at": "2026-10-07T15:05:50+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://api.ashbyhq.com/robots.txt",
+  "http_status": 401,
+  "path_checked": "/posting-api/job-board/snowflake",
+  "allowed": null,
+  "body_excerpt": "",
+  "robots_rules_present": false,
+  "access_basis": "No robots rules exist: HTTP 401 is 'Unavailable' under RFC 9309 s2.3.1.3 (4xx: crawler MAY access), combined with Ashby's documented public posting API (https://developers.ashbyhq.com/docs/public-job-posting-api). This is NOT an actual robots allow. The exception is limited to https://api.ashbyhq.com/posting-api/job-board/; robots 5xx/network (s2.3.1.4) and endpoint 401/403/429/5xx fail closed."
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://api.ashbyhq.com/posting-api/job-board/snowflake"
+ },
+ "http_status": 200,
+ "total_jobs": 353,
+ "sg_jobs": 3,
+ "sg_ds_matches": [],
+ "sg_sample_titles": [
+  "Senior AI/ML Architect, Applied Field Engineering/Field CTO",
+  "Senior Product Marketing Manager and Evangelist, ASEAN",
+  "Sr. Engagement Manager"
+ ]
+}

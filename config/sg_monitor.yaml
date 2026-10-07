@@ -1,0 +1,87 @@
+# Singapore monitoring settings: Employment Pass salary thresholds and search titles.
+#
+# Thresholds come from MOM's official EP eligibility page, fetched 2026-10-07 (the page says
+# "Last Updated: 28 April 2026"):
+#   https://www.mom.gov.sg/passes-and-permits/employment-pass/eligibility
+# The full age table is in tests/fixtures/sg_research/policy/mom_ep_qualifying_salary.json.
+# Monthly fixed salary in SGD. Meeting the threshold is necessary but not sufficient:
+# a candidate also needs 40 COMPASS points unless exempt. Before acting, check with MOM's
+# Self-Assessment Tool:
+#   https://www.mom.gov.sg/eservices/services/employment-s-pass-self-assessment-tool
+#
+# The user is 25, so these are the age-25 rows. The minimum is S$5,600 / S$6,200 at age 23
+# or below and rises with age to S$10,700 / S$11,800 at 45 or above (2026 table).
+
+applicant_age: 25
+
+# LLM used to score Singapore postings. The user chose this existing model.
+llm:
+  provider: openrouter
+
+scoring:
+  model: google/gemma-4-31b-it:free
+  concurrency: 1  # serialize free-tier scoring requests
+
+ep_thresholds:
+  - effective_date: "2025-01-01"
+    applies_to: "new applications before 2027-01-01; renewals expiring before 2028-01-01"
+    non_fs: 6064
+    fs: 6709
+    base_non_fs_age_23_or_below: 5600
+    base_fs_age_23_or_below: 6200
+    source: https://www.mom.gov.sg/passes-and-permits/employment-pass/eligibility
+    verified_at: "2026-10-07"
+  - effective_date: "2027-01-01"
+    applies_to: "new applications from 2027-01-01; renewals expiring from 2028-01-01"
+    non_fs: 6500
+    fs: 7155
+    base_non_fs_age_23_or_below: 6000
+    base_fs_age_23_or_below: 6600
+    source: https://www.mom.gov.sg/passes-and-permits/employment-pass/eligibility
+    verified_at: "2026-10-07"
+
+# A posting's stated salary is evidence only when it is a fixed monthly figure. Treat
+# explicitly fixed annual salary is divided by 12; total-comp / "up to" numbers stay unknown.
+salary_rules:
+  currency: SGD
+  basis: fixed_monthly
+  unknown_salary: manual_review
+
+# Every title to search for. The last three (ML/AI engineering) are secondary and are also
+# listed in secondary_search_terms, so scoring can rank them below the DS titles.
+search_terms:
+  - Data Scientist
+  - Junior Data Scientist
+  - Associate Data Scientist
+  - Data Scientist I
+  - Data Scientist II
+  - Applied Data Scientist
+  - Decision Data Scientist
+  - Decision Scientist
+  - Product Data Scientist
+  - Pricing Data Scientist
+  - Marketing Data Scientist
+  - Risk Data Scientist
+  - Machine Learning Scientist
+  - ML Scientist
+  - Machine Learning Engineer
+  - ML Engineer
+  - AI Engineer
+
+secondary_search_terms:
+  - Machine Learning Engineer
+  - ML Engineer
+  - AI Engineer
+
+schedule:
+  mcf: daily          # search window: postings from the last 7 days, all titles above
+  boards: mwf         # eFinancialCareers, Glints, Tech in Asia
+  recruiters: weekly  # Michael Page, Robert Walters, Hays
+  company_manual: weekly  # status manual_check / unverified entries in sg_companies.yaml
+
+exclusions:
+  employer_types: [government, statutory_board, defence]
+  note: >-
+    MCF and board ads are radar only. An MCF listing exists partly because of the Fair Consideration
+    Framework advertising requirement, so it is not evidence of EP sponsorship. Sponsorship and
+    eligibility must be checked against MOM's official criteria (salary threshold + COMPASS).

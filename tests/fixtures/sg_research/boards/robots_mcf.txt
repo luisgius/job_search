@@ -1,0 +1,3 @@
+User-agent: *
+Disallow:
+Sitemap: https://www.mycareersfuture.gov.sg/sitemap-index.xml

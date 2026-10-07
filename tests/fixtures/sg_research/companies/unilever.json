@@ -1,0 +1,151 @@
+{
+ "company_key": "unilever",
+ "ats": "workday",
+ "identifiers": {
+  "host": "unilever.wd3.myworkdayjobs.com",
+  "tenant": "unilever",
+  "site": "Unilever_Experienced_Professionals"
+ },
+ "checked_at": "2026-10-07T14:59:45+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://unilever.wd3.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/unilever/Unilever_Experienced_Professionals/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://unilever.wd3.myworkdayjobs.com/UK_TemporaryWorkersite/siteMap.xml\nSitemap: https://unilever.wd3.myworkdayjobs.com/Unilever_Early_Careers/siteMap.xml\nSitemap: https://unilever.wd3.myworkdayjobs.com/Unilever_Experienced_Professionals/siteMap.xml\nSitemap: https://unilever.wd3.myworkdayjobs.com/Unilever_UFLP_ULIP_Fast_Track_Career_Site/siteMap.xml\nSitemap: https://unilever.wd3.myworkdayjobs.com/Unilever_Early_Bird_Early_Access_to_Job_Posting/siteMap.xml\n\nUser-agent: *\nAllow: /UK_TemporaryWorkersite/\nAllow: /Unilever_Early_Careers/\nAllow: /Unilever_Experienced_Professionals/\nAllow: /Unilever_UFLP_ULIP_Fast_Track_Career_Site/\nAllow: /Unilever_Early_Bird_Early_Access_to_Job_Posting/\nDisallow: /EB/\nDisallow: /Unilever_VIP_Careers/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://unilever.wd3.myworkdayjobs.com/wday/cxs/unilever/Unilever_Experienced_Professionals/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 231,
+   "first_page": [
+    {
+     "title": "Jefe de Turno",
+     "locationsText": "Pilar, Argentina",
+     "externalPath": "/job/Pilar-Argentina/Jefe-de-Turno_R-1189083"
+    },
+    {
+     "title": "Senior Trade Marketing Executive",
+     "locationsText": "Vientiane, Laos",
+     "externalPath": "/job/Vientiane-Laos/Senior-General-Trade-Channel-Executive_R-1186434"
+    },
+    {
+     "title": "Channel & CD Excellence Manager",
+     "locationsText": "Vientiane, Laos",
+     "externalPath": "/job/Vientiane-Laos/GT-Channel-Manager---Laos_R-1185775"
+    },
+    {
+     "title": "Instore Manager Lahore",
+     "locationsText": "Lahore Sales Office",
+     "externalPath": "/job/Lahore-Sales-Office/Instore-Manager-Lahore_R-1189125"
+    },
+    {
+     "title": "Bezirksleiter: in Gastronomie Vertrieb / Au\u00dfendienst (d/w/m)",
+     "locationsText": "Remote - Vienna, Austria",
+     "externalPath": "/job/Remote---Vienna-Austria/Bezirksleiter--in-Gastronomie-Vertrieb---Auendienst--d-w-m-_R-1186562-1"
+    },
+    {
+     "title": "Manufacturing Manager Fatty Acid 2 and Hydrogenation",
+     "locationsText": "Medan, Indonesia",
+     "externalPath": "/job/Medan-Indonesia/Manufacturing-Manager-Fatty-Acid-2-and-Hydrogenation_R-1189279"
+    },
+    {
+     "title": "Culinary Adviser",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Suceava-Romania/Culinary-Adviser_R-1187414"
+    },
+    {
+     "title": "Project Assistant Manager",
+     "locationsText": "Konya HPC",
+     "externalPath": "/job/Konya-HPC/Project-Assistant-Manager_R-1186622-1"
+    },
+    {
+     "title": "Foods PH Condiments Assistant Brand Manager",
+     "locationsText": "Taguig, Philippines",
+     "externalPath": "/job/Taguig-Philippines/Foods-PH-Condiments-Assistant-Brand-Manager_R-1188771"
+    },
+    {
+     "title": "Beauty & Wellbeing Thailand Makro and 1UL CVS Lead",
+     "locationsText": "Bangkok, Thailand",
+     "externalPath": "/job/Bangkok-Thailand/Beauty---Wellbeing-Thailand-Makro--CJ-and-1UL-BigC-Lead_R-1184355"
+    },
+    {
+     "title": "Territory Development Manager - Boston",
+     "locationsText": "Remote - USA",
+     "externalPath": "/job/Remote---USA/Territory-Development-Manager---Boston_R-1189159"
+    },
+    {
+     "title": "Schichtschlosser:in (d/w/m)",
+     "locationsText": "Buxtehude, Germany",
+     "externalPath": "/job/Buxtehude-Germany/Schichtschlosser-in--d-w-m-_R-1188616"
+    },
+    {
+     "title": "Senior Executive - Ultralogistic",
+     "locationsText": "Mumbai HO",
+     "externalPath": "/job/Mumbai-HO/Senior-Executive---Ultralogistic_R-1188395-1"
+    },
+    {
+     "title": "Engineering Executive (Mechanical)",
+     "locationsText": "Yangon, Myanmar",
+     "externalPath": "/job/Yangon-Myanmar/Engineering-Executive--Mechanical-_R-1189259"
+    },
+    {
+     "title": "Mechnical Technician",
+     "locationsText": "Yangon, Myanmar",
+     "externalPath": "/job/Yangon-Myanmar/Mechnical-Technician_R-1188484"
+    },
+    {
+     "title": "AFM National Finance Operations + Digital Execution",
+     "locationsText": "Hoboken US HQ",
+     "externalPath": "/job/Hoboken-US-HQ/AFM-National-Finance-Operations---Digital-Execution_R-1186445"
+    },
+    {
+     "title": "Promotor De Merchandising - Salvador Exclusiva para Pessoa com Defici\u00eancia",
+     "locationsText": "Recife, Brazil",
+     "externalPath": "/job/Recife-Brazil/Promotor-De-Merchandising---Salvador-Exclusiva-para-Pessoa-com-Deficincia_R-1188600"
+    },
+    {
+     "title": "Customer Account Manager - The Value Channel (Home Care)",
+     "locationsText": "Sunlight House",
+     "externalPath": "/job/Sunlight-House/Customer-Account-Manager---The-Value-Channel--Home-Care-_R-1186018"
+    },
+    {
+     "title": "Associate Finance Manager, Foods (Canada)",
+     "locationsText": "Toronto, ON",
+     "externalPath": "/job/Toronto-ON/Associate-Finance-Manager--Foods--Canada-_R-1186856-1"
+    },
+    {
+     "title": "Senior Manager, Revenue Growth Management - Skin Cleansing US",
+     "locationsText": "Hoboken US HQ",
+     "externalPath": "/job/Hoboken-US-HQ/Senior-Manager--Net-Revenue-Management---Personal-Care-US_R-1184203"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 0,
+   "first_page": []
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 0,
+   "first_page": []
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 231,
+ "sg_search_total": 0,
+ "sg_ds_first_page_matches": [],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

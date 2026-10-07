@@ -1,0 +1,40 @@
+{
+ "company_key": "pinterest",
+ "ats": "greenhouse",
+ "identifiers": {
+  "token": "pinterest"
+ },
+ "checked_at": "2026-10-07T15:05:23+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://boards-api.greenhouse.io/robots.txt",
+  "http_status": 200,
+  "path_checked": "/v1/boards/pinterest/jobs",
+  "allowed": true,
+  "body_excerpt": "# See http://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file\n\nUser-agent: *\nDisallow: /embed/"
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://boards-api.greenhouse.io/v1/boards/pinterest/jobs"
+ },
+ "http_status": 200,
+ "board_name": "Pinterest",
+ "total_jobs": 178,
+ "sg_jobs": 13,
+ "sg_ds_matches": [],
+ "sg_sample_titles": [
+  "Content Growth Specialist, APAC Growth [6-Month Fixed Term]",
+  "Director, Enterprise Sales - Greater China Region",
+  "Director, Sales Partners & Agency - Greater China Region",
+  "Lead Client Account Manager  (eCommerce) - Greater China Region",
+  "Lead Client Partner ",
+  "Performance Solutions Lead",
+  "Sr. Agency Partner ",
+  "Sr. Client Account Manager (Entertainment App) - Greater China Region",
+  "Sr. Client Account Manager (Growth) - Greater China Region",
+  "Sr. Client Account Manager - SEA",
+  "Sr. Client Partner (Gaming/App)",
+  "Sr. Lead HRBP - APAC Region",
+  "Sr. Performance Solutions Partner"
+ ]
+}

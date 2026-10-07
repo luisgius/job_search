@@ -1,0 +1,242 @@
+{
+ "company_key": "paypal",
+ "ats": "workday",
+ "identifiers": {
+  "host": "paypal.wd1.myworkdayjobs.com",
+  "tenant": "paypal",
+  "site": "jobs"
+ },
+ "checked_at": "2026-10-07T15:00:06+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://paypal.wd1.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/paypal/jobs/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://wd1.myworkdaysite.com/recruiting/paypal/jobs/siteMap.xml\n\nUser-agent: *\nAllow: /jobs/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://paypal.wd1.myworkdayjobs.com/wday/cxs/paypal/jobs/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 297,
+   "first_page": [
+    {
+     "title": "Manager, Global Mobility Tax",
+     "locationsText": "3 Locations",
+     "externalPath": "/job/Austin-Texas-United-States-of-America/Manager--Global-Mobility---Immigration-Ops_R0136403-1"
+    },
+    {
+     "title": "Head of Compliance Governance and CMS Oversight, PayPal Bank",
+     "locationsText": "Utah, United States of America (Virtual)",
+     "externalPath": "/job/Utah-United-States-of-America-Virtual/Head-of-Compliance-Governance-and-CMS-Oversight--PayPal-Bank_R0138198-1"
+    },
+    {
+     "title": "Head of Payment Operations, PayPal Bank",
+     "locationsText": "5 Locations",
+     "externalPath": "/job/Utah-United-States-of-America-Virtual/Head-of-Payment-Operations--PayPal-Bank_R0138217-1"
+    },
+    {
+     "title": "Product Manager, Deposits (PayPal Bank)",
+     "locationsText": "5 Locations",
+     "externalPath": "/job/Utah-United-States-of-America-Virtual/Product-Manager--Deposits--PayPal-Bank-_R0138219"
+    },
+    {
+     "title": "Staff Cybersecurity Engineer",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Staff-Cybersecurity-Engineer_R0138254"
+    },
+    {
+     "title": "Sr Manager, Product Sales",
+     "locationsText": "Berlin, Berlin, Germany",
+     "externalPath": "/job/Berlin-Berlin-Germany/Sr-Manager--Product-Sales_R0137387-1"
+    },
+    {
+     "title": "Account Representative, SMB (South)",
+     "locationsText": "Germany (Virtual)",
+     "externalPath": "/job/Germany-Virtual/Account-Representative--Small-and-Medium-Business_R0137443-1"
+    },
+    {
+     "title": "Sr Manager, Sales Specialist, Risk-as-a-Service",
+     "locationsText": "6 Locations",
+     "externalPath": "/job/New-York-City-New-York-United-States-of-America/SrManager--Product-Sales_R0138024"
+    },
+    {
+     "title": "Sr Director, Legal Transformation/Portfolio Mgmt",
+     "locationsText": "San Jose, California, United States of America",
+     "externalPath": "/job/San-Jose-California-United-States-of-America/Sr-Director--Legal-Transformation-Portfolio-Mgmt_R0137788"
+    },
+    {
+     "title": "Manager, Audit Operations",
+     "locationsText": "4 Locations",
+     "externalPath": "/job/Chicago-Illinois-United-States-of-America/Manager--Audit-Operations_R0138338-1"
+    },
+    {
+     "title": "Sr. Manager, Sales Specialist - Payouts",
+     "locationsText": "6 Locations",
+     "externalPath": "/job/New-York-City-New-York-United-States-of-America/Sr-Manager--Sales-Specialist---Payouts_R0138366"
+    },
+    {
+     "title": "Manager, Sales Specialist - Payouts",
+     "locationsText": "6 Locations",
+     "externalPath": "/job/New-York-City-New-York-United-States-of-America/Manager--Sales-Specialist---Payouts_R0138367"
+    },
+    {
+     "title": "Sr Analyst, Strategic Sourcing",
+     "locationsText": "4 Locations",
+     "externalPath": "/job/Scottsdale-Arizona-United-States-of-America/Sr-Analyst--Strategic-Sourcing_R0137504-1"
+    },
+    {
+     "title": "Regulatory Reporting Senior Manager",
+     "locationsText": "Bangalore, Karnataka, India",
+     "externalPath": "/job/Bangalore-Karnataka-India/Regulatory-Reporting-Senior-Manager_R0137288"
+    },
+    {
+     "title": "Regulatory Reporting Specialist",
+     "locationsText": "Bangalore, Karnataka, India",
+     "externalPath": "/job/Bangalore-Karnataka-India/Regulatory-Reporting-Specialist_R0137739"
+    },
+    {
+     "title": "Regulatory Reporting Specialist",
+     "locationsText": "Bangalore, Karnataka, India",
+     "externalPath": "/job/Bangalore-Karnataka-India/Regulatory-Reporting-Specialist_R0137740"
+    },
+    {
+     "title": "Manager, Internal Controls",
+     "locationsText": "Tokyo, Tokyo Prefecture, Japan",
+     "externalPath": "/job/Tokyo-Tokyo-Prefecture-Japan/Manager--Internal-Controls_R0137171-1"
+    },
+    {
+     "title": "Relationship Manager",
+     "locationsText": "Tokyo, Tokyo Prefecture, Japan",
+     "externalPath": "/job/Tokyo-Tokyo-Prefecture-Japan/Relationship-Manager_R0137322"
+    },
+    {
+     "title": "Sr Analyst, Financial Planning & Analysis",
+     "locationsText": "San Jose, California, United States of America",
+     "externalPath": "/job/San-Jose-California-United-States-of-America/Sr-Analyst--Financial-Planning---Analysis_R0138358"
+    },
+    {
+     "title": "Sr Analyst, Strategic Sourcing",
+     "locationsText": "4 Locations",
+     "externalPath": "/job/Scottsdale-Arizona-United-States-of-America/Sr-Analyst--Strategic-Sourcing_R0138266"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 18,
+   "first_page": [
+    {
+     "title": "Senior Cybersecurity Threat Analyst",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Senior-Cybersecurity-Threat-Analyst_R0135904-1"
+    },
+    {
+     "title": "Small and Medium Business  Commercial Manager",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Small-and-Medium-Business--Commercial-Manager_R0137459"
+    },
+    {
+     "title": "Sr Manager, Global Accounts",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Sr-Manager--Global-Strategic-Accounts_R0137345"
+    },
+    {
+     "title": "Senior Manager, Channel Partners",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/CBT_R0137383"
+    },
+    {
+     "title": "Manager, Global Strategic Accounts",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Manager--Global-Strategic-Accounts_R0137471"
+    },
+    {
+     "title": "Sr Specialist, Solutions Partner",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Sr-Specialist--Solutions-Partner_R0137309"
+    },
+    {
+     "title": "Software Engineer",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Software-Engineer_R0137876"
+    },
+    {
+     "title": "Large Enterprise Account Manager",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Large-Enterprise-Back-Book-rep_R0137835"
+    },
+    {
+     "title": "Staff Software Engineer",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Staff-Software-Engineer_R0137877"
+    },
+    {
+     "title": "Software Engineer (Java, Spark & GCP Data Platform)",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Software-Engineer_R0137859"
+    },
+    {
+     "title": "Sr Analyst, Data Analytics",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Sr-Analyst--Data-Analytics_R0137840"
+    },
+    {
+     "title": "Software Engineer",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Software-Engineer_R0137858"
+    },
+    {
+     "title": "Principal Software Engineer",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Principal-Software-Engineer_R0137875"
+    },
+    {
+     "title": "Sr. Manager Integrated Marketing -\u00a0 Global CBT",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Sr-Manager-Integrated-Marketing----Global-CBT_R0138009"
+    },
+    {
+     "title": "Staff Cybersecurity Threat Analyst",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Staff-Cybersecurity-Threat-Analyst_R0137949"
+    },
+    {
+     "title": "Senior Cybersecurity Engineer",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Senior-Cybersecurity-Engineer_R0137321"
+    },
+    {
+     "title": "Staff Cybersecurity Engineer",
+     "locationsText": "Central Singapore, Singapore",
+     "externalPath": "/job/Central-Singapore-Singapore/Staff-Cybersecurity-Engineer_R0138254"
+    },
+    {
+     "title": "Sr Legal Counsel, Employment-EMEA & APAC",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/London-County-London-England-United-Kingdom/Sr-Legal-Counsel--Employment-EMEA---APAC_R0138207"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 0,
+   "first_page": []
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 297,
+ "sg_search_total": 18,
+ "sg_ds_first_page_matches": [],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

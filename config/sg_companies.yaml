@@ -1,0 +1,924 @@
+companies:
+- name: Micron Technology
+  ats: workday
+  identifiers:
+    host: micron.wd1.myworkdayjobs.com
+    tenant: micron
+    site: External
+  verified_url: https://micron.wd1.myworkdayjobs.com/External
+  sector: semiconductors
+  fs: false
+  status: verified
+  automation_allowed: false
+  robots_url: https://micron.wd1.myworkdayjobs.com/robots.txt
+  terms_url: https://www.workday.com/en-us/legal/site-terms.html
+  seed: true
+  notes: 'ENDPOINT VERIFIED, AUTOMATION GATED OFF: tenant robots.txt does not disallow /wday/cxs/, but the CXS JSON
+    endpoint is undocumented and Workday''s site terms (updated 2026-08-13) prohibit ''data mining, robots or similar
+    data gathering or extraction methods'' on ''our Sites''. Whether that covers customer career sites is unclear,
+    so Workday stays manual (check verified_url weekly). jobs.micron.com now fronts Eightfold, but the Workday tenant
+    is still live and was linked from that page.'
+  evidence:
+    checked_at: '2026-10-07T14:58:46+00:00'
+    http_status: 200
+    endpoint: https://micron.wd1.myworkdayjobs.com/wday/cxs/micron/External/jobs
+    method: POST
+    total_jobs: 3125
+    sg_keyword_total: 881
+    sg_ds_first_page_matches: 1
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/micron.json
+- name: Agilent Technologies
+  ats: workday
+  identifiers:
+    host: agilent.wd5.myworkdayjobs.com
+    tenant: agilent
+    site: Agilent_Careers
+  verified_url: https://agilent.wd5.myworkdayjobs.com/Agilent_Careers
+  sector: life-science instruments
+  fs: false
+  status: verified
+  automation_allowed: false
+  robots_url: https://agilent.wd5.myworkdayjobs.com/robots.txt
+  terms_url: https://www.workday.com/en-us/legal/site-terms.html
+  seed: true
+  notes: 'ENDPOINT VERIFIED, AUTOMATION GATED OFF: tenant robots.txt does not disallow /wday/cxs/, but the CXS JSON
+    endpoint is undocumented and Workday''s site terms (updated 2026-08-13) prohibit ''data mining, robots or similar
+    data gathering or extraction methods'' on ''our Sites''. Whether that covers customer career sites is unclear,
+    so Workday stays manual (check verified_url weekly).'
+  evidence:
+    checked_at: '2026-10-07T14:58:51+00:00'
+    http_status: 200
+    endpoint: https://agilent.wd5.myworkdayjobs.com/wday/cxs/agilent/Agilent_Careers/jobs
+    method: POST
+    total_jobs: 345
+    sg_keyword_total: 21
+    sg_ds_first_page_matches: 2
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/agilent.json
+- name: HP Inc.
+  ats: workday
+  identifiers:
+    host: hp.wd5.myworkdayjobs.com
+    tenant: hp
+    site: ExternalCareerSite
+  verified_url: https://hp.wd5.myworkdayjobs.com/ExternalCareerSite
+  sector: hardware
+  fs: false
+  status: verified
+  automation_allowed: false
+  robots_url: https://hp.wd5.myworkdayjobs.com/robots.txt
+  terms_url: https://www.workday.com/en-us/legal/site-terms.html
+  seed: true
+  notes: 'ENDPOINT VERIFIED, AUTOMATION GATED OFF: tenant robots.txt does not disallow /wday/cxs/, but the CXS JSON
+    endpoint is undocumented and Workday''s site terms (updated 2026-08-13) prohibit ''data mining, robots or similar
+    data gathering or extraction methods'' on ''our Sites''. Whether that covers customer career sites is unclear,
+    so Workday stays manual (check verified_url weekly). careers.hp.com did not resolve on 2026-10-07; the Workday
+    tenant answers directly.'
+  evidence:
+    checked_at: '2026-10-07T14:58:58+00:00'
+    http_status: 200
+    endpoint: https://hp.wd5.myworkdayjobs.com/wday/cxs/hp/ExternalCareerSite/jobs
+    method: POST
+    total_jobs: 900
+    sg_keyword_total: 74
+    sg_ds_first_page_matches: 1
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/hp.json
+- name: Applied Materials
+  ats: workday
+  identifiers:
+    host: amat.wd1.myworkdayjobs.com
+    tenant: amat
+    site: External
+  verified_url: https://amat.wd1.myworkdayjobs.com/External
+  sector: semiconductor equipment
+  fs: false
+  status: verified
+  automation_allowed: false
+  robots_url: https://amat.wd1.myworkdayjobs.com/robots.txt
+  terms_url: https://www.workday.com/en-us/legal/site-terms.html
+  seed: true
+  notes: 'ENDPOINT VERIFIED, AUTOMATION GATED OFF: tenant robots.txt does not disallow /wday/cxs/, but the CXS JSON
+    endpoint is undocumented and Workday''s site terms (updated 2026-08-13) prohibit ''data mining, robots or similar
+    data gathering or extraction methods'' on ''our Sites''. Whether that covers customer career sites is unclear,
+    so Workday stays manual (check verified_url weekly). Workday ''all'' total is capped at 2000 by the API.'
+  evidence:
+    checked_at: '2026-10-07T14:59:05+00:00'
+    http_status: 200
+    endpoint: https://amat.wd1.myworkdayjobs.com/wday/cxs/amat/External/jobs
+    method: POST
+    total_jobs: 2000
+    sg_keyword_total: 354
+    sg_ds_first_page_matches: 1
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/applied_materials.json
+- name: GlobalFoundries
+  ats: workday
+  identifiers:
+    host: globalfoundries.wd1.myworkdayjobs.com
+    tenant: globalfoundries
+    site: External
+  verified_url: https://globalfoundries.wd1.myworkdayjobs.com/External
+  sector: semiconductors
+  fs: false
+  status: verified
+  automation_allowed: false
+  robots_url: https://globalfoundries.wd1.myworkdayjobs.com/robots.txt
+  terms_url: https://www.workday.com/en-us/legal/site-terms.html
+  seed: true
+  notes: 'ENDPOINT VERIFIED, AUTOMATION GATED OFF: tenant robots.txt does not disallow /wday/cxs/, but the CXS JSON
+    endpoint is undocumented and Workday''s site terms (updated 2026-08-13) prohibit ''data mining, robots or similar
+    data gathering or extraction methods'' on ''our Sites''. Whether that covers customer career sites is unclear,
+    so Workday stays manual (check verified_url weekly).'
+  evidence:
+    checked_at: '2026-10-07T14:59:13+00:00'
+    http_status: 200
+    endpoint: https://globalfoundries.wd1.myworkdayjobs.com/wday/cxs/globalfoundries/External/jobs
+    method: POST
+    total_jobs: 735
+    sg_keyword_total: 243
+    sg_ds_first_page_matches: 1
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/globalfoundries.json
+- name: Expedia Group
+  ats: workday
+  identifiers:
+    host: expedia.wd108.myworkdayjobs.com
+    tenant: expedia
+    site: search
+  verified_url: https://expedia.wd108.myworkdayjobs.com/search
+  sector: travel tech
+  fs: false
+  status: verified
+  automation_allowed: false
+  robots_url: https://expedia.wd108.myworkdayjobs.com/robots.txt
+  terms_url: https://www.workday.com/en-us/legal/site-terms.html
+  seed: true
+  notes: 'ENDPOINT VERIFIED, AUTOMATION GATED OFF: tenant robots.txt does not disallow /wday/cxs/, but the CXS JSON
+    endpoint is undocumented and Workday''s site terms (updated 2026-08-13) prohibit ''data mining, robots or similar
+    data gathering or extraction methods'' on ''our Sites''. Whether that covers customer career sites is unclear,
+    so Workday stays manual (check verified_url weekly). careers.expediagroup.com links to the wd108 ''search''
+    site. Few SG postings.'
+  evidence:
+    checked_at: '2026-10-07T14:59:19+00:00'
+    http_status: 200
+    endpoint: https://expedia.wd108.myworkdayjobs.com/wday/cxs/expedia/search/jobs
+    method: POST
+    total_jobs: 172
+    sg_keyword_total: 3
+    sg_ds_first_page_matches: 0
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/expedia.json
+- name: Mastercard
+  ats: workday
+  identifiers:
+    host: mastercard.wd1.myworkdayjobs.com
+    tenant: mastercard
+    site: CorporateCareers
+  verified_url: https://mastercard.wd1.myworkdayjobs.com/CorporateCareers
+  sector: payments
+  fs: true
+  status: verified
+  automation_allowed: false
+  robots_url: https://mastercard.wd1.myworkdayjobs.com/robots.txt
+  terms_url: https://www.workday.com/en-us/legal/site-terms.html
+  seed: true
+  notes: 'ENDPOINT VERIFIED, AUTOMATION GATED OFF: tenant robots.txt does not disallow /wday/cxs/, but the CXS JSON
+    endpoint is undocumented and Workday''s site terms (updated 2026-08-13) prohibit ''data mining, robots or similar
+    data gathering or extraction methods'' on ''our Sites''. Whether that covers customer career sites is unclear,
+    so Workday stays manual (check verified_url weekly). careers.mastercard.com (Phenom) links to the wd1 CorporateCareers
+    site.'
+  evidence:
+    checked_at: '2026-10-07T14:59:24+00:00'
+    http_status: 200
+    endpoint: https://mastercard.wd1.myworkdayjobs.com/wday/cxs/mastercard/CorporateCareers/jobs
+    method: POST
+    total_jobs: 1085
+    sg_keyword_total: 44
+    sg_ds_first_page_matches: 3
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/mastercard.json
+- name: Visa
+  ats: workday
+  identifiers:
+    host: visa.wd5.myworkdayjobs.com
+    tenant: visa
+    site: Visa
+  verified_url: https://visa.wd5.myworkdayjobs.com/Visa
+  sector: payments
+  fs: true
+  status: verified
+  automation_allowed: false
+  robots_url: https://visa.wd5.myworkdayjobs.com/robots.txt
+  terms_url: https://www.workday.com/en-us/legal/site-terms.html
+  seed: true
+  notes: 'ENDPOINT VERIFIED, AUTOMATION GATED OFF: tenant robots.txt does not disallow /wday/cxs/, but the CXS JSON
+    endpoint is undocumented and Workday''s site terms (updated 2026-08-13) prohibit ''data mining, robots or similar
+    data gathering or extraction methods'' on ''our Sites''. Whether that covers customer career sites is unclear,
+    so Workday stays manual (check verified_url weekly). corporate.visa.com/en/jobs redirects to visa.wd5 /Visa.
+    The old SmartRecruiters API host disallows all crawlers except LinkedInBot, so it was not used.'
+  evidence:
+    checked_at: '2026-10-07T14:59:31+00:00'
+    http_status: 200
+    endpoint: https://visa.wd5.myworkdayjobs.com/wday/cxs/visa/Visa/jobs
+    method: POST
+    total_jobs: 797
+    sg_keyword_total: 95
+    sg_ds_first_page_matches: 1
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/visa.json
+- name: UOB (United Overseas Bank)
+  ats: workday
+  identifiers:
+    host: uobgroup.wd3.myworkdayjobs.com
+    tenant: uobgroup
+    site: UOBExternal
+  verified_url: https://uobgroup.wd3.myworkdayjobs.com/UOBExternal
+  sector: banking
+  fs: true
+  status: verified
+  automation_allowed: false
+  robots_url: https://uobgroup.wd3.myworkdayjobs.com/robots.txt
+  terms_url: https://www.workday.com/en-us/legal/site-terms.html
+  seed: true
+  notes: 'ENDPOINT VERIFIED, AUTOMATION GATED OFF: tenant robots.txt does not disallow /wday/cxs/, but the CXS JSON
+    endpoint is undocumented and Workday''s site terms (updated 2026-08-13) prohibit ''data mining, robots or similar
+    data gathering or extraction methods'' on ''our Sites''. Whether that covers customer career sites is unclear,
+    so Workday stays manual (check verified_url weekly). Linked from uob.com.sg/careers. The searchText ''Singapore''
+    total equals the overall total, so keyword search does not filter by location here.'
+  evidence:
+    checked_at: '2026-10-07T14:59:39+00:00'
+    http_status: 200
+    endpoint: https://uobgroup.wd3.myworkdayjobs.com/wday/cxs/uobgroup/UOBExternal/jobs
+    method: POST
+    total_jobs: 1043
+    sg_keyword_total: 1043
+    sg_ds_first_page_matches: 0
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/uob.json
+- name: Unilever
+  ats: workday
+  identifiers:
+    host: unilever.wd3.myworkdayjobs.com
+    tenant: unilever
+    site: Unilever_Experienced_Professionals
+  verified_url: https://unilever.wd3.myworkdayjobs.com/Unilever_Experienced_Professionals
+  sector: consumer goods
+  fs: false
+  status: verified
+  automation_allowed: false
+  robots_url: https://unilever.wd3.myworkdayjobs.com/robots.txt
+  terms_url: https://www.workday.com/en-us/legal/site-terms.html
+  seed: true
+  notes: 'ENDPOINT VERIFIED, AUTOMATION GATED OFF: tenant robots.txt does not disallow /wday/cxs/, but the CXS JSON
+    endpoint is undocumented and Workday''s site terms (updated 2026-08-13) prohibit ''data mining, robots or similar
+    data gathering or extraction methods'' on ''our Sites''. Whether that covers customer career sites is unclear,
+    so Workday stays manual (check verified_url weekly). careers.unilever.com (Radancy) links to wd3 Unilever_Experienced_Professionals.
+    0 SG hits on 2026-10-07; low value.'
+  evidence:
+    checked_at: '2026-10-07T14:59:45+00:00'
+    http_status: 200
+    endpoint: https://unilever.wd3.myworkdayjobs.com/wday/cxs/unilever/Unilever_Experienced_Professionals/jobs
+    method: POST
+    total_jobs: 231
+    sg_keyword_total: 0
+    sg_ds_first_page_matches: 0
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/unilever.json
+- name: Agoda
+  ats: greenhouse
+  identifiers:
+    token: agoda
+  verified_url: https://boards-api.greenhouse.io/v1/boards/agoda/jobs
+  sector: travel tech
+  fs: false
+  status: verified
+  automation_allowed: true
+  robots_url: https://boards-api.greenhouse.io/robots.txt
+  terms_url: https://developers.greenhouse.io/job-board.html
+  seed: true
+  notes: Greenhouse Job Board API is documented for public, unauthenticated GET use; boards-api.greenhouse.io robots.txt
+    only disallows /embed/. Mostly Bangkok; a handful of SG-based DS roles.
+  evidence:
+    checked_at: '2026-10-07T15:04:56+00:00'
+    http_status: 200
+    endpoint: https://boards-api.greenhouse.io/v1/boards/agoda/jobs
+    method: GET
+    total_jobs: 307
+    sg_jobs: 7
+    sg_ds_matches: 6
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/agoda.json
+    board_name: Agoda
+- name: Airwallex
+  ats: ashby
+  identifiers:
+    board: airwallex
+  verified_url: https://api.ashbyhq.com/posting-api/job-board/airwallex
+  sector: fintech / payments
+  fs: true
+  status: verified
+  automation_allowed: true
+  robots_url: https://api.ashbyhq.com/robots.txt
+  terms_url: https://developers.ashbyhq.com/docs/public-job-posting-api
+  seed: true
+  notes: 'Documented public job-posting API (developers.ashbyhq.com/docs/public-job-posting-api, updatedAt 2026-05-26:
+    unauthenticated GET https://api.ashbyhq.com/posting-api/job-board/{JOB_BOARD_NAME}). api.ashbyhq.com/robots.txt
+    returns HTTP 401, which RFC 9309 s2.3.1.3 classes as ''Unavailable'' (4xx): the crawler MAY access any resources.
+    See robots_unavailable. This exception covers only an unavailable robots file on that path prefix. A robots
+    5xx/network failure (s2.3.1.4 ''Unreachable'', MUST assume complete disallow), an actual Disallow rule, or a
+    401/403/429/5xx on the job endpoint itself must fail closed. jobs.ashbyhq.com disallows /api/, but that is a
+    different origin and is never called.'
+  robots_unavailable:
+    http_status: 401
+    policy: documented_public_api
+    path_prefix: /posting-api/job-board/
+    documentation_url: https://developers.ashbyhq.com/docs/public-job-posting-api
+    reference_url: https://www.rfc-editor.org/rfc/rfc9309.html#section-2.3.1.3
+    verified_at: '2026-10-07'
+  evidence:
+    checked_at: '2026-10-07T15:05:10+00:00'
+    http_status: 200
+    endpoint: https://api.ashbyhq.com/posting-api/job-board/airwallex
+    method: GET
+    total_jobs: 540
+    sg_jobs: 153
+    sg_ds_matches: 13
+    robots_allows_endpoint: null
+    fixture: tests/fixtures/sg_research/companies/airwallex.json
+    robots_http_status: 401
+    robots_basis: 'robots_unavailable: RFC 9309 s2.3.1.3 (4xx Unavailable) + documented public API; not an actual
+      robots allow'
+- name: Stripe
+  ats: greenhouse
+  identifiers:
+    token: stripe
+  verified_url: https://boards-api.greenhouse.io/v1/boards/stripe/jobs
+  sector: fintech / payments
+  fs: true
+  status: verified
+  automation_allowed: true
+  robots_url: https://boards-api.greenhouse.io/robots.txt
+  terms_url: https://developers.greenhouse.io/job-board.html
+  seed: false
+  notes: Greenhouse Job Board API is documented for public, unauthenticated GET use; boards-api.greenhouse.io robots.txt
+    only disallows /embed/. Extension (not in seed list).
+  evidence:
+    checked_at: '2026-10-07T15:04:59+00:00'
+    http_status: 200
+    endpoint: https://boards-api.greenhouse.io/v1/boards/stripe/jobs
+    method: GET
+    total_jobs: 718
+    sg_jobs: 53
+    sg_ds_matches: 0
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/stripe.json
+    board_name: Stripe
+- name: Databricks
+  ats: greenhouse
+  identifiers:
+    token: databricks
+  verified_url: https://boards-api.greenhouse.io/v1/boards/databricks/jobs
+  sector: data / AI platform
+  fs: false
+  status: verified
+  automation_allowed: true
+  robots_url: https://boards-api.greenhouse.io/robots.txt
+  terms_url: https://developers.greenhouse.io/job-board.html
+  seed: false
+  notes: Greenhouse Job Board API is documented for public, unauthenticated GET use; boards-api.greenhouse.io robots.txt
+    only disallows /embed/. Extension.
+  evidence:
+    checked_at: '2026-10-07T15:05:02+00:00'
+    http_status: 200
+    endpoint: https://boards-api.greenhouse.io/v1/boards/databricks/jobs
+    method: GET
+    total_jobs: 888
+    sg_jobs: 29
+    sg_ds_matches: 0
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/databricks.json
+    board_name: Databricks
+- name: Datadog
+  ats: greenhouse
+  identifiers:
+    token: datadog
+  verified_url: https://boards-api.greenhouse.io/v1/boards/datadog/jobs
+  sector: observability software
+  fs: false
+  status: verified
+  automation_allowed: true
+  robots_url: https://boards-api.greenhouse.io/robots.txt
+  terms_url: https://developers.greenhouse.io/job-board.html
+  seed: false
+  notes: Greenhouse Job Board API is documented for public, unauthenticated GET use; boards-api.greenhouse.io robots.txt
+    only disallows /embed/. Extension.
+  evidence:
+    checked_at: '2026-10-07T15:05:06+00:00'
+    http_status: 200
+    endpoint: https://boards-api.greenhouse.io/v1/boards/datadog/jobs
+    method: GET
+    total_jobs: 435
+    sg_jobs: 17
+    sg_ds_matches: 0
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/datadog.json
+    board_name: Datadog
+- name: Coinbase
+  ats: greenhouse
+  identifiers:
+    token: coinbase
+  verified_url: https://boards-api.greenhouse.io/v1/boards/coinbase/jobs
+  sector: crypto / fintech
+  fs: true
+  status: verified
+  automation_allowed: true
+  robots_url: https://boards-api.greenhouse.io/robots.txt
+  terms_url: https://developers.greenhouse.io/job-board.html
+  seed: false
+  notes: Greenhouse Job Board API is documented for public, unauthenticated GET use; boards-api.greenhouse.io robots.txt
+    only disallows /embed/. Extension.
+  evidence:
+    checked_at: '2026-10-07T15:05:12+00:00'
+    http_status: 200
+    endpoint: https://boards-api.greenhouse.io/v1/boards/coinbase/jobs
+    method: GET
+    total_jobs: 223
+    sg_jobs: 7
+    sg_ds_matches: 1
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/coinbase.json
+    board_name: Coinbase
+- name: Okta
+  ats: greenhouse
+  identifiers:
+    token: okta
+  verified_url: https://boards-api.greenhouse.io/v1/boards/okta/jobs
+  sector: identity software
+  fs: false
+  status: verified
+  automation_allowed: true
+  robots_url: https://boards-api.greenhouse.io/robots.txt
+  terms_url: https://developers.greenhouse.io/job-board.html
+  seed: false
+  notes: Greenhouse Job Board API is documented for public, unauthenticated GET use; boards-api.greenhouse.io robots.txt
+    only disallows /embed/. Extension.
+  evidence:
+    checked_at: '2026-10-07T15:05:15+00:00'
+    http_status: 200
+    endpoint: https://boards-api.greenhouse.io/v1/boards/okta/jobs
+    method: GET
+    total_jobs: 372
+    sg_jobs: 5
+    sg_ds_matches: 0
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/okta.json
+    board_name: Okta
+- name: MongoDB
+  ats: greenhouse
+  identifiers:
+    token: mongodb
+  verified_url: https://boards-api.greenhouse.io/v1/boards/mongodb/jobs
+  sector: database software
+  fs: false
+  status: verified
+  automation_allowed: true
+  robots_url: https://boards-api.greenhouse.io/robots.txt
+  terms_url: https://developers.greenhouse.io/job-board.html
+  seed: false
+  notes: Greenhouse Job Board API is documented for public, unauthenticated GET use; boards-api.greenhouse.io robots.txt
+    only disallows /embed/. Extension.
+  evidence:
+    checked_at: '2026-10-07T15:05:19+00:00'
+    http_status: 200
+    endpoint: https://boards-api.greenhouse.io/v1/boards/mongodb/jobs
+    method: GET
+    total_jobs: 392
+    sg_jobs: 9
+    sg_ds_matches: 0
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/mongodb.json
+    board_name: MongoDB
+- name: Pinterest
+  ats: greenhouse
+  identifiers:
+    token: pinterest
+  verified_url: https://boards-api.greenhouse.io/v1/boards/pinterest/jobs
+  sector: consumer internet
+  fs: false
+  status: verified
+  automation_allowed: true
+  robots_url: https://boards-api.greenhouse.io/robots.txt
+  terms_url: https://developers.greenhouse.io/job-board.html
+  seed: false
+  notes: Greenhouse Job Board API is documented for public, unauthenticated GET use; boards-api.greenhouse.io robots.txt
+    only disallows /embed/. Extension.
+  evidence:
+    checked_at: '2026-10-07T15:05:23+00:00'
+    http_status: 200
+    endpoint: https://boards-api.greenhouse.io/v1/boards/pinterest/jobs
+    method: GET
+    total_jobs: 178
+    sg_jobs: 13
+    sg_ds_matches: 0
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/pinterest.json
+    board_name: Pinterest
+- name: Elastic
+  ats: greenhouse
+  identifiers:
+    token: elastic
+  verified_url: https://boards-api.greenhouse.io/v1/boards/elastic/jobs
+  sector: search / observability software
+  fs: false
+  status: verified
+  automation_allowed: true
+  robots_url: https://boards-api.greenhouse.io/robots.txt
+  terms_url: https://developers.greenhouse.io/job-board.html
+  seed: false
+  notes: Greenhouse Job Board API is documented for public, unauthenticated GET use; boards-api.greenhouse.io robots.txt
+    only disallows /embed/. Extension.
+  evidence:
+    checked_at: '2026-10-07T15:05:27+00:00'
+    http_status: 200
+    endpoint: https://boards-api.greenhouse.io/v1/boards/elastic/jobs
+    method: GET
+    total_jobs: 419
+    sg_jobs: 6
+    sg_ds_matches: 0
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/elastic.json
+    board_name: Elastic
+- name: OpenAI
+  ats: ashby
+  identifiers:
+    board: openai
+  verified_url: https://api.ashbyhq.com/posting-api/job-board/openai
+  sector: AI research / products
+  fs: false
+  status: verified
+  automation_allowed: true
+  robots_url: https://api.ashbyhq.com/robots.txt
+  terms_url: https://developers.ashbyhq.com/docs/public-job-posting-api
+  seed: false
+  notes: Documented public Ashby API with evidenced robots-401 policy. User approved ordinary civilian roles at
+    general technology employers; defence-related roles remain excluded. Sponsorship is unconfirmed for each role.
+  robots_unavailable:
+    http_status: 401
+    policy: documented_public_api
+    path_prefix: /posting-api/job-board/
+    documentation_url: https://developers.ashbyhq.com/docs/public-job-posting-api
+    reference_url: https://www.rfc-editor.org/rfc/rfc9309.html#section-2.3.1.3
+    verified_at: '2026-10-07'
+  evidence:
+    checked_at: '2026-10-07T15:05:47+00:00'
+    http_status: 200
+    endpoint: https://api.ashbyhq.com/posting-api/job-board/openai
+    method: GET
+    total_jobs: 823
+    sg_jobs: 38
+    sg_ds_matches: 2
+    robots_allows_endpoint: null
+    fixture: tests/fixtures/sg_research/companies/openai.json
+    robots_http_status: 401
+    robots_basis: 'robots_unavailable: RFC 9309 s2.3.1.3 (4xx Unavailable) + documented public API; not an actual
+      robots allow'
+- name: Salesforce
+  ats: workday
+  identifiers:
+    host: salesforce.wd12.myworkdayjobs.com
+    tenant: salesforce
+    site: External_Career_Site
+  verified_url: https://salesforce.wd12.myworkdayjobs.com/External_Career_Site
+  sector: enterprise software
+  fs: false
+  status: verified
+  automation_allowed: false
+  robots_url: https://salesforce.wd12.myworkdayjobs.com/robots.txt
+  terms_url: https://www.workday.com/en-us/legal/site-terms.html
+  seed: false
+  notes: 'ENDPOINT VERIFIED, AUTOMATION GATED OFF: tenant robots.txt does not disallow /wday/cxs/, but the CXS JSON
+    endpoint is undocumented and Workday''s site terms (updated 2026-08-13) prohibit ''data mining, robots or similar
+    data gathering or extraction methods'' on ''our Sites''. Whether that covers customer career sites is unclear,
+    so Workday stays manual (check verified_url weekly). Extension; replaces Palantir, which was removed as a defence-focused
+    employer. Workday tenant reached directly; evidence fetched 2026-10-07.'
+  evidence:
+    checked_at: '2026-10-07T14:59:52+00:00'
+    http_status: 200
+    endpoint: https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/External_Career_Site/jobs
+    method: POST
+    total_jobs: 1523
+    sg_keyword_total: 31
+    sg_ds_first_page_matches: 0
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/salesforce.json
+- name: Point72 (incl. Cubist Systematic Strategies)
+  ats: greenhouse
+  identifiers:
+    token: point72
+  verified_url: https://boards-api.greenhouse.io/v1/boards/point72/jobs
+  sector: asset management / hedge fund
+  fs: true
+  status: verified
+  automation_allowed: true
+  robots_url: https://boards-api.greenhouse.io/robots.txt
+  terms_url: https://developers.greenhouse.io/job-board.html
+  seed: false
+  notes: Greenhouse Job Board API is documented for public, unauthenticated GET use; boards-api.greenhouse.io robots.txt
+    only disallows /embed/. Extension. Its SG 'Cubist Data Scientist' posting is the qualifying sample in docs/SINGAPORE_RESEARCH.md.
+  evidence:
+    checked_at: '2026-10-07T15:18:12+00:00'
+    http_status: 200
+    endpoint: https://boards-api.greenhouse.io/v1/boards/point72/jobs
+    method: GET
+    total_jobs: 215
+    sg_jobs: 10
+    sg_ds_matches: 3
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/point72.json
+    board_name: Point72
+- name: Tower Research Capital
+  ats: greenhouse
+  identifiers:
+    token: towerresearchcapital
+  verified_url: https://boards-api.greenhouse.io/v1/boards/towerresearchcapital/jobs?content=true
+  sector: quantitative trading
+  fs: true
+  status: verified
+  automation_allowed: true
+  robots_url: https://boards-api.greenhouse.io/robots.txt
+  terms_url: https://developers.greenhouse.io/job-board.html
+  seed: false
+  notes: Established multinational quantitative trading firm; official careers page embeds the verified Greenhouse
+    board. Singapore ML engineering roles are secondary. Sponsorship is unconfirmed for each role.
+  evidence:
+    checked_at: '2026-10-07T15:36:41.509031+00:00'
+    http_status: 200
+    endpoint: https://boards-api.greenhouse.io/v1/boards/towerresearchcapital/jobs?content=true
+    method: GET
+    total_jobs: 93
+    sg_jobs: 21
+    sg_ds_matches: 1
+    robots_allows_endpoint: true
+    fixture: tests/fixtures/sg_research/companies/tower_research.json
+    board_name: Tower Research Capital
+    company_careers_url: https://tower-research.com/roles/
+- name: Snowflake
+  ats: ashby
+  identifiers:
+    board: snowflake
+  verified_url: https://api.ashbyhq.com/posting-api/job-board/snowflake
+  sector: data platform
+  fs: false
+  status: verified
+  automation_allowed: true
+  robots_url: https://api.ashbyhq.com/robots.txt
+  terms_url: https://developers.ashbyhq.com/docs/public-job-posting-api
+  seed: false
+  notes: 'Documented public job-posting API (developers.ashbyhq.com/docs/public-job-posting-api, updatedAt 2026-05-26:
+    unauthenticated GET https://api.ashbyhq.com/posting-api/job-board/{JOB_BOARD_NAME}). api.ashbyhq.com/robots.txt
+    returns HTTP 401, which RFC 9309 s2.3.1.3 classes as ''Unavailable'' (4xx): the crawler MAY access any resources.
+    See robots_unavailable. This exception covers only an unavailable robots file on that path prefix. A robots
+    5xx/network failure (s2.3.1.4 ''Unreachable'', MUST assume complete disallow), an actual Disallow rule, or a
+    401/403/429/5xx on the job endpoint itself must fail closed. jobs.ashbyhq.com disallows /api/, but that is a
+    different origin and is never called. Extension.'
+  robots_unavailable:
+    http_status: 401
+    policy: documented_public_api
+    path_prefix: /posting-api/job-board/
+    documentation_url: https://developers.ashbyhq.com/docs/public-job-posting-api
+    reference_url: https://www.rfc-editor.org/rfc/rfc9309.html#section-2.3.1.3
+    verified_at: '2026-10-07'
+  evidence:
+    checked_at: '2026-10-07T15:05:50+00:00'
+    http_status: 200
+    endpoint: https://api.ashbyhq.com/posting-api/job-board/snowflake
+    method: GET
+    total_jobs: 353
+    sg_jobs: 3
+    sg_ds_matches: 0
+    robots_allows_endpoint: null
+    fixture: tests/fixtures/sg_research/companies/snowflake.json
+    robots_http_status: 401
+    robots_basis: 'robots_unavailable: RFC 9309 s2.3.1.3 (4xx Unavailable) + documented public API; not an actual
+      robots allow'
+- name: Booking.com
+  ats: custom
+  identifiers: {}
+  verified_url: https://jobs.booking.com/booking/jobs
+  sector: travel tech
+  fs: false
+  status: manual_check
+  automation_allowed: false
+  robots_url: https://jobs.booking.com/robots.txt
+  terms_url: ''
+  seed: true
+  notes: 'Custom careers site (iCIMS-backed, as page markup shows). robots.txt allows all with crawl-delay 5, but
+    there''s no documented public jobs API, so no endpoint is recorded. Check weekly by hand: filter Location=Singapore,
+    keyword ''data scientist''.'
+  evidence:
+    checked_at: '2026-10-07'
+- name: Grab
+  ats: custom
+  identifiers: {}
+  verified_url: https://www.grab.careers/en/jobs/
+  sector: ride-hailing / fintech super-app
+  fs: false
+  status: manual_check
+  automation_allowed: false
+  robots_url: https://www.grab.careers/robots.txt
+  terms_url: ''
+  seed: true
+  notes: Custom JS-rendered site (hireEZ assets); not on Greenhouse or Lever (both 404 for 'grab'). No documented
+    API. Check weekly by hand; Grab posts many SG DS roles.
+  evidence:
+    checked_at: '2026-10-07'
+- name: Shopee / Sea Group
+  ats: custom
+  identifiers: {}
+  verified_url: https://career.sea.com/
+  sector: e-commerce / gaming / fintech
+  fs: false
+  status: manual_check
+  automation_allowed: false
+  robots_url: https://career.sea.com/robots.txt
+  terms_url: ''
+  seed: true
+  notes: Custom Next.js site (career.sea.com, careers.shopee.sg). robots.txt path serves HTML, not a robots file,
+    so policy is unclear. No public API. Check weekly by hand.
+  evidence:
+    checked_at: '2026-10-07'
+- name: Traveloka
+  ats: custom
+  identifiers: {}
+  verified_url: https://careers.traveloka.com/
+  sector: travel tech
+  fs: false
+  status: manual_check
+  automation_allowed: false
+  robots_url: ''
+  terms_url: ''
+  seed: true
+  notes: Custom site; Greenhouse and Lever slugs 404. No public API found. Check weekly by hand.
+  evidence:
+    checked_at: '2026-10-07'
+- name: ByteDance / TikTok
+  ats: custom
+  identifiers: {}
+  verified_url: https://lifeattiktok.com/
+  sector: consumer internet
+  fs: false
+  status: manual_check
+  automation_allowed: false
+  robots_url: https://careers.tiktok.com/robots.txt
+  terms_url: ''
+  seed: true
+  notes: Custom ByteDance recruiting platform. robots.txt allows /position for '*', but the search API is undocumented
+    and rejects plain GETs. Check weekly by hand with the Singapore filter.
+  evidence:
+    checked_at: '2026-10-07'
+- name: Wise
+  ats: custom
+  identifiers: {}
+  verified_url: https://wise.jobs/
+  sector: fintech / payments
+  fs: true
+  status: manual_check
+  automation_allowed: false
+  robots_url: ''
+  terms_url: ''
+  seed: true
+  notes: wise.jobs runs on Attrax (custom). Greenhouse token 'wise' exists but its 15-job board was NOT confirmed
+    to be Wise plc; 'transferwise' 404s, and Ashby/Lever 404. Not recorded as a verified ID.
+  evidence:
+    checked_at: '2026-10-07'
+- name: DBS Bank
+  ats: custom
+  identifiers: {}
+  verified_url: https://www.dbs.com/careers/jobs.page
+  sector: banking
+  fs: true
+  status: manual_check
+  automation_allowed: false
+  robots_url: https://www.dbs.com/robots.txt
+  terms_url: ''
+  seed: true
+  notes: robots.txt disallows the careers jobs page for generic agents, so it was not fetched. Check weekly by hand.
+  evidence:
+    checked_at: '2026-10-07'
+- name: OCBC
+  ats: custom
+  identifiers: {}
+  verified_url: https://www.ocbc.com/group/careers/
+  sector: banking
+  fs: true
+  status: manual_check
+  automation_allowed: false
+  robots_url: ''
+  terms_url: ''
+  seed: true
+  notes: The careers page links to ocbc.taleo.net (Oracle Taleo). Taleo has no documented public job-feed API. Check
+    weekly by hand.
+  evidence:
+    checked_at: '2026-10-07'
+- name: Standard Chartered
+  ats: custom
+  identifiers: {}
+  verified_url: https://www.sc.com/en/global-careers/experienced-hire/
+  sector: banking
+  fs: true
+  status: unverified
+  automation_allowed: false
+  robots_url: ''
+  terms_url: ''
+  seed: true
+  notes: Third-party sources say Taleo (scb.taleo.net), but that host did not resolve on 2026-10-07. ATS is unconfirmed;
+    check weekly by hand.
+  evidence:
+    checked_at: '2026-10-07'
+- name: Sia Partners
+  ats: custom
+  identifiers: {}
+  verified_url: https://www.sia-partners.com/en/opportunities
+  sector: management consulting
+  fs: false
+  status: manual_check
+  automation_allowed: false
+  robots_url: ''
+  terms_url: ''
+  seed: true
+  notes: Custom opportunities page; no ATS API detected (Greenhouse/Lever 404). Check weekly by hand.
+  evidence:
+    checked_at: '2026-10-07'
+- name: Frost & Sullivan
+  ats: custom
+  identifiers: {}
+  verified_url: https://www.frost.com/careers/
+  sector: research / consulting
+  fs: false
+  status: manual_check
+  automation_allowed: false
+  robots_url: ''
+  terms_url: ''
+  seed: true
+  notes: Custom careers page; no ATS API detected. Check weekly by hand.
+  evidence:
+    checked_at: '2026-10-07'
+- name: McKinsey & Company / QuantumBlack
+  ats: custom
+  identifiers: {}
+  verified_url: https://www.mckinsey.com/careers/search-jobs
+  sector: management consulting
+  fs: false
+  status: manual_check
+  automation_allowed: false
+  robots_url: ''
+  terms_url: ''
+  seed: true
+  notes: Custom search UI; no documented public API. Check weekly by hand (filter Singapore, QuantumBlack / Data
+    Science).
+  evidence:
+    checked_at: '2026-10-07'
+- name: BCG X
+  ats: custom
+  identifiers: {}
+  verified_url: https://careers.bcg.com/global/en/
+  sector: management consulting
+  fs: false
+  status: manual_check
+  automation_allowed: false
+  robots_url: ''
+  terms_url: ''
+  seed: true
+  notes: Phenom People + Eightfold front end; no documented public API. Check weekly by hand.
+  evidence:
+    checked_at: '2026-10-07'
+- name: Procter & Gamble
+  ats: custom
+  identifiers: {}
+  verified_url: https://www.pgcareers.com/
+  sector: consumer goods
+  fs: false
+  status: manual_check
+  automation_allowed: false
+  robots_url: ''
+  terms_url: ''
+  seed: true
+  notes: Phenom People front end; no documented public API. Check weekly by hand.
+  evidence:
+    checked_at: '2026-10-07'
+- name: Dyson
+  ats: custom
+  identifiers: {}
+  verified_url: https://careers.dyson.com/
+  sector: consumer hardware
+  fs: false
+  status: unverified
+  automation_allowed: false
+  robots_url: ''
+  terms_url: ''
+  seed: true
+  notes: careers.dyson.com returned HTTP 403 to the research User-Agent; dyson.wd3 'Careers' 404s. ATS is unconfirmed.
+  evidence:
+    checked_at: '2026-10-07'

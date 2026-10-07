@@ -1,0 +1,279 @@
+{
+ "company_key": "visa",
+ "ats": "workday",
+ "identifiers": {
+  "host": "visa.wd5.myworkdayjobs.com",
+  "tenant": "visa",
+  "site": "Visa"
+ },
+ "checked_at": "2026-10-07T14:59:31+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://visa.wd5.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/visa/Visa/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://visa.wd5.myworkdayjobs.com/Visa/siteMap.xml\nSitemap: https://visa.wd5.myworkdayjobs.com/Visa_Early_Careers/siteMap.xml\n\nUser-agent: *\nAllow: /Visa/\nAllow: /Visa_Early_Careers/\nDisallow: /Visa_Talent_Portal/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://visa.wd5.myworkdayjobs.com/wday/cxs/visa/Visa/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 797,
+   "first_page": [
+    {
+     "title": "Senior Manager, Client Growth",
+     "locationsText": "GB - London, United Kingdom",
+     "externalPath": "/job/GB---London-United-Kingdom/Senior-Manager--Client-Growth_REF089004W"
+    },
+    {
+     "title": "Senior Manager, U.S. Merchant Business Development",
+     "locationsText": "5 Locations",
+     "externalPath": "/job/US---San-Francisco-CA/Senior-Manager--US-Merchant-Business-Development_REF088832W"
+    },
+    {
+     "title": "Director, U.S. Merchant Business Development",
+     "locationsText": "5 Locations",
+     "externalPath": "/job/US---San-Francisco-CA/Director--US-Merchant-Business-Development_REF088831W-1"
+    },
+    {
+     "title": "Analyst, Data Analyst",
+     "locationsText": "GB - London, United Kingdom",
+     "externalPath": "/job/GB---London-United-Kingdom/Analyst--Data-Analyst_REF088712W"
+    },
+    {
+     "title": "Senior Director, Consumer Payments Marketing",
+     "locationsText": "US - Miami, FL",
+     "externalPath": "/job/US---Miami-FL/Senior-Director--Consumer-Payments-Marketing_REF088019W-1"
+    },
+    {
+     "title": "Sr. Risk Manager",
+     "locationsText": "CD - Kinshasa, Democratic Republic of Congo",
+     "externalPath": "/job/CD---Kinshasa-Democratic-Republic-of-Congo/Sr-Risk-Manager_REF089107W"
+    },
+    {
+     "title": "Senior Manager, Sales Engineering",
+     "locationsText": "CR - San Jose, Costa Rica",
+     "externalPath": "/job/CR---San-Jose-Costa-Rica/Senior-Manager--Sales-Engineering_REF084736W"
+    },
+    {
+     "title": "Sr. Manager, LAC Accounts Payable",
+     "locationsText": "CO - Bogota, Colombia",
+     "externalPath": "/job/CO---Bogota-Colombia/Sr-Manager--LAC-Accounts-Payable_REF089129W"
+    },
+    {
+     "title": "Senior Manager Revenue Operations, 12 months FTC maternity cover",
+     "locationsText": "GB - London, United Kingdom",
+     "externalPath": "/job/GB---London-United-Kingdom/Senior-Manager-Revenue-Operations--12-months-FTC-maternity-cover_REF089071W"
+    },
+    {
+     "title": "Client and Network Queries Manager (Compliance)",
+     "locationsText": "PL - Warsaw, Poland",
+     "externalPath": "/job/PL---Warsaw-Poland/Client-and-Network-Queries-Manager_REF087984W"
+    },
+    {
+     "title": "Sourcing and Property Counsel",
+     "locationsText": "GB - London, United Kingdom",
+     "externalPath": "/job/GB---London-United-Kingdom/Sourcing-and-Property-Counsel_REF089067W"
+    },
+    {
+     "title": "Sr. Director, Financial Analysis",
+     "locationsText": "AE - Dubai, United Arab Emirates",
+     "externalPath": "/job/AE---Dubai-United-Arab-Emirates/Sr-Director--Financial-Analysis_REF088997W"
+    },
+    {
+     "title": "Cybersecurity Engineer - Cloud",
+     "locationsText": "GB - London, United Kingdom",
+     "externalPath": "/job/GB---London-United-Kingdom/Cybersecurity-Engineer---Cloud_REF080470W"
+    },
+    {
+     "title": "Senior Manager (Production Reliability Engineering)",
+     "locationsText": "PL - Warsaw, Poland",
+     "externalPath": "/job/PL---Warsaw-Poland/Senior-Manager--Production-Reliability-Engineering-_REF089085W"
+    },
+    {
+     "title": "Marketing Manager",
+     "locationsText": "IN - Mumbai, India",
+     "externalPath": "/job/IN---Mumbai-India/Manager_REF089197W"
+    },
+    {
+     "title": "Senior Director - Govt Advisory and strategic partnerships",
+     "locationsText": "IN - Mumbai, India",
+     "externalPath": "/job/IN---Mumbai-India/Senior-Director---Head-of-Visa-Consulting---Analytics--India-and-South-Asia-_REF089138W"
+    },
+    {
+     "title": "Sr. SW Test Engineer",
+     "locationsText": "PH - Pasay, Philippines - Manila",
+     "externalPath": "/job/PH---Pasay-Philippines---Manila/Analyst--Software-Test-Engineering_REF089048W"
+    },
+    {
+     "title": "Staff SW Test Engineer",
+     "locationsText": "PH - Pasay, Philippines - Manila",
+     "externalPath": "/job/PH---Pasay-Philippines---Manila/Consultant--Software-Test-Engineering_REF089049W"
+    },
+    {
+     "title": "SW Test Enigeer, Sr. Consultant",
+     "locationsText": "PH - Pasay, Philippines - Manila",
+     "externalPath": "/job/PH---Pasay-Philippines---Manila/Senior-Consultant--Software-Test-Engineering_REF089050W-1"
+    },
+    {
+     "title": "Director, Fintech Partnerships, Account Executive",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Director--Fintech-Partnerships--Account-Executive_REF089105W"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 95,
+   "first_page": [
+    {
+     "title": "Director, Fintech Partnerships, Account Executive",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Director--Fintech-Partnerships--Account-Executive_REF089105W"
+    },
+    {
+     "title": "Senior Manager, Strategic Funds",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/AU---Sydney-Australia/Senior-Manager--Strategic-Funds_REF089090W-1"
+    },
+    {
+     "title": "Director, Head of Visa Direct, Philippines",
+     "locationsText": "PH - Makati, Philippines",
+     "externalPath": "/job/PH---Makati-Philippines/Director--Head-of-Visa-Direct--Philippines_REF089152W"
+    },
+    {
+     "title": "Finance Analyst",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Finance-Analyst_REF088861W-1"
+    },
+    {
+     "title": "Senior Business Development Manager",
+     "locationsText": "PH - Makati, Philippines",
+     "externalPath": "/job/PH---Makati-Philippines/Senior-Business-Development-Manager_REF089164W"
+    },
+    {
+     "title": "Senior Consultant, Delivery & Implementation",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Senior-Consultant--Delivery---Implementation_REF088116W-1"
+    },
+    {
+     "title": "Marketing Manager, Client Marketing & Partnerships",
+     "locationsText": "TH - Bangkok, Thailand",
+     "externalPath": "/job/TH---Bangkok-Thailand/Marketing-Manager--Client-Marketing---Partnerships_REF088920W-1"
+    },
+    {
+     "title": "Director, Client Services, AP Service Experience",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Director--Client-Services--AP-Service-Experience_REF088680W-1"
+    },
+    {
+     "title": "Senior Manager, Corporate Communications",
+     "locationsText": "PK - Karachi, Pakistan",
+     "externalPath": "/job/PK---Karachi-Pakistan/Senior-Manager--Corporate-Communications_REF084854W"
+    },
+    {
+     "title": "Manager, Issuing Sales Executive",
+     "locationsText": "PH - Makati, Philippines",
+     "externalPath": "/job/PH---Makati-Philippines/Manager--Issuing-Sales-Executive_REF088821W"
+    },
+    {
+     "title": "Manager, Travel Marketing Specialist",
+     "locationsText": "MY - Kuala Lumpur, Malaysia",
+     "externalPath": "/job/MY---Kuala-Lumpur-Malaysia/Manager--Travel-Marketing-Specialist_REF088812W"
+    },
+    {
+     "title": "Director, Client Consulting - Global Clients & Acquirers",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Director--Client-Consulting---Global-Clients---Acquirers_REF088950W-1"
+    },
+    {
+     "title": "Manager, Visa Direct- South Asia",
+     "locationsText": "BD - Dhaka, Bangladesh",
+     "externalPath": "/job/BD---Dhaka-Bangladesh/Manager_REF087352W"
+    },
+    {
+     "title": "Senior Solutions Manager, VAS Japan",
+     "locationsText": "JP - Tokyo, Japan",
+     "externalPath": "/job/JP---Tokyo-Japan/Solutions-Manager_REF080669W"
+    },
+    {
+     "title": "Director, Cyber Risk Practice",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Director--Cyber-Risk-Practice_REF088674W"
+    },
+    {
+     "title": "Software Test Engineer",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Software-Test-Engineer_REF088803W"
+    },
+    {
+     "title": "Sr. SW Test Engineer",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Sr-SW-Test-Engineer_REF088800W"
+    },
+    {
+     "title": "Software Engineer",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Software-Engineer_REF088802W"
+    },
+    {
+     "title": "Sr. Cybersecurity Analyst",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Sr-Cybersecurity-Analyst_REF088804W"
+    },
+    {
+     "title": "Senior Data Engineer",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Senior-Data-Engineer_REF088710W"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 4,
+   "first_page": [
+    {
+     "title": "Senior Software Engineer",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Senior-Software-Engineer_REF088189W"
+    },
+    {
+     "title": "Data Engineer",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Data-Engineer_REF088212W"
+    },
+    {
+     "title": "Data Engineer",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Data-Engineer_REF077890W"
+    },
+    {
+     "title": "Manager, Data Science & Analytics Consulting",
+     "locationsText": "SG - Singapore",
+     "externalPath": "/job/SG---Singapore/Manager--Data-Science---Analytics-Consulting_REF082107W"
+    }
+   ]
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 797,
+ "sg_search_total": 95,
+ "sg_ds_first_page_matches": [
+  {
+   "title": "Manager, Data Science & Analytics Consulting",
+   "locationsText": "SG - Singapore",
+   "externalPath": "/job/SG---Singapore/Manager--Data-Science---Analytics-Consulting_REF082107W"
+  }
+ ],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

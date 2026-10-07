@@ -1,5 +1,10 @@
 # Job Hunter
 
+Singapore public career monitoring is available through
+`python -m src.singapore.main --mode weekly --cv /path/to/your-real-cv.md`.
+Its setup, access-policy evidence and manual alerts are documented in
+[docs/SINGAPORE.md](docs/SINGAPORE.md).
+
 A daily job-search pipeline for one person. Every weekday morning it pulls
 fresh postings from the company boards you name plus (optionally) Adzuna and
 your LinkedIn job-alert emails, throws away everything outside your countries,

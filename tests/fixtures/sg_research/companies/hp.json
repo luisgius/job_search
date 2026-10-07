@@ -1,0 +1,264 @@
+{
+ "company_key": "hp",
+ "ats": "workday",
+ "identifiers": {
+  "host": "hp.wd5.myworkdayjobs.com",
+  "tenant": "hp",
+  "site": "ExternalCareerSite"
+ },
+ "checked_at": "2026-10-07T14:58:58+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://hp.wd5.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/hp/ExternalCareerSite/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://hp.wd5.myworkdayjobs.com/ExternalCareerSite/siteMap.xml\n\nUser-agent: *\nAllow: /ExternalCareerSite/\nDisallow: /EXTEU-AC-CareerSite/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://hp.wd5.myworkdayjobs.com/wday/cxs/hp/ExternalCareerSite/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 900,
+   "first_page": [
+    {
+     "title": "Machine Operator / Integrator",
+     "locationsText": "Kiryat-Gat, South District, Israel",
+     "externalPath": "/job/Kiryat-Gat-South-District-Israel/Machine-Operator---Integrator_UNI2641-2"
+    },
+    {
+     "title": "Print Service Desk Technical Customer Support Engineer",
+     "locationsText": "Dalian, Liaoning, China",
+     "externalPath": "/job/Dalian-Liaoning-China/Print-Service-Desk-Technical-Customer-Support-Engineer---Level-4_3164195"
+    },
+    {
+     "title": "ACS Quality Engineer - Workstation Products",
+     "locationsText": "Fort Collins, Colorado, United States of America",
+     "externalPath": "/job/Fort-Collins-Colorado-United-States-of-America/ACS-Quality-Engineer---Workstation-Products_3164651-2"
+    },
+    {
+     "title": "Practice Development Manager",
+     "locationsText": "4 Locations",
+     "externalPath": "/job/All-Cities-New-York-United-States-of-America/Practice-Development-Manager_JET0303-1"
+    },
+    {
+     "title": "Placement Year - Channel Sales Intern",
+     "locationsText": "Reading, Berkshire, United Kingdom",
+     "externalPath": "/job/Reading-Berkshire-United-Kingdom/Placement-Year---Commercial-Channel-Sales-Support-Intern_UNI4892-1"
+    },
+    {
+     "title": "Placement Year - Channel Sales Intern",
+     "locationsText": "Reading, Berkshire, United Kingdom",
+     "externalPath": "/job/Reading-Berkshire-United-Kingdom/Placement-Year---UK-I-PC-Channel-Sales-Intern_UNI4889"
+    },
+    {
+     "title": "Placement Year - End User Sales Intern (Glasgow)",
+     "locationsText": "Glasgow, Glasgow City, United Kingdom",
+     "externalPath": "/job/Glasgow-Glasgow-City-United-Kingdom/Placement-Year---Sales-Intern_UNI4888-1"
+    },
+    {
+     "title": "Italian Technical Mentor",
+     "locationsText": "Ariana, Ariana, Tunisia",
+     "externalPath": "/job/Ariana-Ariana-Tunisia/Italian-Technical-Mentor_3169567-1"
+    },
+    {
+     "title": "College Intern - Procurement Engineering",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/College-Intern---Procurement-Engineering_UNI4112-1"
+    },
+    {
+     "title": "Operatore di Supporto Tecnico (Italian Technical Support Representative)",
+     "locationsText": "Ariana, Ariana, Tunisia",
+     "externalPath": "/job/Ariana-Ariana-Tunisia/Operatore-di-Supporto-Tecnico--Italian-Technical-Support-Representative-_3169736-1"
+    },
+    {
+     "title": "What a College Intern - Regional Product Ops Testing Lead (Digital Go To Market)",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/College-Intern---Regional-Product-Ops-Testing-Lead--Digital-Go-To-Market-_3166739-1"
+    },
+    {
+     "title": "PWI Customer Assurance SW Engineer",
+     "locationsText": "Sant Cugat del Valles, Barcelona, Spain",
+     "externalPath": "/job/Sant-Cugat-del-Valles-Barcelona-Spain/PWI-Customer-Assurance-SW-Engineer_3168798-2"
+    },
+    {
+     "title": "Enterprise Account Manager (EAM)",
+     "locationsText": "Makati City, National Capital Region (Manila), Philippines",
+     "externalPath": "/job/Makati-City-National-Capital-Region-Manila-Philippines/Enterprise-Account-Manager--EAM-_3163623-1"
+    },
+    {
+     "title": "Partner Sales - Distribution",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Gurugram-Haryana-India/Partner-Sales---Distribution_3167839-1"
+    },
+    {
+     "title": "Inside Presales Technical Consultant",
+     "locationsText": "Tlaquepaque, Jalisco, Mexico",
+     "externalPath": "/job/Tlaquepaque-Jalisco-Mexico/Inside-Presales-Technical-Consultant_3169668-1"
+    },
+    {
+     "title": "Principle Software Product Manager - HP app",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Vancouver-Washington-United-States-of-America/Principle-Software-Product-Manager---HP-app_3165600-1"
+    },
+    {
+     "title": "SQA Automation Engineer",
+     "locationsText": "Austin, Texas, United States of America",
+     "externalPath": "/job/Austin-Texas-United-States-of-America/SQA-Automation-Engineer_3169148"
+    },
+    {
+     "title": "Workstations Business Development Manager - Mexico",
+     "locationsText": "Ciudad de Mexico, Ciudad de Mexico, Mexico",
+     "externalPath": "/job/Ciudad-de-Mexico-Ciudad-de-Mexico-Mexico/Workstations-Business-Development-Manager---Mexico_3167524-1"
+    },
+    {
+     "title": "SQA Test Engineer",
+     "locationsText": "Austin, Texas, United States of America",
+     "externalPath": "/job/Austin-Texas-United-States-of-America/SQA-Test-Engineer_3169056-1"
+    },
+    {
+     "title": "Senior Director, HP on HP Customer Zero",
+     "locationsText": "Palo Alto, California, United States of America",
+     "externalPath": "/job/Palo-Alto-California-United-States-of-America/Senior-Director--HP-on-HP-Customer-Zero_3169113-1"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 74,
+   "first_page": [
+    {
+     "title": "College Intern - Procurement Engineering",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/College-Intern---Procurement-Engineering_UNI4112-1"
+    },
+    {
+     "title": "What a College Intern - Regional Product Ops Testing Lead (Digital Go To Market)",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/College-Intern---Regional-Product-Ops-Testing-Lead--Digital-Go-To-Market-_3166739-1"
+    },
+    {
+     "title": "Software Development Engineer, LaserJet R&D",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/Software-Development-Engineer--LaserJet-R-D_3168474-1"
+    },
+    {
+     "title": "Service Supply Chain Strategic Partner Manager",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Taipei-Taipei-City-Taiwan-Region/Service-Supply-Chain-Strategic-Partner-Manager_3163065-1"
+    },
+    {
+     "title": "Enterprise Account Manager - South Vietnam",
+     "locationsText": "Ho Chi Minh City, Ho Chi Minh, Vietnam",
+     "externalPath": "/job/Ho-Chi-Minh-City-Ho-Chi-Minh-Vietnam/Enterprise-Account-Manager---South-Vietnam_3167345-1"
+    },
+    {
+     "title": "Enterprise Account Manager, Personal Systems (Public Sector)",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/Enterprise-Account-Manager--Personal-Systems--Public-Sector-_3167684-1"
+    },
+    {
+     "title": "R&D Firmware Engineer",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/R-D-Firmware-Engineer_3162825-1"
+    },
+    {
+     "title": "Software (Embedded Firmware ) Application Engineer",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/Software--Embedded-Firmware---Application-Engineer_3162690-1"
+    },
+    {
+     "title": "College Intern - Pen Health & Servicing Development Engineer",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/College-Intern---Machine-Learning-and-Artificial-Intelligence_UNI4651-1"
+    },
+    {
+     "title": "College Intern - Process and Digitalization",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/College-Intern---Process-and-Digitalization_UNI4555-1"
+    },
+    {
+     "title": "Defective Operations and Cost Optimization Manager",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/Defective-Operations-and-Cost-Optimization-Manager_3169061-1"
+    },
+    {
+     "title": "Solutions Program Manager",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/Solutions-Program-Manager_3168277-1"
+    },
+    {
+     "title": "Partner Programs Manager",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/Partner-Programs-Manager_3169228-2"
+    },
+    {
+     "title": "Manufacturing Test Software Engineer",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/Manufacturing-Test-Software-Engineer_3168797-1"
+    },
+    {
+     "title": "Large Format Manufacturing Development Engineer",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/Large-Format-Manufacturing-Development-Engineer_3167123-1"
+    },
+    {
+     "title": "Business Operations & Customer Program Specialist (Fresh Graduate)",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/Business-Support-Assistant_3166662-1"
+    },
+    {
+     "title": "Control Panel Mechanical Engineer",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/Control-Panel-Mechanical-Engineer_3168846-1"
+    },
+    {
+     "title": "Product Cost Lead",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/Product-Cost-Lead_3168685-1"
+    },
+    {
+     "title": "Embedded Firmware and Software Engineer",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Spring-Texas-United-States-of-America/Embedded-Firmware-and-Software-Engineer_3167624-1"
+    },
+    {
+     "title": "ISA Mechanical Engineer",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/ISA-Mechanical-Engineer_3167776-1"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 1,
+   "first_page": [
+    {
+     "title": "Lead Data Scientist",
+     "locationsText": "Singapore, South West, Singapore",
+     "externalPath": "/job/Singapore-South-West-Singapore/Lead-Data-Scientist_3164894-2"
+    }
+   ]
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 900,
+ "sg_search_total": 74,
+ "sg_ds_first_page_matches": [
+  {
+   "title": "Lead Data Scientist",
+   "locationsText": "Singapore, South West, Singapore",
+   "externalPath": "/job/Singapore-South-West-Singapore/Lead-Data-Scientist_3164894-2"
+  }
+ ],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

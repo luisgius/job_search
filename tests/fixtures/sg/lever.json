@@ -1,0 +1,40 @@
+[
+  {
+    "id": "9f2b1c4e-1111-4a2b-9d3e-000000000001",
+    "text": "Senior Data Scientist",
+    "hostedUrl": "https://jobs.lever.co/globex/9f2b1c4e-1111-4a2b-9d3e-000000000001",
+    "applyUrl": "https://jobs.lever.co/globex/9f2b1c4e-1111-4a2b-9d3e-000000000001/apply",
+    "createdAt": 1785826800000,
+    "workplaceType": "remote",
+    "categories": {
+      "commitment": "Full-time",
+      "department": "Engineering",
+      "location": "Singapore",
+      "team": "Backend",
+      "allLocations": [
+        "Singapore",
+        "Hong Kong"
+      ]
+    },
+    "descriptionPlain": "We are looking for a Senior Python Engineer to own our ingestion pipeline.",
+    "description": "<p>We are looking for a Senior Python Engineer to own our ingestion pipeline.</p>",
+    "lists": [
+      {
+        "text": "What you'll do",
+        "content": "<li>Design event-driven services in Python</li><li>Scale Kafka consumers past 100k msg/s</li>"
+      },
+      {
+        "text": "Requirements",
+        "content": "<li>6+ years of Python</li><li>Kafka or equivalent streaming experience</li><li>Based in the EU</li>"
+      }
+    ],
+    "additional": "",
+    "additionalPlain": "",
+    "salaryRange": {
+      "currency": "SGD",
+      "min": 12000,
+      "max": 16000,
+      "interval": "month"
+    }
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "pages": [
+    {"offset": 0, "limit": 100, "totalFound": 2, "content": [{"id": "744000001234001", "name": "Senior Data Scientist", "releasedDate": "2026-10-05T03:10:00.000Z", "location": {"city": "Singapore", "country": "sg"}}]},
+    {"offset": 1, "limit": 100, "totalFound": 2, "content": [{"id": "744000001234002", "name": "Lead Data Scientist", "releasedDate": "2026-10-01T03:10:00.000Z", "location": {"city": "Singapore", "country": "sg"}}]}
+  ],
+  "details": [
+    {"id": "744000001234001", "name": "Senior Data Scientist", "releasedDate": "2026-10-05T03:10:00.000Z", "postingUrl": "https://jobs.smartrecruiters.com/Example/744000001234001-senior-data-scientist", "applyUrl": "https://jobs.smartrecruiters.com/Example/744000001234001-senior-data-scientist/apply", "location": {"city": "Singapore", "country": "sg", "remote": false}, "jobAd": {"sections": {"companyDescription": {"title": "Company Description", "text": "<p>Regional analytics group.</p>"}, "jobDescription": {"title": "Job Description", "text": "<p>Build models with Python and SQL.</p>"}, "qualifications": {"text": "<ul><li>Five years experience.</li></ul>"}}}, "salary": {"currency": "SGD", "min": 10000, "max": 14000, "interval": "MONTH"}},
+    {"id": "744000001234002", "name": "Lead Data Scientist", "releasedDate": "2026-10-01T03:10:00.000Z", "postingUrl": "https://jobs.smartrecruiters.com/Example/744000001234002-lead-data-scientist", "location": {"city": "Singapore", "country": "sg"}, "jobAd": {"sections": {"jobDescription": {"text": "<p>Lead a team of analysts.</p>"}}}}
+  ]
+}

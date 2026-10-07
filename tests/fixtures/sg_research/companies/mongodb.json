@@ -1,0 +1,36 @@
+{
+ "company_key": "mongodb",
+ "ats": "greenhouse",
+ "identifiers": {
+  "token": "mongodb"
+ },
+ "checked_at": "2026-10-07T15:05:19+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://boards-api.greenhouse.io/robots.txt",
+  "http_status": 200,
+  "path_checked": "/v1/boards/mongodb/jobs",
+  "allowed": true,
+  "body_excerpt": "# See http://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file\n\nUser-agent: *\nDisallow: /embed/"
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://boards-api.greenhouse.io/v1/boards/mongodb/jobs"
+ },
+ "http_status": 200,
+ "board_name": "MongoDB",
+ "total_jobs": 392,
+ "sg_jobs": 9,
+ "sg_ds_matches": [],
+ "sg_sample_titles": [
+  "Advisory Solutions Architect",
+  "Enablement Delivery Specialist",
+  "Enterprise Account Executive (Bahasa, Vietnamese and Thai speaker)",
+  "Enterprise Account Executive, Growth (Vietnam)",
+  "Global Deal Strategy Sr. Analyst",
+  "Manager / Senior Manager, Solution Architecture",
+  "Partner Specialist",
+  "Senior Solutions Architect",
+  "Senior Solutions Architect"
+ ]
+}

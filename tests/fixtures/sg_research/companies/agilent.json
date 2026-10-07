@@ -1,0 +1,309 @@
+{
+ "company_key": "agilent",
+ "ats": "workday",
+ "identifiers": {
+  "host": "agilent.wd5.myworkdayjobs.com",
+  "tenant": "agilent",
+  "site": "Agilent_Careers"
+ },
+ "checked_at": "2026-10-07T14:58:51+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://agilent.wd5.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/agilent/Agilent_Careers/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://agilent.wd5.myworkdayjobs.com/Agilent_Careers/siteMap.xml\nSitemap: https://agilent.wd5.myworkdayjobs.com/Agilent_Student_Careers/siteMap.xml\n\nUser-agent: *\nAllow: /Agilent_Careers/\nAllow: /Agilent_Student_Careers/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://agilent.wd5.myworkdayjobs.com/wday/cxs/agilent/Agilent_Careers/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 345,
+   "first_page": [
+    {
+     "title": "Market Development Manager - Biopharma",
+     "locationsText": "India-Hyderabad-Unit 201",
+     "externalPath": "/job/India-Hyderabad-Unit-201/Market-Development-Manager---Biopharma_4039813"
+    },
+    {
+     "title": "APAC CBD/CDD Product Launch & Market Readiness Project Manager",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/India-Remote-Location-Manesar/APAC-CBD-CDD-Product-Launch---Market-Readiness-Project-Manager_4040193"
+    },
+    {
+     "title": "ACG Global Commercialization Manager",
+     "locationsText": "8 Locations",
+     "externalPath": "/job/US-DE-Wilmington/ACG-Global-Commercialization-Manager_4039868"
+    },
+    {
+     "title": "Production Planner",
+     "locationsText": "Malaysia-Penang",
+     "externalPath": "/job/Malaysia-Penang/Production-Planner_4040137"
+    },
+    {
+     "title": "Manufacturing Quality Assurance Manager",
+     "locationsText": "US-TX-Cedar Creek",
+     "externalPath": "/job/US-TX-Cedar-Creek/Manufacturing-Quality-Assurance-Manager_4040057"
+    },
+    {
+     "title": "General & Administrative Business Finance Partner - Corporate Operations",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/US-CA-Remote-Location/G-A-Finance---Sr-Analyst_4039548"
+    },
+    {
+     "title": "Process Engineer",
+     "locationsText": "US-CO-Boulder",
+     "externalPath": "/job/US-CO-Boulder/Process-Engineer_4040083"
+    },
+    {
+     "title": "Process Engineer",
+     "locationsText": "US-CO-Boulder",
+     "externalPath": "/job/US-CO-Boulder/Project-Engineer_4038048-1"
+    },
+    {
+     "title": "Services New Business Account Manager",
+     "locationsText": "Canada-Remote Location-Greater Toronto Area",
+     "externalPath": "/job/Canada-Remote-Location-Greater-Toronto-Area/Services-New-Business-Account-Manager_4040128"
+    },
+    {
+     "title": "HR Administration Support Italy (Intended for Protected Categories candidates - Law 68/99 Art.1)",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Italy-Torino/HR-Administration-Support-Italy--Intended-for-Protected-Categories-candidates---Law-68-99-Art1-_4031707"
+    },
+    {
+     "title": "Customer\u00a0Application\u00a0Specialist (CAS), Pathology",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/US-PA-Remote-Location-Philadelphia-Area/Customer-Application-Specialist--CAS---Pathology_4039076"
+    },
+    {
+     "title": "Manesar CrossLab Education Center Instructor",
+     "locationsText": "India-Manesar",
+     "externalPath": "/job/India-Manesar/Manesar-CrossLab-Education-Center-Instructor_4040136"
+    },
+    {
+     "title": "Software Product Manager, LC/MS",
+     "locationsText": "US-CA-Santa Clara",
+     "externalPath": "/job/US-CA-Santa-Clara/Software-Product-Manager--LC-MS_4039345-1"
+    },
+    {
+     "title": "Associate Vice President Global Credit & Collections",
+     "locationsText": "India-Manesar",
+     "externalPath": "/job/India-Manesar/Associate-Vice-President-Global-Credit---Collections_4040247"
+    },
+    {
+     "title": "Manufacturing Operator",
+     "locationsText": "Malaysia-Penang",
+     "externalPath": "/job/Malaysia-Penang/Manufacturing-Operator_4039929"
+    },
+    {
+     "title": "Manufacturing Technician",
+     "locationsText": "Malaysia-Penang",
+     "externalPath": "/job/Malaysia-Penang/Manufacturing-Technician_4039781"
+    },
+    {
+     "title": "Sales Process Specialist APAC",
+     "locationsText": "India-Manesar Campus-Ground Floor",
+     "externalPath": "/job/India-Manesar-Campus-Ground-Floor/Sales-Process-Specialist-APAC_4039436"
+    },
+    {
+     "title": "Logistics Admin",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/US-TN-Memphis/Logistics-Admin_4035862"
+    },
+    {
+     "title": "Leasing Sales Assistant",
+     "locationsText": "Mexico-Mexico City",
+     "externalPath": "/job/Mexico-Mexico-City/Sales-Assistant_4035627"
+    },
+    {
+     "title": "Material Science & Technology (MSAT)  Associate",
+     "locationsText": "US-DE-Newport",
+     "externalPath": "/job/US-DE-Newport/Material-Science---Technology--MSAT---Associate_4040195-1"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 21,
+   "first_page": [
+    {
+     "title": "Marketing Program Manager, Singapore",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Marketing-Program-Manager--Japan_4040190"
+    },
+    {
+     "title": "Customer Service Manager",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Customer-Service-Manager_4037383"
+    },
+    {
+     "title": "Process Reliability Engineer",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Process-Reliability-Engineer_4038360"
+    },
+    {
+     "title": "Customer Operations Specialist",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Customer-Operations-Specialist_4038679"
+    },
+    {
+     "title": "HR Business Partner, Global Manufacturing",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Senior-HR-Business-Partner_4039327"
+    },
+    {
+     "title": "Process Reliability Engineer",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Process-Reliability-Engineer_4038991"
+    },
+    {
+     "title": "Decision Support Data Scientist (Global Manufacturing Analytics)",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Decision-Support-Data-Scientist--Global-Manufacturing-Analytics-_4039242-1"
+    },
+    {
+     "title": "Manufacturing Engineer",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Manufacturing-Engineer--Advanced---Singapore_4038918"
+    },
+    {
+     "title": "Customer Operations Specialist",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Customer-Operations-Specialist_4039511"
+    },
+    {
+     "title": "Digital Solutions Engineer \u2013 Application Experience",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Digital-Solutions-Engineer---Application-Experience_4039670"
+    },
+    {
+     "title": "Global Trade Data Analyst",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Global-Trade-Data-Analyst_4037251"
+    },
+    {
+     "title": "Digital Solutions Engineer \u2013 Operational Applications",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Digital-Solutions-Engineer---Operational-Applications_4039668"
+    },
+    {
+     "title": "Global Operations Data Engineer",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Global-Operations-Data-Engineer_4039671"
+    },
+    {
+     "title": "AI & Data Scientist \u2013 Smart Manufacturing",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/AI---Data-Scientist---Smart-Manufacturing_4039990"
+    },
+    {
+     "title": "Global Operations Data Architect",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Global-Operations-Data-Architect_4039989"
+    },
+    {
+     "title": "Digital Solutions Engineer \u2013 Platform Services",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Digital-Solutions-Engineer---Platform-Services_4039991"
+    },
+    {
+     "title": "Manufacturing Tech, Test and Repair",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Manufacturing-Tech--Test-and-Repair_4040120"
+    },
+    {
+     "title": "Materials Engineer",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Materials-Engineer_4040182"
+    },
+    {
+     "title": "Channel Partner Sales",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Thailand-Bangkok/Channel-Sales_4039775"
+    },
+    {
+     "title": "Demand Planner",
+     "locationsText": "9 Locations",
+     "externalPath": "/job/China-Remote-Location-Shanghai/Demand-Planner_4039205"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 9,
+   "first_page": [
+    {
+     "title": "Decision Support Data Scientist (Global Manufacturing Analytics)",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Decision-Support-Data-Scientist--Global-Manufacturing-Analytics-_4039242-1"
+    },
+    {
+     "title": "AI & Data Scientist \u2013 Smart Manufacturing",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/AI---Data-Scientist---Smart-Manufacturing_4039990"
+    },
+    {
+     "title": "IBP Supply Planning Data Scientist",
+     "locationsText": "13 Locations",
+     "externalPath": "/job/Singapore-Yishun/IBP-Supply-Planning-Data-Scientist_4039190"
+    },
+    {
+     "title": "Global Operations Data Engineer",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Global-Operations-Data-Engineer_4039671"
+    },
+    {
+     "title": "Global Operations Data Architect",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Global-Operations-Data-Architect_4039989"
+    },
+    {
+     "title": "Digital Solutions Engineer \u2013 Platform Services",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Digital-Solutions-Engineer---Platform-Services_4039991"
+    },
+    {
+     "title": "Digital Solutions Engineer \u2013 Application Experience",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Digital-Solutions-Engineer---Application-Experience_4039670"
+    },
+    {
+     "title": "Digital Solutions Engineer \u2013 Operational Applications",
+     "locationsText": "Singapore-Yishun",
+     "externalPath": "/job/Singapore-Yishun/Digital-Solutions-Engineer---Operational-Applications_4039668"
+    },
+    {
+     "title": "Demand Planner",
+     "locationsText": "9 Locations",
+     "externalPath": "/job/China-Remote-Location-Shanghai/Demand-Planner_4039205"
+    }
+   ]
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 345,
+ "sg_search_total": 21,
+ "sg_ds_first_page_matches": [
+  {
+   "title": "Decision Support Data Scientist (Global Manufacturing Analytics)",
+   "locationsText": "Singapore-Yishun",
+   "externalPath": "/job/Singapore-Yishun/Decision-Support-Data-Scientist--Global-Manufacturing-Analytics-_4039242-1"
+  },
+  {
+   "title": "AI & Data Scientist \u2013 Smart Manufacturing",
+   "locationsText": "Singapore-Yishun",
+   "externalPath": "/job/Singapore-Yishun/AI---Data-Scientist---Smart-Manufacturing_4039990"
+  }
+ ],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

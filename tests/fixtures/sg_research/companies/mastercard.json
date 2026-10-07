@@ -1,0 +1,289 @@
+{
+ "company_key": "mastercard",
+ "ats": "workday",
+ "identifiers": {
+  "host": "mastercard.wd1.myworkdayjobs.com",
+  "tenant": "mastercard",
+  "site": "CorporateCareers"
+ },
+ "checked_at": "2026-10-07T14:59:24+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://mastercard.wd1.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/mastercard/CorporateCareers/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://mastercard.wd1.myworkdayjobs.com/CorporateCareers/siteMap.xml\nSitemap: https://mastercard.wd1.myworkdayjobs.com/Campus/siteMap.xml\nSitemap: https://mastercard.wd1.myworkdayjobs.com/ContractorConversion/siteMap.xml\nSitemap: https://mastercard.wd1.myworkdayjobs.com/RYC/siteMap.xml\n\nUser-agent: *\nAllow: /CorporateCareers/\nAllow: /Campus/\nAllow: /ContractorConversion/\nAllow: /RYC/\nDisallow: /CUOReqSite/\nDisallow: /CampusApplyOnly/\nDisallow: /Public_Posting_Site/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://mastercard.wd1.myworkdayjobs.com/wday/cxs/mastercard/CorporateCareers/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 1085,
+   "first_page": [
+    {
+     "title": "Principal Software Development Engineer",
+     "locationsText": "3 Locations",
+     "externalPath": "/job/Arlington-Virginia/Principal-Software-Development-Engineer_R-286148-1"
+    },
+    {
+     "title": "Senior Analyst, Strategy and Business Excellence",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Lisbon-Portugal/Senior-Analyst--Business-Development_R-291237"
+    },
+    {
+     "title": "Manager, Services Business Development",
+     "locationsText": "Budapest, Hungary (Paulay Ede Street 55)",
+     "externalPath": "/job/Budapest-Hungary-Paulay-Ede-Street-55/Manager--Services-Business-Development_R-290536"
+    },
+    {
+     "title": "Software Engineer I",
+     "locationsText": "O'Fallon, Missouri",
+     "externalPath": "/job/OFallon-Missouri/Software-Engineer-I_R-292618-1"
+    },
+    {
+     "title": "Senior Technical Program Manager",
+     "locationsText": "O'Fallon, Missouri",
+     "externalPath": "/job/OFallon-Missouri/Senior-Technical-Program-Manager_R-292097-1"
+    },
+    {
+     "title": "Senior Software Engineer",
+     "locationsText": "Pune, India",
+     "externalPath": "/job/Pune-India/Senior-Software-Engineer_R-292290"
+    },
+    {
+     "title": "Senior Platform Engineer",
+     "locationsText": "Copenhagen, Denmark (Arne Jacobsens)",
+     "externalPath": "/job/Copenhagen-Denmark-Arne-Jacobsens/Senior-Platform-Engineer_R-289288"
+    },
+    {
+     "title": "Senior Counsel, Regulatory & Privacy",
+     "locationsText": "Oslo, Norway (haavard martinsens vei)",
+     "externalPath": "/job/Oslo-Norway-haavard-martinsens-vei/Senior-Counsel--Regulatory---Privacy_R-292913"
+    },
+    {
+     "title": "Director, Global Network Economics & Value Optimization",
+     "locationsText": "Purchase, New York",
+     "externalPath": "/job/Purchase-New-York/Director--Global-Network-Economics---Value-Optimization_R-292438"
+    },
+    {
+     "title": "Manager Product Management, Commercialization, Consumer Acquisition & Engagement (German Speaker)",
+     "locationsText": "3 Locations",
+     "externalPath": "/job/Vienna-Austria/Manager-Product-Management--Commercialization--Consumer-Acquisition---Engagement--CA-E-_R-292423"
+    },
+    {
+     "title": "Director, Product Delivery",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/OFallon-Missouri/Director--Product-Delivery_R-292645"
+    },
+    {
+     "title": "Director, Solution Architect",
+     "locationsText": "Riyadh, Saudi Arabia",
+     "externalPath": "/job/Riyadh-Saudi-Arabia/Director--Solution-Architect_R-292301"
+    },
+    {
+     "title": "Senior Specialist, Customer Experience Design",
+     "locationsText": "Pune, India",
+     "externalPath": "/job/Pune-India/Senior-Specialist--Customer-Experience-Design_R-291684"
+    },
+    {
+     "title": "Manager, Software Engineering",
+     "locationsText": "Pune, India",
+     "externalPath": "/job/Pune-India/Manager--Software-Engineering_R-292287-1"
+    },
+    {
+     "title": "Principal , Product Management-Technical",
+     "locationsText": "O'Fallon, Missouri",
+     "externalPath": "/job/OFallon-Missouri/Principal---Product-Management-Technical_R-289745-1"
+    },
+    {
+     "title": "Senior Enterprise Operations Engineer",
+     "locationsText": "Dublin, Ireland",
+     "externalPath": "/job/Dublin-Ireland/Senior-Enterprise-Operations-Engineer_R-289798-1"
+    },
+    {
+     "title": "Principal Software Engineer",
+     "locationsText": "Pune, India",
+     "externalPath": "/job/Pune-India/Principal-Software-Engineer_R-292828"
+    },
+    {
+     "title": "Manager, Product Development - EMV and Payment Technology",
+     "locationsText": "Pune, India",
+     "externalPath": "/job/Pune-India/Manager--Product-Development---EMV-and-Payment-Technology_R-288503"
+    },
+    {
+     "title": "Manager, Technology Account Manager, Kuwait",
+     "locationsText": "Vendor - Kuwait City, Kuwait (Mercans)",
+     "externalPath": "/job/Vendor---Kuwait-City-Kuwait-Mercans/Manager--Technology-Account-Manager_R-261523"
+    },
+    {
+     "title": "Director Specialist Sales - Egypt",
+     "locationsText": "Cairo, Egypt",
+     "externalPath": "/job/Cairo-Egypt/Director-Specialist-Sales---Egypt_R-286532"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 44,
+   "first_page": [
+    {
+     "title": "Lead Engineer, Site Reliability Engineering",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Lead-Network-Engineer--Site-Reliability-Engineering_R-272566-1"
+    },
+    {
+     "title": "Director, Solutions Growth & Enablement",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Singapore/Director--Solutions-Growth---Enablement_R-292703-1"
+    },
+    {
+     "title": "Consultant, Client Training and Education",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Taipei-Taiwan/Consultant--Client-Training-and-Education_R-291276"
+    },
+    {
+     "title": "Director, Services Business Development (Innovation & Digital Assets)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Senior-Managing-Consultant--Services-Business-Development_R-291768"
+    },
+    {
+     "title": "Manager, Services Business Development (Acquiring & Processing)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Manager--Services-Business-Development--Acquiring---Processing-_R-291925-1"
+    },
+    {
+     "title": "Manager, Solutions Growth & Enablement",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Manager--Solutions-Growth---Enablement_R-292070-1"
+    },
+    {
+     "title": "Vice President, Field CISO Commercial, Asia Pacific",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Vice-President--Field-CISO-Commercial--Asia-Pacific_R-291168"
+    },
+    {
+     "title": "Senior People Specialist",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Senior-People-Specialist_R-290852"
+    },
+    {
+     "title": "Manager, Sales Engineering (Loyalty Solutions)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Manager--Solutions-Engineering--Loyalty-Solutions-_R-291504"
+    },
+    {
+     "title": "Manager, SME Channel Distribution Specialist Sales, South East Asia (West)",
+     "locationsText": "Kuala Lumpur, Malaysia",
+     "externalPath": "/job/Kuala-Lumpur-Malaysia/Manager--SME-Channel-Distribution-Specialist-Sales--South-East-Asia--West-_R-289279"
+    },
+    {
+     "title": "Director, Product Management - Tokenization",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Director--Product-Management---Tokenization_R-286714"
+    },
+    {
+     "title": "Manager, Product Management, ALM",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Manager--Product-Management--ALM_R-291758"
+    },
+    {
+     "title": "Manager, Partner Success \u2013 Security Solutions",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Manager--Partner-Success---Security-Solutions_R-291512"
+    },
+    {
+     "title": "Lead Platform Engineer - Network Operations",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Lead-Platform-Engineer_R-287861"
+    },
+    {
+     "title": "Senior Managing Consultant, Business Development, Services, Francophone Africa",
+     "locationsText": "Abidjan, Cote d'ivoire",
+     "externalPath": "/job/Abidjan-Cote-divoire/Senior-Managing-Consultant--Business-Development--Services--Francophone-Africa_R-289538"
+    },
+    {
+     "title": "Managing Consultant, Innovation Consulting",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Managing-Consultant--Innovation-Consulting_R-291831"
+    },
+    {
+     "title": "Specialist, B2B Field Marketing",
+     "locationsText": "Taipei, Taiwan",
+     "externalPath": "/job/Taipei-Taiwan/Field-Marketing-Specialist--Partner-Events_R-291712"
+    },
+    {
+     "title": "Manager, Technology Account Management - Singapore",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Manager--Technology-Account-Management---Singapore_R-291058"
+    },
+    {
+     "title": "Manager, Account Management, MCDS Philippines",
+     "locationsText": "Manila, Philippines",
+     "externalPath": "/job/Manila-Philippines/Manager--Account-Management--MCDS-Philippines_R-291412"
+    },
+    {
+     "title": "Security Solutions (SSO) Product Lead \u2013 Southeast Asia Division East",
+     "locationsText": "3 Locations",
+     "externalPath": "/job/Singapore/SSO-Product-SEA-East-Division-Lead_R-281787"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 4,
+   "first_page": [
+    {
+     "title": "AP Lead Data Scientist \u2013 Financial Crime",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/AP-Data-Scientist---Financial-Crime_R-291075"
+    },
+    {
+     "title": "Senior AI Engineer",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Senior-AI-Engineer_R-289958"
+    },
+    {
+     "title": "Lead AI Engineer",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Lead-AI-Engineer_R-288104"
+    },
+    {
+     "title": "Director, Applied AI Product Enablement & Commercialisation, AP SME",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Director--Applied-AI-Product-Enablement---Commercialisation--AP-SME_R-287180-1"
+    }
+   ]
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 1085,
+ "sg_search_total": 44,
+ "sg_ds_first_page_matches": [
+  {
+   "title": "AP Lead Data Scientist \u2013 Financial Crime",
+   "locationsText": "Singapore",
+   "externalPath": "/job/Singapore/AP-Data-Scientist---Financial-Crime_R-291075"
+  },
+  {
+   "title": "Senior AI Engineer",
+   "locationsText": "Singapore",
+   "externalPath": "/job/Singapore/Senior-AI-Engineer_R-289958"
+  },
+  {
+   "title": "Lead AI Engineer",
+   "locationsText": "Singapore",
+   "externalPath": "/job/Singapore/Lead-AI-Engineer_R-288104"
+  }
+ ],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

@@ -1,0 +1,42 @@
+{
+ "company_key": "stripe",
+ "ats": "greenhouse",
+ "identifiers": {
+  "token": "stripe"
+ },
+ "checked_at": "2026-10-07T15:04:59+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://boards-api.greenhouse.io/robots.txt",
+  "http_status": 200,
+  "path_checked": "/v1/boards/stripe/jobs",
+  "allowed": true,
+  "body_excerpt": "# See http://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file\n\nUser-agent: *\nDisallow: /embed/"
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://boards-api.greenhouse.io/v1/boards/stripe/jobs"
+ },
+ "http_status": 200,
+ "board_name": "Stripe",
+ "total_jobs": 718,
+ "sg_jobs": 53,
+ "sg_ds_matches": [],
+ "sg_sample_titles": [
+  "Account Executive, Commercial Hunter",
+  "Account Executive, Cross Border China",
+  "Account Executive, Privy",
+  "Account Executive, Product - Local Payment Methods",
+  "Account Executive, Product Sales - Currency Management",
+  "Account Executive, Product Sales (Data Pipeline) ",
+  "Account Executive, Product Sales - Money Management  APAC",
+  "Account Executive Product - Tax",
+  "Account Executive - SEA, Platforms (Grower)",
+  "Core Recruiter (Risk, Partnerships, Operations)",
+  "Customer Success Leader (Greater China)",
+  "Data Analyst, Global Growth",
+  "Data Analyst, Payments",
+  "Deal Pricing Strategist, APAC",
+  "Engagement Manager, Professional Services (SEA/GCN)"
+ ]
+}

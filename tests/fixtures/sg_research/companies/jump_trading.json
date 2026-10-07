@@ -1,0 +1,42 @@
+{
+ "company_key": "jump_trading",
+ "ats": "greenhouse",
+ "identifiers": {
+  "token": "jumptrading"
+ },
+ "checked_at": "2026-10-07T15:18:15+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://boards-api.greenhouse.io/robots.txt",
+  "http_status": 200,
+  "path_checked": "/v1/boards/jumptrading/jobs",
+  "allowed": true,
+  "body_excerpt": "# See http://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file\n\nUser-agent: *\nDisallow: /embed/"
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://boards-api.greenhouse.io/v1/boards/jumptrading/jobs"
+ },
+ "http_status": 200,
+ "board_name": "Jump Trading",
+ "total_jobs": 109,
+ "sg_jobs": 20,
+ "sg_ds_matches": [],
+ "sg_sample_titles": [
+  "Campus AI/ML Researcher (Intern)",
+  "Campus C++ Software Engineer (Intern)",
+  "Campus Python Software Engineer (Intern)",
+  "Campus Quantitative Researcher (Intern)",
+  "Campus Quantitative Trader (Intern)",
+  "Campus Systems Engineer (Intern)",
+  "Deep Learning Researcher | Trading Team",
+  "Early Career Talent Development Programs Specialist\u202f | Talent Development",
+  "HR Operations Specialist",
+  "Leadership and Professional Development Specialist | Talent Development",
+  "Product Site Reliability Engineer | Production Infrastructure",
+  "Quantamental Research Analyst | Trading Team ",
+  "Quantitative Developer | Trading Team ",
+  "Quantitative Researcher | Trading Team",
+  "Quantitative Trader | Trading Team"
+ ]
+}

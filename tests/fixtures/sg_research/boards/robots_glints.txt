@@ -1,0 +1,21 @@
+user-agent: *
+disallow: */opportunities/jobs/recommended$
+disallow: */opportunities/jobs/bookmarked$
+disallow: */settings
+disallow: */oauth2
+disallow: */forgot-password
+disallow: */onboarding-guided
+disallow: */preview/
+disallow: */talenthunt
+disallow: */user/
+disallow: */redirect$
+disallow: */403$
+disallow: */500$
+disallow: */opportunities/jobs/explore?*
+disallow: */en/opportunities/jobs/explore?*
+disallow: */blog/?s*
+disallow: /api/glintsTracking/*
+disallow: /api/gt/*
+
+sitemap: https://glints.com/sitemap_index.xml
+sitemap: https://glints.com/sitemaps/explore-page-id-sitemap.xml

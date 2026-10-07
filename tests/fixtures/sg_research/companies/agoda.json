@@ -1,0 +1,65 @@
+{
+ "company_key": "agoda",
+ "ats": "greenhouse",
+ "identifiers": {
+  "token": "agoda"
+ },
+ "checked_at": "2026-10-07T15:04:56+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://boards-api.greenhouse.io/robots.txt",
+  "http_status": 200,
+  "path_checked": "/v1/boards/agoda/jobs",
+  "allowed": true,
+  "body_excerpt": "# See http://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file\n\nUser-agent: *\nDisallow: /embed/"
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://boards-api.greenhouse.io/v1/boards/agoda/jobs"
+ },
+ "http_status": 200,
+ "board_name": "Agoda",
+ "total_jobs": 307,
+ "sg_jobs": 7,
+ "sg_ds_matches": [
+  {
+   "title": "[Data Scientist] Principle Data Scientist - SG",
+   "location": "Singapore",
+   "url": "https://job-boards.greenhouse.io/agoda/jobs/8229408"
+  },
+  {
+   "title": "Lead Data Scientist - (Singapore Based)",
+   "location": "Singapore",
+   "url": "https://job-boards.greenhouse.io/agoda/jobs/7009865"
+  },
+  {
+   "title": "Lead/Principal Data Scientist ",
+   "location": "Guoco, Singapore",
+   "url": "https://job-boards.greenhouse.io/agoda/jobs/8238989"
+  },
+  {
+   "title": "Staff/Lead LLM Data Scientist (Singapore based)",
+   "location": "Singapore",
+   "url": "https://job-boards.greenhouse.io/agoda/jobs/7916604"
+  },
+  {
+   "title": "Staff/Lead LLM Data Scientist (Singapore based)",
+   "location": "Singapore",
+   "url": "https://job-boards.greenhouse.io/agoda/jobs/7916603"
+  },
+  {
+   "title": "Staff/Lead LLM Data Scientist (Singapore based)",
+   "location": "Singapore",
+   "url": "https://job-boards.greenhouse.io/agoda/jobs/5393397"
+  }
+ ],
+ "sg_sample_titles": [
+  "[Data Scientist] Principle Data Scientist - SG",
+  "Lead Data Scientist - (Singapore Based)",
+  "Lead/Principal Data Scientist ",
+  "Manager, Flight Supply - Singapore based",
+  "Staff/Lead LLM Data Scientist (Singapore based)",
+  "Staff/Lead LLM Data Scientist (Singapore based)",
+  "Staff/Lead LLM Data Scientist (Singapore based)"
+ ]
+}

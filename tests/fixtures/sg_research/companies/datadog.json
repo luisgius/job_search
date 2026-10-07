@@ -1,0 +1,42 @@
+{
+ "company_key": "datadog",
+ "ats": "greenhouse",
+ "identifiers": {
+  "token": "datadog"
+ },
+ "checked_at": "2026-10-07T15:05:06+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://boards-api.greenhouse.io/robots.txt",
+  "http_status": 200,
+  "path_checked": "/v1/boards/datadog/jobs",
+  "allowed": true,
+  "body_excerpt": "# See http://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file\n\nUser-agent: *\nDisallow: /embed/"
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://boards-api.greenhouse.io/v1/boards/datadog/jobs"
+ },
+ "http_status": 200,
+ "board_name": "Datadog",
+ "total_jobs": 435,
+ "sg_jobs": 17,
+ "sg_ds_matches": [],
+ "sg_sample_titles": [
+  "Commercial Account Executive (Hong Kong Market)",
+  "Commercial Sales Engineer (Bahasa Indonesia-Speaking)",
+  "Director, Sales Engineering - ASEAN",
+  "Enterprise Sales Engineer (Bahasa Indonesia Speaking)",
+  "Global Safety & Security Manager",
+  "Manager II, Services Architect",
+  "Manager II, Technical Enablement Management",
+  "Manager, Sales Field Enablement, APJ",
+  "Marketing Operations Associate",
+  "Senior Commercial Counsel",
+  "Senior Manager, Business Recruiting",
+  "Senior Partner Manager - Channels (Security)",
+  "Senior Recruiter, Enterprise Sales",
+  "Senior Sourcer, Enterprise Sales",
+  "Strategic Account Executive"
+ ]
+}

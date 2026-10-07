@@ -1,0 +1,51 @@
+{
+  "checked_at": "2026-10-07",
+  "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+  "note": "Only robots.txt and terms pages were fetched. No job-search endpoints on these boards were called. The robots_*.txt files next to this one are the raw bodies.",
+  "boards": {
+    "mcf": {
+      "robots": {"url": "https://www.mycareersfuture.gov.sg/robots.txt", "http_status": 200, "summary": "User-agent: * / Disallow: (empty), so everything is allowed"},
+      "api_robots": {"url": "https://api.mycareersfuture.gov.sg/robots.txt", "http_status": 404},
+      "terms": {"url": "https://www.mycareersfuture.gov.sg/terms-of-use", "http_status": 200, "readable": false,
+                "summary": "The page is a JS SPA; the static HTML has no terms text. A web-search snippet of the MCF (employer) Terms of Use says Website Content may not be 'reproduced ... stored in a retrieval system, or transmitted in any form or by any means ... without written permission from WSG'. That wording was not verified verbatim on the jobseeker page, so policy is unclear and MCF stays manual."}
+    },
+    "efinancialcareers": {
+      "robots": {"url": "https://www.efinancialcareers.sg/robots.txt", "http_status": 200, "summary": "Disallow /search, /v1, /v3 for '*'; crawl-delay 10; GPTBot fully disallowed"},
+      "terms": {"url": "https://www.efinancialcareers.com/terms-and-conditions", "http_status": 405, "summary": "Served a CAPTCHA bot challenge to a plain HTTPS client. Anti-bot protection is active, so no automation."}
+    },
+    "glints": {
+      "robots": {"url": "https://glints.com/robots.txt", "http_status": 200, "summary": "Disallow */opportunities/jobs/explore?* (the search result pages)"},
+      "terms": {"url": "https://glints.com/sg/terms", "http_status": 403}
+    },
+    "techinasia": {
+      "robots": {"url": "https://www.techinasia.com/robots.txt", "http_status": 403, "summary": "robots.txt itself is blocked (403) for a plain client, so policy is unknown"},
+      "terms": {"url": "https://www.techinasia.com/terms", "http_status": 403}
+    },
+    "michaelpage": {
+      "robots": {"url": "https://www.michaelpage.com.sg/robots.txt", "http_status": 200, "summary": "User-agent: * ends with 'Disallow: /'"},
+      "terms": {"url": "https://www.michaelpage.com.sg/terms-and-conditions", "http_status": 200}
+    },
+    "robertwalters": {
+      "robots": {"url": "https://www.robertwalters.com.sg/robots.txt", "http_status": 200, "summary": "Disallow every search-parameter URL (*?*q=, *?*specialization=, *?*location=, ...)"},
+      "terms": {"url": "https://www.robertwalters.com.sg/legal/terms-of-use.html", "http_status": 404}
+    },
+    "hays": {
+      "robots": {"url": "https://www.hays.com.sg/robots.txt", "http_status": 200, "summary": "Disallow /job-search/* and /search?"},
+      "terms": {"url": "https://www.hays.com.sg/terms-and-conditions", "http_status": 200,
+                "verbatim": "No framing, harvesting, \"scraping\" or other manipulation of the content of the Site is permitted."}
+    },
+    "linkedin": {
+      "robots": {"url": "https://www.linkedin.com/robots.txt", "http_status": 200, "summary": "Only named bots are allowed; job search paths are disallowed for this UA"},
+      "terms": {"url": "https://www.linkedin.com/legal/user-agreement", "http_status": 200,
+                "verbatim": "Develop, support or use software, devices, scripts, robots or any other means or processes (such as crawlers, browser plugins and add-ons or any other technology) to scrape or copy the Services"}
+    },
+    "workday_vendor_terms": {
+      "terms": {"url": "https://www.workday.com/en-us/legal/site-terms.html", "last_updated": "2026-08-13",
+                "verbatim": "Use any data mining, robots or similar data gathering or extraction methods designed to scrape or extract data from our Sites",
+                "scope_note": "'Sites' = www.workday.com and associated pages, the Community, and the Workday APIs. Customer career sites (*.myworkdayjobs.com) are not named explicitly, so coverage is unclear."}
+    },
+    "smartrecruiters_api": {
+      "robots": {"url": "https://api.smartrecruiters.com/robots.txt", "http_status": 200, "summary": "Allow only LinkedInBot on /v1/companies/; 'User-agent: * Disallow: /'"}
+    }
+  }
+}

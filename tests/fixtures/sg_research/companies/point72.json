@@ -1,0 +1,53 @@
+{
+ "company_key": "point72",
+ "ats": "greenhouse",
+ "identifiers": {
+  "token": "point72"
+ },
+ "checked_at": "2026-10-07T15:18:12+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://boards-api.greenhouse.io/robots.txt",
+  "http_status": 200,
+  "path_checked": "/v1/boards/point72/jobs",
+  "allowed": true,
+  "body_excerpt": "# See http://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file\n\nUser-agent: *\nDisallow: /embed/"
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://boards-api.greenhouse.io/v1/boards/point72/jobs"
+ },
+ "http_status": 200,
+ "board_name": "Point72 ",
+ "total_jobs": 215,
+ "sg_jobs": 10,
+ "sg_ds_matches": [
+  {
+   "title": "AI Data Scientist",
+   "location": "Hong Kong, Singapore ",
+   "url": "https://boards.greenhouse.io/point72/jobs/8658618002?gh_jid=8658618002"
+  },
+  {
+   "title": "Cubist Data Scientist",
+   "location": "Singapore",
+   "url": "https://boards.greenhouse.io/point72/jobs/7001158002?gh_jid=7001158002"
+  },
+  {
+   "title": "Cubist Senior Data Scientist",
+   "location": "Singapore",
+   "url": "https://boards.greenhouse.io/point72/jobs/7045995002?gh_jid=7045995002"
+  }
+ ],
+ "sg_sample_titles": [
+  "2027 Point72 Academy Investment Analyst Summer Internship Program - Singapore",
+  "AI Data Scientist",
+  "AV Support Specialist",
+  "Canvas Fundamental Researcher",
+  "Cubist Data Scientist",
+  "Cubist Portfolio Manager",
+  "Cubist Quantitative Researcher",
+  "Cubist Senior Data Scientist",
+  "Head of Compliance, Hong Kong",
+  "Research Analyst"
+ ]
+}

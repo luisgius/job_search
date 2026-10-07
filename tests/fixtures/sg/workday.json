@@ -1,0 +1,10 @@
+{
+  "pages": [
+    {"total": 2, "jobPostings": [{"title": "Senior Data Scientist", "externalPath": "/job/Singapore/Senior-Data-Scientist_R100", "locationsText": "2 Locations", "postedOn": "Posted 3 Days Ago", "bulletFields": ["R100"]}]},
+    {"total": 2, "jobPostings": [{"title": "Data Science Manager", "externalPath": "/job/Singapore/Data-Science-Manager_R101", "locationsText": "Singapore", "postedOn": "Posted 30+ Days Ago", "bulletFields": ["R101"]}]}
+  ],
+  "details": [
+    {"jobPostingInfo": {"title": "Senior Data Scientist", "jobReqId": "R100", "jobDescription": "<p>Build forecasting models in Python.</p><p>Full relocation support.</p>", "location": "Singapore", "additionalLocations": ["Hong Kong"], "startDate": "2026-10-04", "postedOn": "Posted 3 Days Ago", "externalUrl": "https://example.wd3.myworkdayjobs.com/Careers/job/Singapore/Senior-Data-Scientist_R100", "salary": {"currency": "SGD", "min": 12000, "max": 16000, "interval": "MONTH"}}},
+    {"jobPostingInfo": {"title": "Data Science Manager", "jobReqId": "R101", "jobDescription": "<p>Lead analytics projects.</p>", "location": "Singapore", "postedDate": "Posted 30+ Days Ago", "externalUrl": "https://example.wd3.myworkdayjobs.com/Careers/job/Singapore/Data-Science-Manager_R101"}}
+  ]
+}

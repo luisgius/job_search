@@ -1,0 +1,289 @@
+{
+ "company_key": "applied_materials",
+ "ats": "workday",
+ "identifiers": {
+  "host": "amat.wd1.myworkdayjobs.com",
+  "tenant": "amat",
+  "site": "External"
+ },
+ "checked_at": "2026-10-07T14:59:05+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://amat.wd1.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/amat/External/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://amat.wd1.myworkdayjobs.com/External/siteMap.xml\n\nUser-agent: *\nAllow: /External/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://amat.wd1.myworkdayjobs.com/wday/cxs/amat/External/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 2000,
+   "first_page": [
+    {
+     "title": "Manufacturing Engineer (4pm to 1.30am)",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Manufacturing-Engineer--4pm-to-130am-_R2628710"
+    },
+    {
+     "title": "Manufacturing Engineer",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Manufacturing-Engineer_R2611214"
+    },
+    {
+     "title": "Service Manager II - (M2) - MDP",
+     "locationsText": "Hsinchu,TWN",
+     "externalPath": "/job/HsinchuTWN/Service-Manager-II----M2----MDP_R2626096"
+    },
+    {
+     "title": "Manufacturing Engineer II Senior",
+     "locationsText": "Bangalore,IND",
+     "externalPath": "/job/BangaloreIND/Manufacturing-Engineer-II-Senior_R2626537"
+    },
+    {
+     "title": "Automation & Technology Solutions Engineer",
+     "locationsText": "Gloucester,MA",
+     "externalPath": "/job/GloucesterMA/Automation---Technology-Solutions-Engineer_R2627515"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Shenzhen,CHN",
+     "externalPath": "/job/ShenzhenCHN/Customer-Engineer---C1_R2627734"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Wuxi,CHN",
+     "externalPath": "/job/WuxiCHN/Customer-Engineer---C1_R2627639"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Wuxi,CHN",
+     "externalPath": "/job/WuxiCHN/Customer-Engineer---C1_R2627644"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Yixing,CHN",
+     "externalPath": "/job/YixingCHN/Customer-Engineer---C1_R2627645"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Yixing,CHN",
+     "externalPath": "/job/YixingCHN/Customer-Engineer---C1_R2627646"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Yixing,CHN",
+     "externalPath": "/job/YixingCHN/Customer-Engineer---C1_R2627647"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Hangzhou,CHN",
+     "externalPath": "/job/HangzhouCHN/Customer-Engineer---C1_R2627651"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Shanghai,CHN",
+     "externalPath": "/job/ShanghaiCHN/Customer-Engineer---C1_R2627653"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Shanghai,CHN",
+     "externalPath": "/job/ShanghaiCHN/Customer-Engineer---C1_R2627654"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Shanghai,CHN",
+     "externalPath": "/job/ShanghaiCHN/Customer-Engineer---C1_R2627655"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Shanghai,CHN",
+     "externalPath": "/job/ShanghaiCHN/Customer-Engineer---C1_R2627657"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Shanghai,CHN",
+     "externalPath": "/job/ShanghaiCHN/Customer-Engineer---C1_R2627659"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Shenzhen,CHN",
+     "externalPath": "/job/ShenzhenCHN/Customer-Engineer---C1_R2627660"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Shenzhen,CHN",
+     "externalPath": "/job/ShenzhenCHN/Customer-Engineer---C1_R2627661"
+    },
+    {
+     "title": "Customer Engineer - C1",
+     "locationsText": "Chengdu,CHN",
+     "externalPath": "/job/ChengduCHN/Customer-Engineer---C1_R2627664"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 354,
+   "first_page": [
+    {
+     "title": "Regional Physical Security Engineer - Singapore",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Regional-Physical-Security-Engineer---Singapore_R2618345"
+    },
+    {
+     "title": "Director, Advanced Packaging Disruptive Technology (Based in Singapore)",
+     "locationsText": "6 Locations",
+     "externalPath": "/job/SingaporeSGP/Director--Advanced-Packaging-Disruptive-Technology--Based-in-Singapore-_R2622459"
+    },
+    {
+     "title": "Trade Compliance Specialist \u2013 Singapore (US Export Licensing Support)",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Trade-Compliance-Specialist---Singapore--US-Export-Licensing-Support-_R2621229"
+    },
+    {
+     "title": "R&D Process Engineer (Etch)",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/R-D-Process-Engineer--Etch-Packaging-_R2514456"
+    },
+    {
+     "title": "Customer Engineer",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Customer-Engineer_R2514490"
+    },
+    {
+     "title": "Process Engineer (BEOL)",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Process-Engineer--BEOL-_R2515490"
+    },
+    {
+     "title": "Buyer - DMR",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Buyer---DMR_R2517262"
+    },
+    {
+     "title": "Principal/ Senior Reliability Engineer",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Principal--Senior-Reliability-Engineer_R2516821"
+    },
+    {
+     "title": "Senior / Lead Ramp Process Engineer (PVD)",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Ramp-Process-Engineer--PVD-_R2515489"
+    },
+    {
+     "title": "Process Engineer (BEOL)",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Process-Engineer--BEOL-_R2517812"
+    },
+    {
+     "title": "Logistics Coordinator",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Logistics-Coordinator_R2517943"
+    },
+    {
+     "title": "Customer Engineer",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Customer-Engineer_R2518215"
+    },
+    {
+     "title": "Buyer",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Buyer_R2517260"
+    },
+    {
+     "title": "Supplier Account Manager",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Supplier-Account-Management_R2518735"
+    },
+    {
+     "title": "Lead / Senior Process Engineer (Wet Cleans)",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Lead---Senior-Process-Engineer--Wet-Cleans-_R2516729"
+    },
+    {
+     "title": "Physical Automation ( India Based Job)",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Physical-Automation---India-Based-Job-_R2519973"
+    },
+    {
+     "title": "Fab Production Control Engineer",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Fab-Production-Control-Engineer_R2520160"
+    },
+    {
+     "title": "Manufacturing Production Control Engineer",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Manufacturing-Production-Control-Engineer_R2520157"
+    },
+    {
+     "title": "Manufacturing Technician",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Manufacturing-Technician_R2520036"
+    },
+    {
+     "title": "Materials Project Manager",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Materials-Project-Manager_R2517918"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 6,
+   "first_page": [
+    {
+     "title": "AI Engineer",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/AI-Engineer_R2626141"
+    },
+    {
+     "title": "Data Analyst, Global Forward Network",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Data-Analyst--Global-Forward-Network_R2626946"
+    },
+    {
+     "title": "Process Engineering Technician (Shift)",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Process-Engineering-Technician--Shift-_R2622314"
+    },
+    {
+     "title": "Process Technician (Shift)",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Process-Technician--Shift-_R2626837"
+    },
+    {
+     "title": "Research & Development Internship Program",
+     "locationsText": "Singapore,SGP",
+     "externalPath": "/job/SingaporeSGP/Research---Development-Internship-Program_R2627133"
+    },
+    {
+     "title": "Product Quality & Reliability Engineer  IV (E4)",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/AustinTX/Product-Quality---Reliability-Engineer--IV--E4-_R2624718"
+    }
+   ]
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 2000,
+ "sg_search_total": 354,
+ "sg_ds_first_page_matches": [
+  {
+   "title": "AI Engineer",
+   "locationsText": "Singapore,SGP",
+   "externalPath": "/job/SingaporeSGP/AI-Engineer_R2626141"
+  }
+ ],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

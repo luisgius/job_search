@@ -1,0 +1,348 @@
+{
+ "company_key": "uob",
+ "ats": "workday",
+ "identifiers": {
+  "host": "uobgroup.wd3.myworkdayjobs.com",
+  "tenant": "uobgroup",
+  "site": "UOBExternal"
+ },
+ "checked_at": "2026-10-07T14:59:39+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://uobgroup.wd3.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/uobgroup/UOBExternal/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://uobgroup.wd3.myworkdayjobs.com/UOBExternal/siteMap.xml\n\nUser-agent: *\nAllow: /UOBExternal/\nDisallow: /SGPrivateUOBExternal/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://uobgroup.wd3.myworkdayjobs.com/wday/cxs/uobgroup/UOBExternal/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 1043,
+   "first_page": [
+    {
+     "title": "Senior Officer, Investment Management, UOB Asset Management",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Senior-Officer--Investment-Management--UOB-Asset-Management_JR97162"
+    },
+    {
+     "title": "AVP, FIM, Group Finance",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/AVP--FIM--Group-Finance_JR97361"
+    },
+    {
+     "title": "First VP, Anti-Financial Crime Assurance, Group Compliance",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/First-VP--Anti-Financial-Crime-Assurance--Group-Compliance_JR97241"
+    },
+    {
+     "title": "Retail Investment Operations Manager",
+     "locationsText": "Bangkok (City Area)",
+     "externalPath": "/job/Bangkok-City-Area/Retail-Investment-Operations-Manager_JR93397"
+    },
+    {
+     "title": "Relationship Officer-PV",
+     "locationsText": "USJ Taipan (City Area)",
+     "externalPath": "/job/USJ-Taipan-City-Area/Relationship-Officer-PV_JR96243"
+    },
+    {
+     "title": "Group Wholesale Banking Global Markets Intern (Dec - July 2027)",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Group-Wholesale-Banking-Global-Markets-Intern--Dec---July-2027-_JR97462"
+    },
+    {
+     "title": "Spreading & Convenant (maker)",
+     "locationsText": "Jakarta Pusat (City Area)",
+     "externalPath": "/job/Jakarta-Pusat-City-Area/Spreading---Convenant--maker-_JR93137-1"
+    },
+    {
+     "title": "Retail Reconciliation & Investigation Centre Team Manager",
+     "locationsText": "Ho Chi Minh (City Area)",
+     "externalPath": "/job/Ho-Chi-Minh-City-Area/Retail-Reconciliation---Investigation-Centre-Team-Manager_JR96985"
+    },
+    {
+     "title": "Branch Manager - Bandar Lampung",
+     "locationsText": "Bandar Lampung (City Area)",
+     "externalPath": "/job/Bandar-Lampung-City-Area/Branch-Manager---Bandar-Lampung_JR86999"
+    },
+    {
+     "title": "VP, Trade Product Manager - Process & Service Excellence, Group Transaction Banking",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/VP--Trade-Product-Manager---Process---Service-Excellence--Group-Transaction-Banking_JR97606"
+    },
+    {
+     "title": "VP, Business Management (Commercial Banking)",
+     "locationsText": "Bangkok (City Area)",
+     "externalPath": "/job/Bangkok-City-Area/VP--Business-Management_JR88588"
+    },
+    {
+     "title": "VP1 Enterprise Monitoring Lead, GIPS",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/VP1-Enterprise-Monitoring-Lead--GIPS_JR97227"
+    },
+    {
+     "title": "Senior Officer, Cards Payment, Card Operations Processing Center",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Senior-Officer--Cards-Payment--Card-Operations-Processing-Center_JR97663"
+    },
+    {
+     "title": "AVP-VP, AML/CFT/Sanctions Policy, Advisory & Training",
+     "locationsText": "Bangkok (City Area)",
+     "externalPath": "/job/Bangkok-City-Area/VP--AML-CFT-Sanctions-Policy--Advisory---Training_JR97318"
+    },
+    {
+     "title": "Senior Officer, Transaction Surveillance Team",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Senior-Officer--Transaction-Surveillance-Team_JR97208"
+    },
+    {
+     "title": "Affluent Client Advisor",
+     "locationsText": "Bangkok (City Area)",
+     "externalPath": "/job/Bangkok-City-Area/Affluent-Client-Advisor_JR97672"
+    },
+    {
+     "title": "Card Portfolio Senior Officer",
+     "locationsText": "Ho Chi Minh (City Area)",
+     "externalPath": "/job/Ho-Chi-Minh-City-Area/Card-Portfolio-Senior-Officer_JR96383-1"
+    },
+    {
+     "title": "Senior Officer/Manager, Fraud Team, Contact Center",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Customer-Service-Officer--Fraud---Scam--Contact-Center_JR64852-1"
+    },
+    {
+     "title": "Personal Banker",
+     "locationsText": "Kota Kinabalu (City Area)",
+     "externalPath": "/job/Kota-Kinabalu-City-Area/Personal-Banker_JR96125"
+    },
+    {
+     "title": "FXMM, FXD, FutTrd, FundRpt & UOBCAP Ops Manager",
+     "locationsText": "Bangkok (City Area)",
+     "externalPath": "/job/Bangkok-City-Area/FXMM--FXD--FutTrd--FundRpt---UOBCAP-Ops-Manager_JR96877"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 1043,
+   "first_page": [
+    {
+     "title": "Banking & Wealth Career (Opportunities in Malaysia & Singapore)",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Kuala-Lumpur-City-Area/Banking---Wealth-Career--Opportunities-in-Malaysia---Singapore-_JR92862"
+    },
+    {
+     "title": "AVP-VP, Privilege Banking Client Advisor (work in Singapore)",
+     "locationsText": "Bangkok (City Area)",
+     "externalPath": "/job/Bangkok-City-Area/AVP-VP--Privilege-Banking-Client-Advisor--work-in-Singapore-_JR92203"
+    },
+    {
+     "title": "Senior Officer / Manager ,  Business Development Manager (Treasury), Emerging Enterprise",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Senior-Officer---Manager----Business-Development-Manager--Treasury---Emerging-Enterprise_JR96515"
+    },
+    {
+     "title": "Executive/Manager/AVP, Talent Acquisition (Mass Hiring)",
+     "locationsText": "Kuala Lumpur (City Area)",
+     "externalPath": "/job/Kuala-Lumpur-City-Area/Executive-Manager-AVP--Talent-Acquisition--Mass-Hiring-_JR95468"
+    },
+    {
+     "title": "AVP, Product Support Analyst (GenAI/Data), Group Infrastructure & Platform Services",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/AVP--Product-Support-Analyst--L2-Service-Recovery---Compliance-Technology_JR80741"
+    },
+    {
+     "title": "Vice President, Relationship Manager, Medium Enterprise",
+     "locationsText": "North Region (City Area)",
+     "externalPath": "/job/North-Region-City-Area/Vice-President--Relationship-Manager--Enterprise-Banking_JR82455"
+    },
+    {
+     "title": "VP, Product Manager - Pricing & Billing, Group Transaction Banking",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/VP--Product-Manager---Pricing---Billing--Group-Transaction-Banking_JR83135-1"
+    },
+    {
+     "title": "VP, Channel Product Owner, Group Transaction Banking",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/VP--Channel-Product-Owner--Group-Transaction-Banking_JR83377"
+    },
+    {
+     "title": "Senior VP, Product Manager - Digital Currency and Payments, GroupTransaction Banking",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Senior-VP--Product-Manager---Digital-Currency-and-Payments--GroupTransaction-Banking_JR83527"
+    },
+    {
+     "title": "AVP/VP \u2013 AML Operations Change Management",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/MGR-AVP---AML-Ops---Control-Ops_JR82309"
+    },
+    {
+     "title": "Senior Officer/Manager, Credit Analyst, Commercial Banking",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Senior-Officer-Manager--Credit-Analyst_JR62519"
+    },
+    {
+     "title": "AML Reviewer, Affluent Client Group",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/AML-Reviewer--Affluent-Client-Group_JR83934"
+    },
+    {
+     "title": "Senior Team Head - Privilege Banking (Onshore Market)",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Senior-Team-Head---Privilege-Banking--Onshore-Market-_JR84045"
+    },
+    {
+     "title": "Source of Wealth(SOW)Reviewer, Middle Office Anti Money Laundering Controls",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Source-of-Wealth-SOW-Reviewer_JR83864-1"
+    },
+    {
+     "title": "Senior Officer, Integrated Operations Command Centre, Corporate Real Estate Services",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Senior-Officer--Integrated-Operations-Command-Centre--Corporate-Real-Estate-Services_JR81875-2"
+    },
+    {
+     "title": "Senior Team Head",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Senior-Team-Head_JR84428"
+    },
+    {
+     "title": "SVP Strategic Procurement Team Lead, Strategic Alliances & Sourcing (SAS), GTO",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/SVP-Strategic-Procurement-Team-Lead--Strategic-Alliances---Sourcing--SAS---GTO_JR84101"
+    },
+    {
+     "title": "VP, Infrastructure Engineer, Group Infrastructure & Platform Services",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/VP--Infrastructure-Engineer--Group-Infrastructure---Platform-Services_JR84462"
+    },
+    {
+     "title": "First VP, Head of Global Markets Legal Documentation Unit",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/First-VP--Head-of-Global-Markets-Legal-Documentation-Unit_JR83358"
+    },
+    {
+     "title": "Senior VP, AML Operations_ Group Retail",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Senior-VP--AML-Operations--Group-Retail_JR74822"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 19,
+   "first_page": [
+    {
+     "title": "Vice President, Data Scientist, Group Retail",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Vice-President--Data-Scientist--Group-Retail_JR95301"
+    },
+    {
+     "title": "VP, Data Scientist, Enterprise AI, Innovation Group",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/VP--Data-Scientist--Enterprise-AI--Innovation-Group_JR88406"
+    },
+    {
+     "title": "VP/AVP, Innovation & Research (IR) Data Scientist, IR Labs, Innovation Group",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Assistant-Vice-President_JR55271-1"
+    },
+    {
+     "title": "VP / AVP, GenAI Engineer/Scientist, Innovation Group",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/VP---AVP--GenAI-Engineer-Scientist--Innovation-Group_JR80139"
+    },
+    {
+     "title": "First VP, GenAI Engineer/Scientist Lead, Innovation Group",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/First-VP--GenAI-Engineer-Scientist-Lead--Innovation-Group_JR80510"
+    },
+    {
+     "title": "Compliance Analytics & Insights",
+     "locationsText": "Jakarta Pusat (City Area)",
+     "externalPath": "/job/Jakarta-Pusat-City-Area/Compliance-Analytics---Insights_JR66046-1"
+    },
+    {
+     "title": "Assistant VP, Regional Data Modeler, Gp Compliance",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/VP--Regional-Data-Modeler--Gp-Compliance_JR62641"
+    },
+    {
+     "title": "VP2, Data Analytics & Insights Specialist, Compliance",
+     "locationsText": "Kuala Lumpur NBE",
+     "externalPath": "/job/Kuala-Lumpur-NBE/VP2--Data-Analytics---Insights-Specialist--Compliance_JR85571"
+    },
+    {
+     "title": "First VP, Regional Data Analytics, Group Compliance",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/First-VP--Regional-Data-Analytics--Group-Compliance_JR89722"
+    },
+    {
+     "title": "Vice President, Data Analytics, Group Wholesale Banking",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Vice-President--Data-Analytics--Group-Wholesale-Banking_JR84609"
+    },
+    {
+     "title": "Vice President,  Fraud Data Analytics, Group Compliance",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Vice-President---Fraud-Data-Analytics--Group-Compliance_JR95656"
+    },
+    {
+     "title": "First VP, Senior Data Engineer, Group Technology & Ops",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/First-VP--Senior-Data-Engineer--Group-Technology---Ops_JR92144"
+    },
+    {
+     "title": "Analytics & Insights Manager",
+     "locationsText": "Ho Chi Minh (City Area)",
+     "externalPath": "/job/Ho-Chi-Minh-City-Area/Compliance-Analytics---Insights-Manager_JR55618"
+    },
+    {
+     "title": "VP / AVP, AI Platform Specialist, Enterprise AI, Innovation Group",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/VP---AVP--AI-Platform-Specialist--Enterprise-AI--Innovation-Group_JR73664"
+    },
+    {
+     "title": "VP, Machine Learning Engineer, Enterprise AI, Innovation Group",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/VP--Machine-Learning-Engineer--Enterprise-AI--Innovation-Group_JR88245"
+    },
+    {
+     "title": "Analytics & Insights Team Lead",
+     "locationsText": "Ho Chi Minh (City Area)",
+     "externalPath": "/job/Ho-Chi-Minh-City-Area/Analytics---Insights-Team-Lead_JR80989"
+    },
+    {
+     "title": "Senior VP - Transaction Monitoring Systems Head, Compliance Analytics & Insights, Group Compliance",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/Senior-VP---Transaction-Monitoring-Systems-Head--Compliance-Analytics---Insights--Group-Compliance_JR93592"
+    },
+    {
+     "title": "SO MLOps Integration Engineer, GMET",
+     "locationsText": "Central Region (City Area)",
+     "externalPath": "/job/Central-Region-City-Area/SO-MLOps-Integration-Engineer--GMET_JR85291"
+    },
+    {
+     "title": "Senior Developer, Machine Learning Operations",
+     "locationsText": "The Gardens North Tower",
+     "externalPath": "/job/The-Gardens-North-Tower/Associate--MEA-Tech_JR75606"
+    }
+   ]
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 1043,
+ "sg_search_total": 1043,
+ "sg_ds_first_page_matches": [],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

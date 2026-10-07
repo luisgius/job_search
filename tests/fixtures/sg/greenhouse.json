@@ -1,0 +1,38 @@
+{
+  "jobs": [
+    {
+      "id": 4012345,
+      "internal_job_id": 3012345,
+      "title": "Senior Data Scientist",
+      "updated_at": "2026-08-04T07:30:00-04:00",
+      "first_published": "2026-08-04T03:00:00-04:00",
+      "requisition_id": "REQ-101",
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/4012345",
+      "location": {
+        "name": "Singapore"
+      },
+      "offices": [
+        {
+          "id": 11,
+          "name": "Berlin",
+          "location": "Berlin, Germany"
+        }
+      ],
+      "departments": [
+        {
+          "id": 1,
+          "name": "Engineering",
+          "parent_id": null,
+          "child_ids": []
+        }
+      ],
+      "metadata": [
+        {
+          "name": "Salary range",
+          "value": "SGD 12000-15000/month"
+        }
+      ],
+      "content": "&lt;p&gt;We are hiring a &lt;strong&gt;Senior Backend Engineer&lt;/strong&gt; for our payments platform.&lt;/p&gt;&lt;h3&gt;What you&amp;#39;ll do&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;Design and ship Python services on AWS&lt;/li&gt;&lt;li&gt;Own PostgreSQL schema design and query performance&lt;/li&gt;&lt;li&gt;Mentor engineers across two squads&lt;/li&gt;&lt;/ul&gt;&lt;h3&gt;Requirements&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;5+ years backend experience&lt;/li&gt;&lt;li&gt;Strong Python and SQL&lt;/li&gt;&lt;li&gt;EU work authorisation&lt;/li&gt;&lt;/ul&gt;"
+    }
+  ]
+}

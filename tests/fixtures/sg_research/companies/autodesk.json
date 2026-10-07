@@ -1,0 +1,252 @@
+{
+ "company_key": "autodesk",
+ "ats": "workday",
+ "identifiers": {
+  "host": "autodesk.wd1.myworkdayjobs.com",
+  "tenant": "autodesk",
+  "site": "Ext"
+ },
+ "checked_at": "2026-10-07T15:00:24+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://autodesk.wd1.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/autodesk/Ext/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://autodesk.wd1.myworkdayjobs.com/Ext/siteMap.xml\nSitemap: https://autodesk.wd1.myworkdayjobs.com/uni/siteMap.xml\n\nUser-agent: *\nAllow: /Ext/\nAllow: /uni/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://autodesk.wd1.myworkdayjobs.com/wday/cxs/autodesk/Ext/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 383,
+   "first_page": [
+    {
+     "title": "PhD Researcher, AI Research",
+     "locationsText": "Toronto, ON, CAN",
+     "externalPath": "/job/Toronto-ON-CAN/PhD-Researcher--AI-Research_26WD101373-1"
+    },
+    {
+     "title": "Sr. Operations Business Partner - EMEA Expansion",
+     "locationsText": "3 Locations",
+     "externalPath": "/job/London-GBR/Sr-Manager--Operations-Business-Partner---EMEA-Expansion_26WD101229-1"
+    },
+    {
+     "title": "Senior Site Reliability Engineer",
+     "locationsText": "EMEA - Croatia - Offsite/Home",
+     "externalPath": "/job/EMEA---Croatia---OffsiteHome/Senior-Site-Reliability-Engineer_26WD101322-2"
+    },
+    {
+     "title": "Intern, Software Engineer [PDMS-DPM-Engineering]",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Intern--Software-Engineer--PDMS-DPM-Engineering-_26WD101277-1"
+    },
+    {
+     "title": "Fusion Account Executive - Expansion Dutch speaker",
+     "locationsText": "EMEA - Ireland - Dublin - Windmill",
+     "externalPath": "/job/EMEA---Ireland---Dublin---Windmill/Fusion-Account-Executive---Expansion_25WD93410-1"
+    },
+    {
+     "title": "Senior Operations Business Partner - APAC Expansion",
+     "locationsText": "APAC - Singapore - Singapore - Fusionopolis",
+     "externalPath": "/job/APAC---Singapore---Singapore---Fusionopolis/Senior-Manager--Operations-Business-Partner---APAC-Expansion_26WD101228-3"
+    },
+    {
+     "title": "Sr. Product Manager - Case Management & Agent Experience",
+     "locationsText": "Bengaluru, IND",
+     "externalPath": "/job/Bengaluru-IND/Sr-Product-Manager---Case-Management---Agent-Experience_26WD101159"
+    },
+    {
+     "title": "Software Engineering Manager (Java, AWS, Search)",
+     "locationsText": "Pune, IND",
+     "externalPath": "/job/Pune-IND/Software-Engineering-Manager--Java--AWS--Search-_26WD100857-1"
+    },
+    {
+     "title": "Product Manager (Data Ingestion & Delivery)",
+     "locationsText": "Pune, IND",
+     "externalPath": "/job/Pune-IND/Product-Manager--Data-Ingestion---Delivery-_26WD101185-1"
+    },
+    {
+     "title": "Technical Specialist, AECO",
+     "locationsText": "Massachusetts, USA - Remote",
+     "externalPath": "/job/Massachusetts-USA---Remote/Technical-Specialist--AECO_26WD101353-2"
+    },
+    {
+     "title": "AEC Territory Manager, Canada",
+     "locationsText": "AMER - Canada - British Columbia - Remote",
+     "externalPath": "/job/AMER---Canada---British-Columbia---Remote/AEC-Territory-Manager--Canada_26WD101488-1"
+    },
+    {
+     "title": "Senior Operations Business Partner - AMER Expansion",
+     "locationsText": "6 Locations",
+     "externalPath": "/job/San-Francisco-CA-USA/Senior-Manager--Operations-Business-Partner---AMER-Expansion_26WD101227-2"
+    },
+    {
+     "title": "Data Evangelist & Communications Specialist",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Barcelona-ESP/Data-Evangelist---Communications-Specialist_26WD101368-2"
+    },
+    {
+     "title": "Principal Enterprise Renewal Representative \u2013 Enterprise Accounts \u2013 Italian Speaker",
+     "locationsText": "Italy - Remote",
+     "externalPath": "/job/Italy---Remote/Principal-Enterprise-Renewal-Representative---Enterprise-Accounts---Italian-Speaker_26WD101500"
+    },
+    {
+     "title": "Principal Account Executive, Enterprise Accounts",
+     "locationsText": "United Kingdom - Remote",
+     "externalPath": "/job/United-Kingdom---Remote/Principal-Account-Executive--Enterprise-Accounts_26WD96825"
+    },
+    {
+     "title": "Software Quality Assurance Engineer / Software Engineer in Test",
+     "locationsText": "Bucharest, ROU",
+     "externalPath": "/job/Bucharest-ROU/Software-Quality-Assurance-Engineer---Software-Engineer-in-Test_26WD100450-2"
+    },
+    {
+     "title": "Sales Specialist, Construction",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/New-Delhi-IND/Sales-Specialist--Construction_26WD100417-2"
+    },
+    {
+     "title": "Vendor Services Lead",
+     "locationsText": "Bengaluru, IND",
+     "externalPath": "/job/Bengaluru-IND/Vendor-Services-Lead_26WD100483-1"
+    },
+    {
+     "title": "Head of Forma Solution Marketing",
+     "locationsText": "Denver, CO, USA",
+     "externalPath": "/job/Denver-CO-USA/Head-of-Forma-Solution-Marketing_26WD101325-2"
+    },
+    {
+     "title": "Senior Software Engineer",
+     "locationsText": "Pune, IND",
+     "externalPath": "/job/Pune-IND/Senior-Software-Engineer_25WD93636-1"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 28,
+   "first_page": [
+    {
+     "title": "Senior Account Executive, Expansion Sales, Singapore",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Senior-Account-Executive--Expansion-Sales--Singapore_26WD99745-1"
+    },
+    {
+     "title": "Senior Sales Manager,(Autodesk Forma)",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Singapore-SGP/Senior-Manager--Account-Executive--Autodesk-Construction-Solutions----Sales-Leader_26WD99673-2"
+    },
+    {
+     "title": "Senior Operations Business Partner - APAC Expansion",
+     "locationsText": "APAC - Singapore - Singapore - Fusionopolis",
+     "externalPath": "/job/APAC---Singapore---Singapore---Fusionopolis/Senior-Manager--Operations-Business-Partner---APAC-Expansion_26WD101228-3"
+    },
+    {
+     "title": "Territory Account Representative",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Territory-Account-Representative_26WD97445-2"
+    },
+    {
+     "title": "Principal Software Engineer",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Principal-Software-Engineer_26WD97610-1"
+    },
+    {
+     "title": "Senior Software Engineer",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Senior-Software-Engineer_26WD98312"
+    },
+    {
+     "title": "Senior Software Engineer",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Senior-Software-Engineer_26WD100194-2"
+    },
+    {
+     "title": "Technical Program Manager, IDL",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Technical-Program-Manager--IDL_26WD100371-1"
+    },
+    {
+     "title": "Software Development Engineer",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Software-Development-Engineer_26WD101025-2"
+    },
+    {
+     "title": "Intern, Software Development Engineer [PSET - Product Data -\u00a0 Document Management]",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Intern--Software-Development-Engineer--PSET---Product-Data----Document-Management-_26WD100984"
+    },
+    {
+     "title": "Intern, Software Development Engineer [PSET-Access-ENG]",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Intern--Software-Development-Engineer--PSET-Access-ENG-_26WD100985-2"
+    },
+    {
+     "title": "Intern, Software Development Engineer [PSET-Access-ENG]",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Intern--Software-Development-Engineer--PSET-Access-ENG-_26WD100986-2"
+    },
+    {
+     "title": "Intern, Software Development Engineer [PSET-Access-ENG]",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Intern--Software-Development-Engineer--PSET-Access-ENG-_26WD100987-2"
+    },
+    {
+     "title": "Intern, Product Manager [PSET-Access-PM]",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Intern--Product-Manager--PSET-Access-PM-_26WD100993-2"
+    },
+    {
+     "title": "Intern, Software Development Engineer [PSET-Localization]",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Intern--Software-Development-Engineer--PSET-Localization-_26WD100997-2"
+    },
+    {
+     "title": "Intern, Software Development Engineer [PSET-Localization]",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Intern--Software-Development-Engineer--PSET-Localization-_26WD100998-2"
+    },
+    {
+     "title": "Intern, Software Development Engineer [PSET-Access-ENG]",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Intern--Software-Development-Engineer--PSET-Access-ENG-_26WD100988-2"
+    },
+    {
+     "title": "Intern, Software Development Engineer [PSET-Access-ENG]",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Intern--Software-Development-Engineer--PSET-Access-ENG-_26WD100989-2"
+    },
+    {
+     "title": "Intern, Product Manager [PSET-Access-PM]",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Intern--Product-Manager--PSET-Access-PM-_26WD100994-2"
+    },
+    {
+     "title": "Intern, Software Development Engineer [PSET-Connected Delivery]",
+     "locationsText": "Singapore, SGP",
+     "externalPath": "/job/Singapore-SGP/Intern--Software-Development-Engineer--PSET-Connected-Delivery-_26WD100995-2"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 0,
+   "first_page": []
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 383,
+ "sg_search_total": 28,
+ "sg_ds_first_page_matches": [],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

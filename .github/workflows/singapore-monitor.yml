@@ -1,0 +1,78 @@
+name: Singapore public career monitor
+
+on:
+  schedule:
+    # A single clock avoids duplicate Monday runs. The runner selects daily,
+    # M/W/F boards, and Monday company/recruiter work by the Warsaw weekday.
+    - cron: '0 7 * * *'
+      timezone: Europe/Warsaw
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Source frequency to run
+        type: choice
+        default: weekly
+        options: [auto, weekly, daily, boards]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: singapore-monitor-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Restore SQLite history
+        uses: actions/cache/restore@v6
+        with:
+          path: output/singapore.sqlite3
+          key: sg-history-v1-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: sg-history-v1-${{ github.ref_name }}-
+      - name: Write private scoring profile
+        env:
+          SINGAPORE_CV_MARKDOWN: ${{ secrets.SINGAPORE_CV_MARKDOWN }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          profile = os.environ.get("SINGAPORE_CV_MARKDOWN", "")
+          if not profile.strip():
+              raise SystemExit("Set SINGAPORE_CV_MARKDOWN to your real CV before enabling scheduled scoring")
+          Path("output").mkdir(exist_ok=True)
+          Path("output/scoring_profile.md").write_text(profile, encoding="utf-8")
+          PY
+      - name: Run due public sources
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MONITOR_MODE: ${{ inputs.mode || 'auto' }}
+        run: python -m src.singapore.main --mode "$MONITOR_MODE" --cv output/scoring_profile.md
+      - name: Preserve updated SQLite history
+        if: always() && hashFiles('output/singapore.sqlite3') != ''
+        uses: actions/cache/save@v6
+        with:
+          path: output/singapore.sqlite3
+          key: sg-history-v1-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Upload digest and public run evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: singapore-digest-${{ github.run_id }}
+          path: |
+            output/digest_singapore_*.md
+            output/singapore_runs.jsonl
+            output/sg_candidates.yaml
+          if-no-files-found: ignore
+          retention-days: 90

@@ -1,0 +1,245 @@
+User-agent: *
+
+#block indexing of logos and account pages
+
+Disallow: /content/dam/wwwmedialibrary/*
+Disallow: /content/robert-walters/*
+Disallow: /content/robert-walters-redesign/*
+Disallow: /content/resource-solutions/*
+Disallow: /content/walters-people/*
+Disallow: /account/*
+Disallow: /career-desktop/*
+
+#block indexing of facets
+
+Disallow: *?*location=
+Disallow: *?*contractType=
+Disallow: *?*salary=
+Disallow: *?*specialization=
+Disallow: *?*industry=
+Disallow: *?*internalVacancy=
+Disallow: *?*language1=
+Disallow: *?*language2=
+Disallow: *?*language3=
+Disallow: *?*experience=
+Disallow: *?*remoteWorking=
+Disallow: *?*_pxhc=
+Disallow: *?*q=
+Disallow: *?*p=
+
+# Comment
+Sitemap: https://www.robertwalters.com.sg/sitemap.xml
+# Below part of file modifies via scheduler for hideInRobots, please DO NOT make any changes
+
+Disallow: /content/dam/robert-walters-redesign/country/the-netherlands/files/generalconditions/ENG-GeneralConditionsInterimServices.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/PD SESB2 EGM PandC April 26.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/salary-survey-2024/rw-th-ss2024-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/rw/ima/ENG-General-Conditions-Interim-Management-RW-CL-July24.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/terms-and-conditions/Robert Walters AU Payroll TCs v4.0 2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/guias/old/ITMarketUpdateChile.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/remote-onboarding/rw-cl-remote-onboarding-rebranded.pdf
+Disallow: /content/dam/robert-walters/global/files/salary-survey/salary-survey-2019-europe.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/hotcand/Regional Launch Manager .pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Retail Marketing Director .pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Gerente de Operaciones (Mina y Planta).pdf
+Disallow: /content/dam/robert-walters-redesign/country/spain/files/GTandCs_Spain_RW_Perm_ESP_2021.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Gerente de Planificación.pdf
+Disallow: /content/dam/robert-walters-redesign/country/germany/files/RW GER Temp (English) Januar 2025.pdf
+Disallow: /content/dam/robert-walters-redesign/country/malaysia/files/documents/Robert-Walters-Malaysia-Market-Intelligence-Services-Terms-and-Conditions.pdf
+Disallow: /content/dam/robert-walters-redesign/country/china/files/RW-CN-TOB-Perm-FTC(2023.12.15)(Eng).pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Gerente de Marketing y Desarrollo.pdf
+Disallow: /content/dam/robert-walters-redesign/country/germany/files/RW GER Interim (English) July 2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/PD SESB2 GCandBS April 26.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/job-description/AU_Financial-Accountant_Job-Description-Template.docx
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/job-description/AU_Payroll-Manager_Job-Description-Template.docx
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/pr/Resiliencia en Industria y Cadena de Suministro.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/chile 3.pdf
+Disallow: /content/dam/robert-walters-redesign/country/singapore/files/SG Market Intel Services - General Terms and Conditions of Purchase.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/top-talent-trends-2024/rw-br-talent-trends-eguide-2024-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/hotcand/HRBP.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/interview-guide/rw-gl-interview-guide-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/germany/files/RW GER Temp (Deutsch) Januar 2025.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/pr/Inteligencia Artificial, aliada de los CMOs.pdf
+Disallow: /content/dam/robert-walters-redesign/country/france/files/policies/cgv-2024/CGV RW_Français_07.2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/ta/AU-Benefits-All-Levels.pdf
+Disallow: /content/dam/robert-walters-redesign/country/united-states/files/policy/RW Texas Terms and Conditions of Business - July 2024 Rebrand.pdf
+Disallow: /content/dam/robert-walters-redesign/country/vietnam/files/RW_Vietnam_General_Terms_and_condition_of_purchase_updated.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/PD SESB2 EGM CandS April 26.pdf
+Disallow: /content/dam/robert-walters-redesign/country/switzerland/files/legal-/t-cs/perm/RW Switzerland_Perm FTC_Terms (French)_Juillet2024.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/sea-start-up-guide/a-guide-for-sea-start-ups-how-to-build-a-winning-team.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/rw-evp/work-for-us-brochure/rw-de-work-for-us-brochure-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/france/files/policies/VENGConditions Générales_RW France_Management de Transition_v8_AM - Copie.pdf
+Disallow: /content/dam/robert-walters-redesign/country/united-kingdom/files/policies/Temp-Agreement-RW-UK-Template-July-2026.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/gtc-ima/ENG-General-Conditions-Interim-Management-RW-CL-June-23.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/top-talent-trends-2024/rw-de-talent-trends-eguide-2024-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/germany/files/RW GER Temp (Deutsch) Jan 2023.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/hotcand/AP de un Shared Service.pdf
+Disallow: /content/dam/robert-walters-redesign/country/hong-kong/files/RWHK-TOB-Perm-FTC-2024-07-09-Eng.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/make-it-count-90-days/rw-pt-make-it-count-the-first-90-days-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Director de ventas .pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/top-talent-trends-2024/rw-gl-talent-trends-eguide-2024-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/make-it-count-90-days/rw-tw-make-it-count-the-first-90-days-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/hong-kong/files/RWHK-TOB-Temp-2024-07-09.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/interview-guide/rw-mx-interview-guide-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/germany/files/RW GER Perm (Deutsch) Juli 2024.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/salary-survey-2024/rw-cn-ss2024-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/wp/temp-work/NL-AV-Interim-Rekrutering-Tewerkstelling-RWPS-juli24.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/09-26/PD - SESB1 - Project Director Train Systems and System Integrations.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/hotcand/CEO CFO.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/RW-UK-Executive-Search-Website-Video-Loop-1920x1080-V1.mp4
+Disallow: /content/dam/robert-walters-redesign/country/france/files/policies/cgv-2024/v2024Conditions Générales_RW France_Management de Transition_v10.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Gerente Comercial, en industrias como Retail, Real Estate, Inmobiliarias .pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/pr/Cómo abordar las aspiraciones de los jóvenes en el mundo laboral.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/terms-and-conditions/RW-NZ-Payroll-v2.0-2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/RW_CHILE_Permanente_Terms and Conditions ESP 2023.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/PD SESB2 CFO May 26 Final.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/resources/women-in-the-workplace.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/interim-management-guide/rw-fr-interim-management-guide-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/united-states/files/policy/RW California Terms and Conditions of Business - July 2024 Rebrand.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/resources/apra/RW NZ - AI Governance e-Guide Cross Industry - A4 - V2 1.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/ras/AU RAS 2026 - Industry Channel Mastersheet.pdf
+Disallow: /content/dam/robert-walters-redesign/country/germany/files/RW GER Interim (Deutsch) Juli 2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Gerente Regional Seller Experience .pdf
+Disallow: /content/dam/robert-walters-redesign/country/switzerland/files/legal-/t-cs/perm/RW_Switzerland_Perm FTC_Terms (English)_July2024.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/RW-GL-Executive-Search-Website-Video-Loop-1920x1080-V5_Darker.mp4
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/gtc-w-s/NL-Algemene-Voorwaarden-Werving-Selectie-RW-Juni-23.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/interim-management-guide/rw-gl-interim-management-guide-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/hong-kong/files/RW HK TOB Perm FTC Dec 2023 (Traditional Chi).pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/rw/w-s/NL-Algemene-Voorwaarden-Werving-Selectie-Juli24.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/job-description/AU_Financial-Controller_Job-Description-Template.docx
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/terms-and-conditions/RW NZ Combined TCs V5.3.2 NZ.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/top-talent-trends-2024/rw-pt-talent-trends-eguide-2024-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/VP Marketing .pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/wp/w-s/NL-Algemene-Voorwaarden-Werving-Selectie-RWPS-Juli24.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/terms-and-conditions/RW-NZ-Temp-v3.0-2024.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/top-talent-trends/RW-Talent-Trends-2025-Eguide.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/policy/RW Mexico_TsCs_2023_ESP_VDEF.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/resources/lmo/New Zealand Legal Market Overview 20262.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/wp/w-s/FR-Conditions-Generales-Recrutement-Selection-RWPS-Juillet24.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/salary-survey-2024/rw-us-compensation-guide-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/guías/old/Tecnología y Digital market update.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/guías/old/CEO - The Person Behind The Role.pdf
+Disallow: /content/dam/robert-walters-redesign/country/malaysia/files/documents/Robert-Walters-Malaysia-Market-Intelligence-Proposal-Terms-and-Conditions.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/gtc-ima/FR-Conditions-Générales-Interim-Management-RW-CL-Juin-23.pdf
+Disallow: /content/dam/robert-walters-redesign/country/singapore/files/RWSG TCs - Permanent.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Gerente de Excelencia Operacional.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/terms-and-conditions/RW-NZ-Perm-v5.0-2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/malaysia/files/documents/MY-terms-and-conditions-professional-recruitment-services-permanent-and-fixed-term-placements_rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/terms-and-conditions/RW-NZ-Combined-v5.3.2.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Director de Marketing.pdf
+Disallow: /content/dam/robert-walters-redesign/country/vietnam/files/legal-documents/terms-and-conditions-professional-recruitment-services-permanent-and-fixed-term-placements.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/guias/old/Interview Guide.pdf
+Disallow: /content/dam/robert-walters-redesign/country/china/files/RW-CN-TOB-Perm-FTC(2023.12.15)(Chi).pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Jefe de proyectos y Estufios.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/job-description/AU_accounts-payable-manager_job-description-template.docx
+Disallow: /content/dam/robert-walters-redesign/country/malaysia/files/documents/robert-walters-malaysia-market-intelligence-general-terms-and-conditions-of-purchase-landscape.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/guias/old/Diversity - eGuide.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/remote-onboarding/rw-mx-remote-onboarding-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/france/files/policies/cgv-2024/CGV RW_EN_07.2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/gtc-ima/NL-Algemene-Voorwaarden-Interim-Management-RW-KL-Juni-23.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/resources/lmo/Legal Market Overview 2026.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/hotcand/MBA y Director de Planta.pdf
+Disallow: /content/dam/robert-walters-redesign/country/philippines/files/Robert-Walters-Philippines-Terms-and-Conditions-2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/germany/files/RW GER Perm (Deutsch) Januar 2025.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/top-talent-trends-2024/rw-mx-talent-trends-eguide-2024-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/the-netherlands/files/generalconditions/NLAlgemeneVoorwaardenW-S.pdf
+Disallow: /content/dam/robert-walters-redesign/country/portugal/files/policy/Portugal_GTandCs_RW_Perm_PORT_2023_final version.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/terms-and-conditions/Robert Walters NZ Payroll TCs v3.0 2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/hotcand/Estrategia de Abastecimiento .pdf
+Disallow: /content/dam/robert-walters-redesign/country/africa/files/policy/Rebranded - RW SA (Sub Saharan) Perm FTC Terms.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/resources/New Zealand Legal Market Overview 20261.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/contractor-benefits-package/NZ_CBP_Professional_Contingent_Insurance_2026-27.pdf
+Disallow: /content/dam/robert-walters/group/bd-documents/Robert Walters - Divisions - 2022.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/chile 1.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/gtc-w-s/FR-Conditions-Générales-Recrutement-Selection-RW-Juin-23.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/PD SESB2 Program April 26.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/salary-survey-2024/rw-jp-ss2024-jp-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/salary-survey-2024/rw-kr-ss2024-kr-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/germany/files/RW GER Perm (English) Januar 2025.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/gtc-w-s/ENG-General-Conditions-Recruitment-Selection-RW-June-23.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/job-description/AU_Finance-Manager_Job-Description-Template.docx
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/interview-guide/rw-jp-interview-guide-en-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/make-it-count-90-days/rw-br-make-it-count-the-first-90-days-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/make-it-count-90-days/rw-gl-make-it-count-the-first-90-days-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Head of Project Manager.pdf
+Disallow: /content/dam/robert-walters-redesign/country/united-states/files/policy/RW New York Terms and Conditions of Business - July 2024 Rebrand.pdf
+Disallow: /content/dam/robert-walters-redesign/country/france/files/policies/cgv-2024/CGV WP perm_06.2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/resources/robert_walters_walga_capability_statement.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/pr/Prensa- Inflación de puestos de trabajo .pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/09-26/PD SESB1 - General Manager, Property and Place.pdf
+Disallow: /content/dam/robert-walters-redesign/country/france/files/policies/cgv-2024/VENGConditions Générales_RW France_Management de Transition_v8_AM - Copie.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/resources/AU-AI-in-HR.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/hotcand/Financiero de industria manufacturera.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/09-26/PD - SESB1 - General Manager, Corporate and Public Affairs.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/interview-guide/rw-ca-interview-guide-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/09-26/PD - SESB1 - General Manager Counsel Construction.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/terms-and-conditions/Robert Walters NZ Combined TCs V6.4.3.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/contractor-hub/AU_CBP_Professional_Contingent_Insurance_2026-27.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/wp/temp-work/FR-Conditions-Generales-Recrutement-Emploi-Intérimaires-RWPS-Juillet24.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Subgerente Marketing Digital .pdf
+Disallow: /content/dam/robert-walters-redesign/country/germany/files/RW GER Temp (English) Jan 2023.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/resources/Labour-Market-Report-NZ.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/top-talent-trends-2024/rw-it-talent-trends-eguide-2024-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/france/files/policies/CGV WP perm_06.2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/china/files/RW-CN-TOB-Perm-FTC(2024.07.09)(Chi).pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/09-26/PD-SESB1-Project Director Area Package (1-3).pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/wp/w-s/ENG-General-Conditions-Recruitment-Selection-RWPS-July24.pdf
+Disallow: /content/dam/robert-walters-redesign/country/mexico/files/pr/La Industria del Gaming y el auge del talento.pdf
+Disallow: /content/dam/robert-walters-redesign/country/france/files/policies/v2024Conditions Générales_RW France_Management de Transition_v10.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/PD SESB2 COP April 26.pdf
+Disallow: /content/dam/robert-walters-redesign/country/hong-kong/files/RW HK TOB Temp (2023.12.15).pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/interview-guide/rw-gcn-interview-guide-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/brazil/files/policy/GTandCs_Brasil_RW_Perm_PORT_2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/resources/Labour-Market-Report-AU.pdf
+Disallow: /content/dam/robert-walters-redesign/country/germany/files/RW GER Interim (English) Januar 2025.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/rw/ima/NL-Algemene-Voorwaarden-Interim-Management-RW-KL-Juli24.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/guias/old/Career Rediscovery.pdf
+Disallow: /content/dam/robert-walters-redesign/country/middle-east/files/terms-of-business/240807 RW Dubai Limited TOB Retained (no fee table).pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/rw/w-s/FR-Conditions-Générales-Recrutement-Selection-RW-Juillet24.pdf
+Disallow: /content/dam/robert-walters-redesign/country/spain/files/legal-documents/Spain_TCs_Perm_ESP_2024_RW1_RW2_vdef.pdf
+Disallow: /content/dam/robert-walters-redesign/country/africa/files/policy/Rebranded - RW SA (Pty) Ltd Perm FTC Terms of Business (July 2021).pdf
+Disallow: /content/dam/robert-walters/group/news/thought-leadership/rw-global-en-hiring-for-potential-in-the-fourth-industrial-revolution.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/rw/w-s/ENG-General-Conditions-Recruitment-Selection-RW-July24.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/4-day-work-week/rw-4-day-work-week-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/interview-guide/rw-be-interview-guide-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/esg/rw-esg-transformation-eguide.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/salary-survey-2024/rw-kr-ss2024-en-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/interview-guide/rw-cl-interview-guide-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/the-netherlands/files/generalconditions/ENG-GeneralTermsandConditionsR-S.pdf
+Disallow: /content/dam/robert-walters-redesign/country/hong-kong/files/RW HK TOB Perm FTC (2023.12.15)(Eng).pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/09-26/PD - SESB1 - General Manager, Project Communications.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/terms-and-conditions/Robert Walters AU Combined TCs V7.6.4 2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/job-description/AU_Chief-Financial-Officer_Job-Description-Template.docx
+Disallow: /content/dam/robert-walters-redesign/global/files/RW-GL-Executive-Search-Website-Video-Loop-1920x1080-V6_Darker.mp4
+Disallow: /content/dam/robert-walters-redesign/country/indonesia/files/terms-and-conditions-professional-recruitment-services-permanent-and-fixed-term-placements.pdf
+Disallow: /content/dam/robert-walters-redesign/country/thailand/files/legal-documents/bkk-terms-and-conditions-professional-recruitment-services-permanent-and-fixed-term-placements.pdf
+Disallow: /content/dam/robert-walters-redesign/country/philippines/files/Robert-Walters-Philippines-Market-Intelligence-Services-Terms-and-Conditions.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/salary-survey-2024/rw-jp-ss2024-en-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/china/files/RW-CN-TOB-Perm-FTC(2024.07.09)(Eng).pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/gtc-market-intelligence/GTC-Market-Intelligence-Sep23.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/PD SESB2 EGM CCandE April 26.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/wp/temp-work/ENG-GTC's-Temporary-Work--WPS-July24.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/executive-search/hero-video/RW-GL-Executive-Search-Website-Video-Loop-1920x1080-V6_Darker.mp4
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/job-description/AU_Finance-Business-Partner_Job-Description-Template.docx
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/rw-evp/work-for-us-brochure/rw-gl-work-for-us-brochure-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/Director General .pdf
+Disallow: /content/dam/robert-walters-redesign/country/vietnam/files/RW_Vietnam_General_Terms_and_condition_of_purchase.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/resources/exec/AU - Executive Soft Skills Guide - V1.pdf
+Disallow: /content/dam/robert-walters-redesign/country/germany/files/RW GER Interim (Deutsch) Januar 2025.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/interview-guide/rw-apac-interview-guide-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/policies/2025/RW NZ - Spot the signs of modern slavery - V2.pdf
+Disallow: /content/dam/robert-walters-redesign/country/malaysia/files/brochures-flyers/rw-gl-interview-guide-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/chile/files/hot-candidates/chile 2.pdf
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/rw-evp/work-for-us-brochure/rw-uk-work-for-us-brochure-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/job-description/AU_Finance-Director_Job-Description-Template.docx
+Disallow: /content/dam/robert-walters-redesign/global/files/e-guides/top-talent-trends-2024/rw-es-talent-trends-eguide-2024-rebranded.pdf
+Disallow: /content/dam/robert-walters-redesign/country/the-netherlands/files/generalconditions/NL-AlgemeneVoorwaardenInterim-Dienstverlening.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/position-descriptions/hsra/09-26/PD- SESB1 -General Manager Product and Operations.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/resources/NZ-AI-in-HR.pdf
+Disallow: /content/dam/robert-walters-redesign/country/spain/files/legal-documents/Spain_TCs_Temp_ESP_2024_RW2_vdef.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/resources/apra/RW NZ - APRA Generic 1 Exec Search - E-guide - A4 - V2.pdf
+Disallow: /content/dam/robert-walters-redesign/country/singapore/files/RWSG TCs - Contract.pdf
+Disallow: /content/dam/robert-walters-redesign/country/germany/files/RW GER Perm (English) July 2024.pdf
+Disallow: /content/dam/robert-walters-redesign/country/new-zealand/files/resources/RW NZ - 2025 Legal Market Overview.pdf
+Disallow: /content/dam/robert-walters-redesign/country/belgium/files/gtc/rw/ima/FR-Conditions-Générales-Interim-Management-RW-CL-Juillet24.pdf
+Disallow: /content/dam/robert-walters-redesign/country/australia/files/resources/exec/AU - Executive Job Search Guide - V1.pdf

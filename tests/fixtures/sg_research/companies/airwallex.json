@@ -1,0 +1,109 @@
+{
+ "company_key": "airwallex",
+ "ats": "ashby",
+ "identifiers": {
+  "board": "airwallex"
+ },
+ "checked_at": "2026-10-07T15:05:10+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://api.ashbyhq.com/robots.txt",
+  "http_status": 401,
+  "path_checked": "/posting-api/job-board/airwallex",
+  "allowed": null,
+  "body_excerpt": "",
+  "robots_rules_present": false,
+  "access_basis": "No robots rules exist: HTTP 401 is 'Unavailable' under RFC 9309 s2.3.1.3 (4xx: crawler MAY access), combined with Ashby's documented public posting API (https://developers.ashbyhq.com/docs/public-job-posting-api). This is NOT an actual robots allow. The exception is limited to https://api.ashbyhq.com/posting-api/job-board/; robots 5xx/network (s2.3.1.4) and endpoint 401/403/429/5xx fail closed."
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://api.ashbyhq.com/posting-api/job-board/airwallex"
+ },
+ "http_status": 200,
+ "total_jobs": 540,
+ "sg_jobs": 153,
+ "sg_ds_matches": [
+  {
+   "title": "Staff AI Engineer",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/260fdad2-74f5-4b94-b7af-caa7eec0393e"
+  },
+  {
+   "title": "Senior AI Engineer",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/f5c945c9-dc25-4b35-a6bd-ae2fef539727"
+  },
+  {
+   "title": "Staff Data Scientist, Product Analytics",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/66d926f9-e5e4-4271-963e-d1e05d75aa4d"
+  },
+  {
+   "title": "Senior Data Scientist, Product Analytics",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/82fe92ea-852a-4cbf-8a01-46257286828b"
+  },
+  {
+   "title": "Senior Data Scientist, Anaytics (Risk & Compliance)",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/70f6500b-5b70-485e-88b0-9ab77d739a7e"
+  },
+  {
+   "title": "Senior Data Scientist, Analytics (Regulatory Reporting)",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/c54f9e87-56f0-4bb1-9dce-fbf3b0b7060c"
+  },
+  {
+   "title": " Staff Data Scientist, Algorithm (Payments Fraud & Optimization)",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/089d131a-0b3c-4f5d-9eb4-db8643eb42fc"
+  },
+  {
+   "title": "Senior AI Engineer, Data Analytics",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/908fde44-9678-4f84-9d40-2266cebcbdf5"
+  },
+  {
+   "title": "Senior Data Scientist, Algorithm (Lending & Onboarding)",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/9a620994-db83-4dca-b9bd-0e5c792cf2f3"
+  },
+  {
+   "title": "Senior Data Scientist, Analytics (Lending)",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/341d23f4-f254-4a2b-a75c-eb267eedfffc"
+  },
+  {
+   "title": "Senior AI Engineer (Risk & Payments)",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/c7070452-6ec6-443c-8015-db339403634a"
+  },
+  {
+   "title": "Lead AI Engineer",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/02234e0a-e1fc-4b23-b3e6-513200e4ff80"
+  },
+  {
+   "title": "Staff Data Scientist, Algorithm (Risk Product \u2013 AML & Financial Crime)",
+   "location": "[\"SG - Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/airwallex/3644405e-f350-4a3a-bb53-54bfb9400efe"
+  }
+ ],
+ "sg_sample_titles": [
+  "Senior Data Platform Engineer, Knowledge Platform & AI Enablement",
+  "Staff Product Designer",
+  "Staff AI Engineer",
+  "Engineering Manager, Financial Platform",
+  "Senior Mobile Engineer (iOS), Global Payments",
+  "Senior AI Engineer",
+  "Senior Product Manager, AI Risk & Onboarding",
+  "Staff/Senior Product Manager (0-1 Billing)",
+  "Engineering Lead, Infrastructure (Data & AI)",
+  "Account Executive/Senior Account Executive, Enterprise (Team Expansion)",
+  "Associate, Credit Risk Operations (Debt Collections)",
+  "Director, Strategic Partnerships",
+  "Engineering Lead / Manager, KYC",
+  "Software Engineer, GTPN Platform",
+  "Staff Product Designer"
+ ]
+}

@@ -1,0 +1,284 @@
+{
+ "company_key": "micron",
+ "ats": "workday",
+ "identifiers": {
+  "host": "micron.wd1.myworkdayjobs.com",
+  "tenant": "micron",
+  "site": "External"
+ },
+ "checked_at": "2026-10-07T14:58:46+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://micron.wd1.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/micron/External/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://micron.wd1.myworkdayjobs.com/External/siteMap.xml\n\nUser-agent: *\nAllow: /External/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://micron.wd1.myworkdayjobs.com/wday/cxs/micron/External/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 3125,
+   "first_page": [
+    {
+     "title": "PDE NPI PWF Process Engineer",
+     "locationsText": "Taichung - Fab 16, Taiwan",
+     "externalPath": "/job/Taichung---Fab-16-Taiwan/PDE-NPI-PWF-Process-Engineer_JR105575-1"
+    },
+    {
+     "title": "\u534a\u5c0e\u4f53\u88fd\u9020 EUV\u30d5\u30a9\u30c8\u30de\u30b9\u30af\u691c\u67fb\u30fb\u7ba1\u7406\u30b9\u30bf\u30c3\u30d5\uff08\u6280\u8853\u8077\uff09",
+     "locationsText": "Hiroshima - Fab 15, Japan",
+     "externalPath": "/job/Hiroshima---Fab-15-Japan/-EUV---_JR101216"
+    },
+    {
+     "title": "Principal / MTS Analog Layout Engineer \u2013 HBM",
+     "locationsText": "Hyderabad - Phoenix Aquila, India",
+     "externalPath": "/job/Hyderabad---Phoenix-Aquila-India/MTS--HIG-HBM-Layout_JR100024-1"
+    },
+    {
+     "title": "NY US Construction Scheduler",
+     "locationsText": "Syracuse, NY - Downtown Office",
+     "externalPath": "/job/Syracuse-NY---Downtown-Office/NY-US-Construction-Scheduler_JR106573"
+    },
+    {
+     "title": "Senior CMP Equipment Engineer",
+     "locationsText": "Boise, ID - ID1",
+     "externalPath": "/job/Boise-ID---ID1/Senior-Wet-Etch-Equipment-Engineer_JR102756-1"
+    },
+    {
+     "title": "Accountant II - Accounts Payable",
+     "locationsText": "Penang, Malaysia - Grande",
+     "externalPath": "/job/Penang-Malaysia---Grande/Accountant-II---Accounts-Payable_JR114520"
+    },
+    {
+     "title": "Engineer - QEM CC",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/Engineer---QEM-CC_JR113852"
+    },
+    {
+     "title": "F10 MFG Equipment Technician",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/F10-MFG-Equipment-Technician_JR109115"
+    },
+    {
+     "title": "Job Posting Title TECHNICIAN, PROCESS AND EQUIPMENT (POST WAFER FABRICATION)",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/MSB-Singapore/Job-Posting-Title-TECHNICIAN--PROCESS-AND-EQUIPMENT--POST-WAFER-FABRICATION-_JR114511"
+    },
+    {
+     "title": "Quality & Reliability Engineer (NAND)",
+     "locationsText": "Penang, Malaysia - Grande",
+     "externalPath": "/job/Penang-Malaysia---Grande/Quality---Reliability-Engineer--NAND-_JR113746"
+    },
+    {
+     "title": "Sr Engineer, IT",
+     "locationsText": "Penang, Malaysia - Grande",
+     "externalPath": "/job/Penang-Malaysia---Grande/Sr-Engineer--IT_JR112477"
+    },
+    {
+     "title": "Sr Indirect Category Supplier Manager II - Materials Category",
+     "locationsText": "Penang, Malaysia - Grande",
+     "externalPath": "/job/Penang-Malaysia---Grande/Sr-Indirect-Category-Supplier-Manager-II---Materials-Category_JR112332"
+    },
+    {
+     "title": "Technologist - Incoming Quality Control",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/Technologist---Incoming-Quality-Control_JR110398"
+    },
+    {
+     "title": "Apply Now! India Campus Team",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Hyderabad---Phoenix-Aquila-India/Apply-Now--India-Campus-Team_JR114507"
+    },
+    {
+     "title": "Principal Engineer / MTS, PDE Package Design",
+     "locationsText": "MSB, Singapore",
+     "externalPath": "/job/MSB-Singapore/Principal-Engineer---MTS--PDE-Package-Design_JR114154"
+    },
+    {
+     "title": "HVM Production Supervisor (Tainan)",
+     "locationsText": "Tainan, Taiwan",
+     "externalPath": "/job/Tainan-Taiwan/HVM-Production-Supervisor--Tainan-_JR112197"
+    },
+    {
+     "title": "Engineer-std cell layout",
+     "locationsText": "Hyderabad - Phoenix Aquila, India",
+     "externalPath": "/job/Hyderabad---Phoenix-Aquila-India/Engineer-std-cell-layout_JR104451"
+    },
+    {
+     "title": "Associate Engineer, IT Eng System Mgr",
+     "locationsText": "Hyderabad - Phoenix Aquila, India",
+     "externalPath": "/job/Hyderabad---Phoenix-Aquila-India/Associate-Engineer--IT-Eng-System-Mgr_JR112672"
+    },
+    {
+     "title": "Physical Failure Analysis (PFA) Technician",
+     "locationsText": "Fab 10A, Singapore",
+     "externalPath": "/job/Fab-10A-Singapore/Physical-Failure-Analysis--PFA--Technician_JR114501"
+    },
+    {
+     "title": "Staff Engineer - ESD Design",
+     "locationsText": "Bengaluru, India",
+     "externalPath": "/job/Bengaluru-India/Expert-ESD-Design-Engineer_JR95955"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 881,
+   "first_page": [
+    {
+     "title": "Engineer - QEM CC",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/Engineer---QEM-CC_JR113852"
+    },
+    {
+     "title": "F10 MFG Equipment Technician",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/F10-MFG-Equipment-Technician_JR109115"
+    },
+    {
+     "title": "Job Posting Title TECHNICIAN, PROCESS AND EQUIPMENT (POST WAFER FABRICATION)",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/MSB-Singapore/Job-Posting-Title-TECHNICIAN--PROCESS-AND-EQUIPMENT--POST-WAFER-FABRICATION-_JR114511"
+    },
+    {
+     "title": "Technologist - Incoming Quality Control",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/Technologist---Incoming-Quality-Control_JR110398"
+    },
+    {
+     "title": "Principal Engineer / MTS, PDE Package Design",
+     "locationsText": "MSB, Singapore",
+     "externalPath": "/job/MSB-Singapore/Principal-Engineer---MTS--PDE-Package-Design_JR114154"
+    },
+    {
+     "title": "Physical Failure Analysis (PFA) Technician",
+     "locationsText": "Fab 10A, Singapore",
+     "externalPath": "/job/Fab-10A-Singapore/Physical-Failure-Analysis--PFA--Technician_JR114501"
+    },
+    {
+     "title": "TECHNOLOGIST - FAC UPW & WWTP",
+     "locationsText": "Fab 10A, Singapore",
+     "externalPath": "/job/Fab-10A-Singapore/TECHNOLOGIST---FAC-UPW---WWTP_JR93929"
+    },
+    {
+     "title": "TECH SPEC- FAC Tool Install",
+     "locationsText": "Fab 10A, Singapore",
+     "externalPath": "/job/Fab-10A-Singapore/TECH-SPEC--FAC-Tool-Install_JR94003"
+    },
+    {
+     "title": "Intern - NAND Process and Equipment Engineer",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/Intern---NAND-Process-and-Equipment-Engineer_JR114294"
+    },
+    {
+     "title": "Intern - NAND Probe Product Engineering (Test Mode Integration)",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/Intern---NAND-Probe-Product-Engineering--Test-Mode-Integration-_JR113345"
+    },
+    {
+     "title": "Principal Engineer, ATCQE",
+     "locationsText": "Fab 10A, Singapore",
+     "externalPath": "/job/Fab-10A-Singapore/Principal-Engineer--ATCQE_JR109520"
+    },
+    {
+     "title": "GLOBAL EHS SENIOR CONSTRUCTION PROGRAM MANAGER",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/GLOBAL-EHS-SENIOR-CONSTRUCTION-PROGRAM-MANAGER_JR112468"
+    },
+    {
+     "title": "F10 Facilities Operations Technologist",
+     "locationsText": "Fab 10A, Singapore",
+     "externalPath": "/job/Fab-10A-Singapore/F10-Facilities-Operations-Technologist_JR94073"
+    },
+    {
+     "title": "MSB SSD NPM TECHNICIAN (NPI EXECUTION)",
+     "locationsText": "MSB, Singapore",
+     "externalPath": "/job/MSB-Singapore/MSB-SSD-NPM-TECHNICIAN--NPI-EXECUTION-_JR105705"
+    },
+    {
+     "title": "Director, Facilities Construction",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/Director--Facilities-Construction_JR114291"
+    },
+    {
+     "title": "SHIFT ENGINEER LEAD, NAND TD RDA and Metrology",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/SHIFT-ENGINEER-LEAD--NAND-TD-RDA-and-Metrology_JR113713"
+    },
+    {
+     "title": "Staff/Principal PDE APACT (Adv Pkg & Central Team) Prog&Ops Engineer",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/MSB-Singapore/Staff-Principal-PDE-APACT--Adv-Pkg---Central-Team--Prog-Ops-Engineer_JR112111"
+    },
+    {
+     "title": "Engineer, PDE PCS & MRDA",
+     "locationsText": "Fab 10A, Singapore",
+     "externalPath": "/job/Fab-10A-Singapore/Engineer--PDE-PCS---MRDA_JR109566"
+    },
+    {
+     "title": "Intern- PIE RAM (Agentic AI)",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/Intern--PIE-RAM--Agentic-AI-_JR112779"
+    },
+    {
+     "title": "SR/STAFF/PR/MTS FE OCT CPEE SPARES ENRG",
+     "locationsText": "Fab 10A, Singapore",
+     "externalPath": "/job/Fab-10A-Singapore/SR-STAFF-PR-MTS-FE-OCT-CPEE-SPARES-ENRG_JR114371"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 5,
+   "first_page": [
+    {
+     "title": "Intern - NAND Product Engineering - Probe AI/ML",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/Intern---NAND-Product-Engineering---Probe-AI-ML_JR110821"
+    },
+    {
+     "title": "Senior Product Owner",
+     "locationsText": "Fab 10A, Singapore",
+     "externalPath": "/job/Fab-10A-Singapore/Senior-Product-Owner_JR109017-1"
+    },
+    {
+     "title": "Senior Business Intelligence Analyst",
+     "locationsText": "Fab 10A, Singapore",
+     "externalPath": "/job/Fab-10A-Singapore/Senior-Business-Intelligence-Analyst_JR103839"
+    },
+    {
+     "title": "SR DATA SCIENTIST, SMAI OI",
+     "locationsText": "Fab 10A, Singapore",
+     "externalPath": "/job/Fab-10A-Singapore/SR-DATA-SCIENTIST--SMAI-OI_JR103852"
+    },
+    {
+     "title": "Staff Engineer,  TEM",
+     "locationsText": "Fab 10N/X, Singapore",
+     "externalPath": "/job/Fab-10NX-Singapore/Staff-Engineer---TEM_JR98560"
+    }
+   ]
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 3125,
+ "sg_search_total": 881,
+ "sg_ds_first_page_matches": [
+  {
+   "title": "SR DATA SCIENTIST, SMAI OI",
+   "locationsText": "Fab 10A, Singapore",
+   "externalPath": "/job/Fab-10A-Singapore/SR-DATA-SCIENTIST--SMAI-OI_JR103852"
+  }
+ ],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

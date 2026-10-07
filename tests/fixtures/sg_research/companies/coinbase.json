@@ -1,0 +1,40 @@
+{
+ "company_key": "coinbase",
+ "ats": "greenhouse",
+ "identifiers": {
+  "token": "coinbase"
+ },
+ "checked_at": "2026-10-07T15:05:12+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://boards-api.greenhouse.io/robots.txt",
+  "http_status": 200,
+  "path_checked": "/v1/boards/coinbase/jobs",
+  "allowed": true,
+  "body_excerpt": "# See http://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file\n\nUser-agent: *\nDisallow: /embed/"
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://boards-api.greenhouse.io/v1/boards/coinbase/jobs"
+ },
+ "http_status": 200,
+ "board_name": "Coinbase",
+ "total_jobs": 223,
+ "sg_jobs": 7,
+ "sg_ds_matches": [
+  {
+   "title": "Senior Data Scientist",
+   "location": "Remote - Singapore",
+   "url": "https://www.coinbase.com/careers/positions/8147917?gh_jid=8147917"
+  }
+ ],
+ "sg_sample_titles": [
+  "Concierge Specialist IV",
+  "Concierge Specialist IV",
+  "Operations Manager",
+  "Principal Recruiter",
+  "Regulatory Compliance Manager ",
+  "Senior Data Scientist",
+  "Specialist, Market Operations"
+ ]
+}

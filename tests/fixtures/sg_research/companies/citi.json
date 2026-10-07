@@ -1,0 +1,258 @@
+{
+ "company_key": "citi",
+ "ats": "workday",
+ "identifiers": {
+  "host": "citi.wd5.myworkdayjobs.com",
+  "tenant": "citi",
+  "site": "2"
+ },
+ "checked_at": "2026-10-07T15:00:13+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://citi.wd5.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/citi/2/jobs",
+  "allowed": true,
+  "body_excerpt": "\nUser-agent: *\nDisallow: /2/\nDisallow: /Citi_Early_Careers_Events_Site/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://citi.wd5.myworkdayjobs.com/wday/cxs/citi/2/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 2000,
+   "first_page": [
+    {
+     "title": "Part-Time Teller (20 Hours) - Central Islip Branch (Open)",
+     "locationsText": "Central Islip New York United States",
+     "externalPath": "/job/Central-Islip-New-York-United-States/Part-Time-Teller--20-Hours----Central-Islip-Branch--Open-_26998417"
+    },
+    {
+     "title": "Engineer Senior Analyst - Assistant Vice President",
+     "locationsText": "Pune Maharashtra India",
+     "externalPath": "/job/Pune-Maharashtra-India/Engineer-Senior-Analyst---Assistant-Vice-President_26995853"
+    },
+    {
+     "title": "Wealth Relationship Manager - Fremont (Bilingual, Mandarin/Chinese)",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Santa-Clara-California-United-States/Wealth-Relationship-Manager---Pruneridge_26972752"
+    },
+    {
+     "title": "Head of Services, Markets, Operations, and Internal Fraud Risk",
+     "locationsText": "Budapest  Hungary",
+     "externalPath": "/job/Budapest--Hungary/Head-of-Services--Markets--Operations--and-Internal-Fraud-Risk_26991854"
+    },
+    {
+     "title": "Senior Data Scientist Assistant Vice President",
+     "locationsText": "Tampa Florida United States",
+     "externalPath": "/job/Tampa-Florida-United-States/Senior-Data-Modeling-Analyst-Assistant-Vice-President_26957213-1"
+    },
+    {
+     "title": "Applications Development Tech Lead Analyst",
+     "locationsText": "Irving Texas United States",
+     "externalPath": "/job/Irving-Texas-United-States/Applications-Development-Tech-Lead-Analyst_26987622"
+    },
+    {
+     "title": "Senior Engineering Manager - Regulatory Reporting",
+     "locationsText": "Chennai Tamil Nadu India",
+     "externalPath": "/job/Chennai-Tamil-Nadu-India/Senior-Engineering-Manager---Regulatory-Reporting_26995972"
+    },
+    {
+     "title": "Applications Support Senior Manager - Vice President",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Pune-Maharashtra-India/Applications-Support-Senior-Manager---Vice-President_26999799"
+    },
+    {
+     "title": "Securities & Derivatives Analyst",
+     "locationsText": "DLF CYBERCITY 12B",
+     "externalPath": "/job/DLF-CYBERCITY-12B/Securities---Derivatives-Analyst_26991641"
+    },
+    {
+     "title": "Lead API Developer",
+     "locationsText": "Pune Maharashtra India",
+     "externalPath": "/job/Pune-Maharashtra-India/Lead-API-Developer_26998700-1"
+    },
+    {
+     "title": "BANAMEX - Credit Secured Portfolio Intermediate Analyst - Officer",
+     "locationsText": "Ciudad De Mexico Distrito Federal Mexico",
+     "externalPath": "/job/Ciudad-De-Mexico-Distrito-Federal-Mexico/BANAMEX---Credit-Secured-Portfolio-Intermediate-Analyst---Officer_26998951"
+    },
+    {
+     "title": "Personal Banker SAFE Act, Bilingual English/Spanish Speaking Preferred, Pines East Branch, Officer",
+     "locationsText": "Pembroke Pines Florida United States",
+     "externalPath": "/job/Pembroke-Pines-Florida-United-States/Personal-Banker-SAFE-Act--Bilingual-English-Spanish-Speaking-Preferred--Pines-West-Branch--Officer_26995835"
+    },
+    {
+     "title": "Banking - Investment Banking, Full Time Analyst,  New York City - US 2027",
+     "locationsText": "New York New York United States",
+     "externalPath": "/job/New-York-New-York-United-States/Banking---Investment-Banking--Full-Time-Analyst---New-York-City---US-2027_26996016"
+    },
+    {
+     "title": "Branch Manager - Forest Hills, Senior Vice President",
+     "locationsText": "107-01 71 ST AVENUE  FOREST HILLS",
+     "externalPath": "/job/107-01-71-ST-AVENUE--FOREST-HILLS/Branch-Manager---Queens-Area--Senior-Vice-President_26995311"
+    },
+    {
+     "title": "Application Management And Governance AVP",
+     "locationsText": "Pune Maharashtra India",
+     "externalPath": "/job/Pune-Maharashtra-India/Application-Management-And-Governance-AVP_26996383"
+    },
+    {
+     "title": "Banking, Corporate Banking, Full Time Analyst, Zurich - Switzerland, 2027, January - April Start",
+     "locationsText": "Zurich  Switzerland",
+     "externalPath": "/job/Zurich--Switzerland/Banking--Corporate-Banking--Full-Time-Analyst--Zurich---Switzerland--2027--applicable-for-2026-Citi-Summer-Interns-Only-_26991709"
+    },
+    {
+     "title": "AI Product Management Senior Lead",
+     "locationsText": "New York New York United States",
+     "externalPath": "/job/New-York-New-York-United-States/AI-Product-Management-Senior-Lead_26998136-1"
+    },
+    {
+     "title": "Supply Chain Sourcing Lead Analyst",
+     "locationsText": "Budapest  Hungary",
+     "externalPath": "/job/Budapest--Hungary/Supply-Chain-Sourcing-Lead-Analyst_261000496"
+    },
+    {
+     "title": "Supply Chain Sourcing Senior Analyst",
+     "locationsText": "Budapest  Hungary",
+     "externalPath": "/job/Budapest--Hungary/Supply-Chain-Sourcing-Senior-Analyst_261000538"
+    },
+    {
+     "title": "Applications Development Tech Lead Analyst",
+     "locationsText": "Tampa Florida United States",
+     "externalPath": "/job/Tampa-Florida-United-States/Applications-Development-Tech-Lead-Analyst_26993532"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 283,
+   "first_page": [
+    {
+     "title": "Salesperson - C12 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Salesperson---C12---SINGAPORE_24819273"
+    },
+    {
+     "title": "Scheduler - C13 - Singapore",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Scheduler---C13---Singapore_25833726"
+    },
+    {
+     "title": "Salesperson - C13 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Salesperson---C13---SINGAPORE_25848771"
+    },
+    {
+     "title": "Insurance Specialist - C10 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Insurance-Specialist---C10---SINGAPORE_24799489"
+    },
+    {
+     "title": "Insurance Specialist - C11 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Insurance-Specialist---C11---SINGAPORE_24799174"
+    },
+    {
+     "title": "Client Onboarding Analyst - Singapore",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Client-Onboarding-Analyst---Singapore_24801817"
+    },
+    {
+     "title": "Service Associate, C09, Singapore",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Service-Associate--C09--Singapore_25893810"
+    },
+    {
+     "title": "Associate Banker Senior - C12 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Associate-Banker-Senior---C12---SINGAPORE_24778852"
+    },
+    {
+     "title": "Insurance Specialist (IS) - C11 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Insurance-Intermediate-Analyst---C11---SINGAPORE_24799177"
+    },
+    {
+     "title": "Quantitative Equities Trader - VP- SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Quantitative-Equities-Trader---VP--SINGAPORE_24813971"
+    },
+    {
+     "title": "Business Risk Officer - C13 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Business-Risk-Officer---C13---SINGAPORE_25863751"
+    },
+    {
+     "title": "Project Management Lead - C13 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Project-Management-Lead---C13---SINGAPORE_25884582-1"
+    },
+    {
+     "title": "Intelligence Intermediate Analyst - Officer - Singapore",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Intelligence-Intermediate-Analyst---Officer---Singapore_25899956"
+    },
+    {
+     "title": "Engineer Sr Analyst - C12 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Engineer-Sr-Analyst---C12---SINGAPORE_25897138"
+    },
+    {
+     "title": "Engineer Sr Analyst - C12 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Engineer-Sr-Analyst---C12---SINGAPORE_25916078"
+    },
+    {
+     "title": "Services - Summer Analyst, Singapore, 2027",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Services---Summer-Analyst--Singapore--2027_26978591"
+    },
+    {
+     "title": "Digital Exp Grp Manager - C14 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Digital-Exp-Grp-Manager---C14---SINGAPORE_24798058-1"
+    },
+    {
+     "title": "Markets \u2013 Control Assessment Lead \u2013 C14 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Markets---Control-Assessment-Lead---C14---SINGAPORE_24812121"
+    },
+    {
+     "title": "Business Analysis Sr Manager - C13 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Business-Analysis-Sr-Manager---C13---SINGAPORE_25871317"
+    },
+    {
+     "title": "IT Business Lead Analyst - C13 - SINGAPORE",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/IT-Business-Lead-Analyst---C13---SINGAPORE_25871355-1"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 1,
+   "first_page": [
+    {
+     "title": "Data Engineering Lead - Big Data Technologies- Vice President",
+     "locationsText": "Singapore  Singapore",
+     "externalPath": "/job/Singapore--Singapore/Data-Engineering-Lead---Big-Data-Technologies--Vice-President_25907720"
+    }
+   ]
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 2000,
+ "sg_search_total": 283,
+ "sg_ds_first_page_matches": [],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

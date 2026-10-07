@@ -1,0 +1,31 @@
+{
+ "company_key": "ripple",
+ "ats": "greenhouse",
+ "identifiers": {
+  "token": "ripple"
+ },
+ "checked_at": "2026-10-07T15:05:34+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://boards-api.greenhouse.io/robots.txt",
+  "http_status": 200,
+  "path_checked": "/v1/boards/ripple/jobs",
+  "allowed": true,
+  "body_excerpt": "# See http://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file\n\nUser-agent: *\nDisallow: /embed/"
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://boards-api.greenhouse.io/v1/boards/ripple/jobs"
+ },
+ "http_status": 200,
+ "board_name": "Ripple ",
+ "total_jobs": 124,
+ "sg_jobs": 4,
+ "sg_ds_matches": [],
+ "sg_sample_titles": [
+  "Business Development Manager",
+  "Physical Security Manager, APAC/MENA",
+  "Product Operations Specialist",
+  "Staff Cloud Architect"
+ ]
+}

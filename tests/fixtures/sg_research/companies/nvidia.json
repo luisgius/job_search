@@ -1,0 +1,263 @@
+{
+ "company_key": "nvidia",
+ "ats": "workday",
+ "identifiers": {
+  "host": "nvidia.wd5.myworkdayjobs.com",
+  "tenant": "nvidia",
+  "site": "NVIDIAExternalCareerSite"
+ },
+ "checked_at": "2026-10-07T14:59:58+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://nvidia.wd5.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/siteMap.xml\n\nUser-agent: *\nAllow: /NVIDIAExternalCareerSite/\nDisallow: /NVIDIAExternalCareerSiteResearch/\nDisallow: /talentcommunity/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 2000,
+   "first_page": [
+    {
+     "title": "Senior AI Systems Engineer, Chip Design",
+     "locationsText": "3 Locations",
+     "externalPath": "/job/US-CA-Santa-Clara/Senior-Software-Engineer--VLSI-AI-Agent_JR2012538"
+    },
+    {
+     "title": "IC Practical Engineer",
+     "locationsText": "Israel, Yokneam",
+     "externalPath": "/job/Israel-Yokneam/IC-Practical-Engineer_JR2022657"
+    },
+    {
+     "title": "Senior Physical Verification Engineer",
+     "locationsText": "India, Bengaluru",
+     "externalPath": "/job/India-Bengaluru/Senior-Physical-Verification-Engineer_JR2027234"
+    },
+    {
+     "title": "Senior Physical Design AI Engineer",
+     "locationsText": "India, Bengaluru",
+     "externalPath": "/job/India-Bengaluru/Senior-Physical-Design-AI-Engineer_JR2026884"
+    },
+    {
+     "title": "QA and Automation Engineer",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Israel-Raanana/QA-and-Automation-Engineer_JR2024858-1"
+    },
+    {
+     "title": "Project Technical Delivery Manager",
+     "locationsText": "Germany, Remote",
+     "externalPath": "/job/Germany-Remote/Project-Technical-Delivery-Manager_JR2003336"
+    },
+    {
+     "title": "Systems Software Engineer,  AI and Cloud - New College Grad 2026",
+     "locationsText": "US, CA, Santa Clara",
+     "externalPath": "/job/US-CA-Santa-Clara/Systems-Software-Engineer---AI-and-Cloud---New-College-Grad-2026_JR2025458"
+    },
+    {
+     "title": "Senior Solutions Architect, Generative AI",
+     "locationsText": "India, Bengaluru",
+     "externalPath": "/job/India-Bengaluru/Senior-Solutions-Architect--Generative-AI_JR2026872"
+    },
+    {
+     "title": "Senior Post-Silicon Characterization Engineer",
+     "locationsText": "Israel, Yokneam",
+     "externalPath": "/job/Israel-Yokneam/Senior-Post-Silicon-Characterization-Engineer_JR2018531"
+    },
+    {
+     "title": "Senior Machine Learning Engineer, AI Safety",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/US-CA-Santa-Clara/Senior-Machine-Learning-Engineer--AI-Safety_JR2024679"
+    },
+    {
+     "title": "Senior Infrastructure Automation Engineer, Compute Platform - EDA Infrastructure",
+     "locationsText": "3 Locations",
+     "externalPath": "/job/US-NC-Remote/Senior-Infrastructure-Automation-Engineer--Compute-Platform_JR2023962"
+    },
+    {
+     "title": "Senior Linux Systems Engineer - EDA Infrastructure",
+     "locationsText": "5 Locations",
+     "externalPath": "/job/US-CA-Remote/Senior-Linux-Systems-Engineer---EDA-Infrastructure_JR2025019"
+    },
+    {
+     "title": "Senior Business Intelligence Analyst - Corporate Finance",
+     "locationsText": "US, CA, Santa Clara",
+     "externalPath": "/job/US-CA-Santa-Clara/Senior-Business-Intelligence-Analyst---Corporate-Finance_JR2026577"
+    },
+    {
+     "title": "Lead Systems Software Test Engineer \u2013 CSP Engagements",
+     "locationsText": "US, CA, Santa Clara",
+     "externalPath": "/job/US-CA-Santa-Clara/Lead-Systems-Software-Test-Engineer---CSP-Engagements_JR2020107"
+    },
+    {
+     "title": "Senior AI Infrastructure Engineer - EDA Infrastructure",
+     "locationsText": "5 Locations",
+     "externalPath": "/job/US-CA-Remote/Senior-AI-infrastructure-engineer---Hardware-Infrastructure-Engineering_JR2024816"
+    },
+    {
+     "title": "Senior Platform Engineer, Enterprise Products",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/US-CA-Santa-Clara/Senior-Platform-Engineer--Enterprise-Products_JR2026916"
+    },
+    {
+     "title": "Senior Verification Engineer, SoC",
+     "locationsText": "5 Locations",
+     "externalPath": "/job/US-CA-Santa-Clara/Senior-Verification-Engineer--SoC_JR2012656"
+    },
+    {
+     "title": "Machine Learning Engineer, AI Safety",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/US-CA-Santa-Clara/Machine-Learning-Engineer--AI-Safety_JR2021784-1"
+    },
+    {
+     "title": "Product Manager, Developer Experience and Platform Excellence \u2013 Edge AI and Robotics",
+     "locationsText": "US, CA, Santa Clara",
+     "externalPath": "/job/US-CA-Santa-Clara/Product-Manager--Developer-Experience-and-Platform-Excellence---Edge-AI-and-Robotics_JR2025794-1"
+    },
+    {
+     "title": "Senior C++ Software Engineer \u2013 AI Developer Tools",
+     "locationsText": "3 Locations",
+     "externalPath": "/job/UK-Remote/Senior-C---Software-Engineer---AI-Developer-Tools_JR2026662"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 107,
+   "first_page": [
+    {
+     "title": "AI Research Scientist",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/AI-Research-Scientist_JR2015372"
+    },
+    {
+     "title": "AI Research Scientist",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/AI-Research-Scientist_JR2017533"
+    },
+    {
+     "title": "AI Research Scientist",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/AI-Research-Scientist_JR2018673"
+    },
+    {
+     "title": "Senior Solution Architect, AI Compute Engineer - NVIS",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Senior-Solution-Architect--AI-Compute-Engineer---NVIS_JR2019262"
+    },
+    {
+     "title": "Senior Account Manager",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Singapore-Remote/Senior-Account-Manager_JR2022227-1"
+    },
+    {
+     "title": "Research Scientist",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Research-Scientist_JR2025138"
+    },
+    {
+     "title": "Manager, Technical Delivery APAC  - NVIS",
+     "locationsText": "Singapore, Singapore-Suntec Tower",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Manager--Technical-Delivery-APAC----NVIS_JR2015968"
+    },
+    {
+     "title": "Data Center Infrastructure Specialist",
+     "locationsText": "Singapore, Singapore-Suntec Tower",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Data-Center-Infrastructure-Specialist_JR2017932"
+    },
+    {
+     "title": "Senior Program Manager, Architecture Review Board",
+     "locationsText": "Singapore, Singapore-Suntec Tower",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Senior-Program-Manager--Architecture-Review-Board_JR2018711"
+    },
+    {
+     "title": "Senior Account Manager",
+     "locationsText": "Singapore, Singapore-Suntec Tower",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Senior-Account-Manager_JR2022647"
+    },
+    {
+     "title": "Solutions Architect, Vision AI",
+     "locationsText": "Singapore, Singapore-Suntec Tower",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Solutions-Architect--Vision-AI_JR2023216"
+    },
+    {
+     "title": "Solutions Architect, NVIDIA Cloud Partners",
+     "locationsText": "Singapore, Singapore-Suntec Tower",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Solutions-Architect--NVIDIA-Cloud-Partners_JR2023991"
+    },
+    {
+     "title": "Solutions Architect, Data Center Infrastructure",
+     "locationsText": "Singapore, Singapore-Suntec Tower",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Solutions-Architect--Data-Center-Infrastructure_JR2023988"
+    },
+    {
+     "title": "Solutions Architect, Speech AI",
+     "locationsText": "Singapore, Singapore-Suntec Tower",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Solutions-Architect--Speech-AI_JR2022330"
+    },
+    {
+     "title": "Field Operations Specialist - NVIS Professional Services",
+     "locationsText": "Singapore, Singapore-Suntec Tower",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Field-Operations-Specialist---NVIS-Professional-Services_JR2024613-1"
+    },
+    {
+     "title": "Senior Project Delivery Manager, NVIS",
+     "locationsText": "Singapore, Singapore-Suntec Tower",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Senior-Project-Delivery-Manager--NVIS_JR2025711"
+    },
+    {
+     "title": "Senior Cloud Infrastructure Automation Solutions Architect",
+     "locationsText": "Singapore, Singapore-Suntec Tower",
+     "externalPath": "/job/Singapore-Singapore-Suntec-Tower/Senior-Cloud-Infrastructure-Automation-Solutions-Architect_JR2025277"
+    },
+    {
+     "title": "Test Engineer",
+     "locationsText": "Singapore, Remote",
+     "externalPath": "/job/Singapore-Remote/Test-Engineer_JR2020205"
+    },
+    {
+     "title": "Senior Network Engineer, DGX Cloud - Backbone",
+     "locationsText": "Singapore, Remote",
+     "externalPath": "/job/Singapore-Remote/Senior-Network-Engineer--DGX-Cloud---Backbone_JR2022040-1"
+    },
+    {
+     "title": "Senior Credit Analyst",
+     "locationsText": "Singapore, Remote",
+     "externalPath": "/job/Singapore-Remote/Senior-Credit-Analyst_JR2024643"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 2,
+   "first_page": [
+    {
+     "title": "Software Engineer, Data Center Compute Software Tools (RDSS Intern)",
+     "locationsText": "Taiwan, Taipei",
+     "externalPath": "/job/Taiwan-Taipei/Software-Engineer--Data-Center-Compute-Software-Tools--RDSS-Intern-_JR2025645"
+    },
+    {
+     "title": "Developer Technology Engineer, HPC and AI",
+     "locationsText": "Taiwan, Taipei",
+     "externalPath": "/job/Taiwan-Taipei/Developer-Technology-Engineer--HPC-and-AI_JR2015377-1"
+    }
+   ]
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 2000,
+ "sg_search_total": 107,
+ "sg_ds_first_page_matches": [],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

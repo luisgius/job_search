@@ -128,6 +128,12 @@ class Job:
     ats: str | None = None                # "greenhouse" | "lever" | None
     ats_job_id: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
+    # Public monitoring metadata; the existing application pipeline keeps its
+    # identity and behaviour. Singapore merges identities in its own store.
+    apply_url: str = ""
+    source_type: str = "company_site"
+    sources: list[str] = field(default_factory=list)
+    flags: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.company = (self.company or "").strip()
@@ -138,6 +144,19 @@ class Job:
         self.posted_at = ensure_utc(self.posted_at)
         if self.country:
             self.country = self.country.upper()
+        self.apply_url = (self.apply_url or self.url).strip()
+        self.sources = list(dict.fromkeys(self.sources or [self.source]))
+        self.flags = list(dict.fromkeys(self.flags))
+
+    @property
+    def description_text(self) -> str:
+        """Compatibility name for the public monitor's normalized text."""
+        return self.description
+
+    @property
+    def posted_date(self) -> datetime | None:
+        """The employer's publication date, never a fabricated fetch date."""
+        return self.posted_at
 
     # -- identity ---------------------------------------------------------
 

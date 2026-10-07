@@ -1,0 +1,167 @@
+{
+ "company_key": "expedia",
+ "ats": "workday",
+ "identifiers": {
+  "host": "expedia.wd108.myworkdayjobs.com",
+  "tenant": "expedia",
+  "site": "search"
+ },
+ "checked_at": "2026-10-07T14:59:19+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://expedia.wd108.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/expedia/search/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://expedia.wd108.myworkdayjobs.com/search/siteMap.xml\n\nUser-agent: *\nAllow: /search/\nDisallow: /private/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://expedia.wd108.myworkdayjobs.com/wday/cxs/expedia/search/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 172,
+   "first_page": [
+    {
+     "title": "Senior Machine Learning Scientist",
+     "locationsText": "UK - London",
+     "externalPath": "/job/UK---London/Senior-Machine-Learning-Scientist_R-110171-2"
+    },
+    {
+     "title": "Android Engineer III",
+     "locationsText": "Washington - Seattle Campus",
+     "externalPath": "/job/Washington---Seattle-Campus/Mobile-Engineer-III_R-107935-1"
+    },
+    {
+     "title": "Software Development Engineer II - Full Stack",
+     "locationsText": "UK - London",
+     "externalPath": "/job/UK---London/Software-Development-Engineer-II---Full-Stack_R-109577"
+    },
+    {
+     "title": "Infrastructure and Enterprise Engineer II",
+     "locationsText": "Czech Republic - Prague",
+     "externalPath": "/job/Czech-Republic---Prague/Infrastructure-and-Enterprise-Engineer-II_R-105042"
+    },
+    {
+     "title": "Customer/Product Insights Manager III",
+     "locationsText": "India - Gurgaon",
+     "externalPath": "/job/India---Gurgaon/Customer-Product-Insights-Manager-III_R-110128"
+    },
+    {
+     "title": "Software Development Engineer II (Frontend)",
+     "locationsText": "India - Gurgaon",
+     "externalPath": "/job/India---Gurgaon/Software-Development-Engineer-II_R-109215"
+    },
+    {
+     "title": "Software Development Engineer II (Frontend)",
+     "locationsText": "India - Gurgaon",
+     "externalPath": "/job/India---Gurgaon/Software-Development-Engineer-II--Frontend-_R-109985"
+    },
+    {
+     "title": "Software Develpment Engineer III",
+     "locationsText": "India - Gurgaon",
+     "externalPath": "/job/India---Gurgaon/Software-Develpment-Engineer-III_R-109844"
+    },
+    {
+     "title": "Technical Operations Analyst II",
+     "locationsText": "IND0011 - Gurgaon - Downtown - Expedia",
+     "externalPath": "/job/IND0011---Gurgaon---Downtown---Expedia/Technical-Operations-Analyst-II_R-110101-1"
+    },
+    {
+     "title": "Business Development Manager, Lodging Advertising Sales",
+     "locationsText": "Japan - Tokyo",
+     "externalPath": "/job/Japan---Tokyo/Business-Development-Manager--Lodging-Advertising-Sales_R-110318-1"
+    },
+    {
+     "title": "Finance Manager",
+     "locationsText": "Washington - Seattle Campus",
+     "externalPath": "/job/Washington---Seattle-Campus/Finance-Manager_R-110150"
+    },
+    {
+     "title": "Senior Finance Analyst",
+     "locationsText": "Washington - Seattle Campus",
+     "externalPath": "/job/Washington---Seattle-Campus/Senior-Finance-Analyst_R-110180"
+    },
+    {
+     "title": "Principal Software Development Engineer (Loyalty)",
+     "locationsText": "USA - California - San Jose",
+     "externalPath": "/job/USA---California---San-Jose/Principal-Software-Development-Engineer--Loyalty-_R-109548"
+    },
+    {
+     "title": "Business Programs Manager",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Washington---Seattle-Campus/Business-Programs-Manager_R-110339-1"
+    },
+    {
+     "title": "Software Development Engineer II - InsurTech",
+     "locationsText": "Washington - Seattle Campus",
+     "externalPath": "/job/Washington---Seattle-Campus/Software-Development-Engineer-II---InsurTech_R-110027-1"
+    },
+    {
+     "title": "Software Development Engineer II",
+     "locationsText": "USA - Illinois - Chicago",
+     "externalPath": "/job/USA---Illinois---Chicago/Software-Development-Engineer-II_R-109868-1"
+    },
+    {
+     "title": "Associate Account Manager II",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Germany---Mnchen/Associate-Account-Manager-II_R-108831-1"
+    },
+    {
+     "title": "Enterpsie Support Associate",
+     "locationsText": "Ireland - Dublin",
+     "externalPath": "/job/Ireland---Dublin/Enterpsie-Support-Associate_R-107404-1"
+    },
+    {
+     "title": "Software Development Engineer II- Full Stack",
+     "locationsText": "India - Gurgaon",
+     "externalPath": "/job/India---Gurgaon/Software-Development-Engineer-II--Full-Stack_R-110053"
+    },
+    {
+     "title": "Senior Software Development Engineer",
+     "locationsText": "India - Gurgaon",
+     "externalPath": "/job/India---Gurgaon/Senior-Software-Development-Engineer_R-109716"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 3,
+   "first_page": [
+    {
+     "title": "Global Employment & Mobility Tax Manager",
+     "locationsText": "Washington - Seattle Campus",
+     "externalPath": "/job/Washington---Seattle-Campus/Global-Employment---Mobility-Tax-Manager_R-110077"
+    },
+    {
+     "title": "Senior Partnership Manager, APAC",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Senior-Partnership-Manager--APAC_R-109960"
+    },
+    {
+     "title": "Manager, Employee Relations (APAC)",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Manager--Employee-Relations--APAC_R-109615-1"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 0,
+   "first_page": []
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 172,
+ "sg_search_total": 3,
+ "sg_ds_first_page_matches": [],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

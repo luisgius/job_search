@@ -1,0 +1,32 @@
+{
+  "company_key": "tower_research",
+  "ats": "greenhouse",
+  "identifiers": {
+    "token": "towerresearchcapital"
+  },
+  "checked_at": "2026-10-07T15:36:41.509031+00:00",
+  "user_agent": "SingaporeCareerMonitor/1.0 (public personal job monitoring; 1 request/second)",
+  "company_careers_url": "https://tower-research.com/roles/",
+  "company_careers_link": "https://boards.greenhouse.io/embed/job_board/js?for=towerresearchcapital",
+  "robots": {
+    "url": "https://boards-api.greenhouse.io/robots.txt",
+    "http_status": 200,
+    "allowed": true,
+    "body_excerpt": "# See http://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file\n\nUser-agent: *\nDisallow: /embed/\n"
+  },
+  "endpoint": {
+    "method": "GET",
+    "url": "https://boards-api.greenhouse.io/v1/boards/towerresearchcapital/jobs?content=true"
+  },
+  "http_status": 200,
+  "board_name": "Tower Research Capital",
+  "total_jobs": 93,
+  "sg_jobs": 21,
+  "sg_ds_matches": [
+    {
+      "title": "Machine Learning Engineer",
+      "location": "Hong Kong, Singapore, Shanghai",
+      "url": "https://www.tower-research.com/open-positions/?gh_jid=7714667"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+ "company_key": "elastic",
+ "ats": "greenhouse",
+ "identifiers": {
+  "token": "elastic"
+ },
+ "checked_at": "2026-10-07T15:05:27+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://boards-api.greenhouse.io/robots.txt",
+  "http_status": 200,
+  "path_checked": "/v1/boards/elastic/jobs",
+  "allowed": true,
+  "body_excerpt": "# See http://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file\n\nUser-agent: *\nDisallow: /embed/"
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://boards-api.greenhouse.io/v1/boards/elastic/jobs"
+ },
+ "http_status": 200,
+ "board_name": "Elastic",
+ "total_jobs": 419,
+ "sg_jobs": 6,
+ "sg_ds_matches": [],
+ "sg_sample_titles": [
+  "Distributor Business Development Manager, APJ",
+  "Mid Market Account Executive - Indonesia",
+  "Sales Development Representative - Korea (Singapore based)",
+  "Sales Development Representative (Singapore Public Sector)",
+  "Senior Customer Architect ",
+  "Senior Partner Solutions Architect - ASEAN"
+ ]
+}

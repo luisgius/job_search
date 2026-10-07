@@ -1,0 +1,258 @@
+{
+ "company_key": "salesforce",
+ "ats": "workday",
+ "identifiers": {
+  "host": "salesforce.wd12.myworkdayjobs.com",
+  "tenant": "salesforce",
+  "site": "External_Career_Site"
+ },
+ "checked_at": "2026-10-07T14:59:52+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://salesforce.wd12.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/salesforce/External_Career_Site/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://salesforce.wd12.myworkdayjobs.com/External_Career_Site/siteMap.xml\nSitemap: https://salesforce.wd12.myworkdayjobs.com/Futureforce_NewGradRoles/siteMap.xml\nSitemap: https://salesforce.wd12.myworkdayjobs.com/Mulesoft_Careersite/siteMap.xml\nSitemap: https://salesforce.wd12.myworkdayjobs.com/Futureforce_Internships/siteMap.xml\nSitemap: https://salesforce.wd12.myworkdayjobs.com/Salesforce_Research/siteMap.xml\nSitemap: https://salesforce.wd12.myworkdayjobs.com/Tableau/siteMap.xml\nSitemap: https://salesforce.wd12.myworkdayjobs.com/Datorama/siteMap.xml\nSitemap: https://salesforce.wd12.myworkdayjobs.com/Heroku/siteMap.xml\nSitemap: https://salesforce.wd12.myworkdayjobs.com/Slack/siteMap.xml\n\nUser-agent: *\nAllow: /External_Career_Site/\nAllow: /Futureforce_NewGradRoles/\nAllow: /Mulesoft_Careersite/\nAllow: /Futureforce_Internships/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/External_Career_Site/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 1523,
+   "first_page": [
+    {
+     "title": "Director, Industry Strategist, Life Sciences Acceleration Hub",
+     "locationsText": "United Kingdom - London",
+     "externalPath": "/job/United-Kingdom---London/Director--Industry-Strategist--Life-Sciences-Acceleration-Hub_JR362748"
+    },
+    {
+     "title": "Life Sciences Program Manager/Program Executive",
+     "locationsText": "United Kingdom - London",
+     "externalPath": "/job/United-Kingdom---London/Life-Sciences-Program-Manager-Program-Executive_JR362737"
+    },
+    {
+     "title": "Commercial Graduate Rotation Program - Commercial Path - BNL Dutch Speaking Market",
+     "locationsText": "Ireland - Dublin",
+     "externalPath": "/job/Ireland---Dublin/Commercial-Graduate-Rotation-Program---Commercial-Path---BNL-Dutch-Speaking-Market_JR363186-1"
+    },
+    {
+     "title": "Community Operations Analyst",
+     "locationsText": "Mexico - Mexico City",
+     "externalPath": "/job/Mexico---Mexico-City/Community-Operations-Sr-Analyst_JR356556"
+    },
+    {
+     "title": "Life Sciences Ecosystem Lead Director",
+     "locationsText": "United Kingdom - London",
+     "externalPath": "/job/United-Kingdom---London/Life-Sciences-Ecosystem-Lead-Director_JR361664"
+    },
+    {
+     "title": "Life Sciences Program Manager/Program Executive",
+     "locationsText": "United Kingdom - London",
+     "externalPath": "/job/United-Kingdom---London/Life-Sciences-Program-Manager-Program-Executive_JR362735"
+    },
+    {
+     "title": "Sales Programs Senior Manager",
+     "locationsText": "Canada - Toronto",
+     "externalPath": "/job/Canada---Toronto/Run-Rate-Programs-Senior-Manager_JR362834"
+    },
+    {
+     "title": "Life Sciences Program Manager/Program Executive",
+     "locationsText": "United Kingdom - London",
+     "externalPath": "/job/United-Kingdom---London/Life-Sciences-Program-Manager-Program-Executive_JR362736"
+    },
+    {
+     "title": "Territory Account Executive",
+     "locationsText": "Colombia - Bogota",
+     "externalPath": "/job/Colombia---Bogota/Territory-Account-Executive_JR354492"
+    },
+    {
+     "title": "Senior Technical Architect",
+     "locationsText": "6 Locations",
+     "externalPath": "/job/Indiana---Remote/Senior-Technical-Architect_JR349406"
+    },
+    {
+     "title": "Director, Sales Strategy",
+     "locationsText": "4 Locations",
+     "externalPath": "/job/Illinois---Chicago/Director--Sales-Strategy_JR363038"
+    },
+    {
+     "title": "Security Architect Lead",
+     "locationsText": "16 Locations",
+     "externalPath": "/job/Indiana---Remote/Security-Architect-Lead_JR360446"
+    },
+    {
+     "title": "Member of Technical Staff, Revenue Cloud Rating \u2013 Backend Java Engineer",
+     "locationsText": "United Kingdom - England - Remote",
+     "externalPath": "/job/United-Kingdom---England---Remote/Member-of-Technical-Staff--Revenue-Cloud-Rating---Backend-Java-Engineer_JR362562"
+    },
+    {
+     "title": "Mid- Level Backend Engineer",
+     "locationsText": "Israel - Tel Aviv",
+     "externalPath": "/job/Israel---Tel-Aviv/Mid--Level-Backend-Engineer_JR343717"
+    },
+    {
+     "title": "Business Development Representative",
+     "locationsText": "India - Bangalore",
+     "externalPath": "/job/India---Bangalore/Business-Development-Representative_JR351752"
+    },
+    {
+     "title": "Forward Deployed Engineer - Public sector, Nonprofit and Education",
+     "locationsText": "Finland - Espoo",
+     "externalPath": "/job/Finland---Espoo/Forward-Deployed-Engineer---Public-sector--Nonprofit-and-Education_JR362814"
+    },
+    {
+     "title": "Name Account Executive",
+     "locationsText": "Netherlands - Amsterdam",
+     "externalPath": "/job/Netherlands---Amsterdam/Name-Named-Account-Executive_JR363008"
+    },
+    {
+     "title": "RVP Sales EMEA, Process Transformation (Regrello & Apromore)",
+     "locationsText": "Spain - Madrid",
+     "externalPath": "/job/Spain---Madrid/RVP-Sales-EMEA--Process-Transformation--Regrello---Apromore-_JR363143"
+    },
+    {
+     "title": "ES Position Management Ops Analyst",
+     "locationsText": "India - Hyderabad",
+     "externalPath": "/job/India---Hyderabad/ES-Position-Management-Ops-Analyst_JR362610"
+    },
+    {
+     "title": "Principal Technical Support Engineer",
+     "locationsText": "Japan - Tokyo",
+     "externalPath": "/job/Japan---Tokyo/Principal-Technical-Support-Engineer_JR359309-1"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 31,
+   "first_page": [
+    {
+     "title": "APAC Payroll Analyst",
+     "locationsText": "India - Hyderabad",
+     "externalPath": "/job/India---Hyderabad/Payroll-Analyst_JR359307"
+    },
+    {
+     "title": "Business Development Representative, Singapore Market",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Business-Development-Representative--Singapore-Market_JR354513"
+    },
+    {
+     "title": "AI Research Scientist, Singapore",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Research-Scientist-Senior-Research-Scientist---Salesforce-AI-Research-Singapore_JR274065"
+    },
+    {
+     "title": "Manager, Accounting - Compensation and Benefits",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Manager--Accounting_JR356373"
+    },
+    {
+     "title": "Principal Executive Assistant to President & CEO, JAPAC",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Principal-Executive-Assistant-to-President---CEO--JAPAC_JR362353"
+    },
+    {
+     "title": "Cloud Account Executive, Slack - Singapore & Vietnam Enterprise",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Cloud-Account-Executive--Slack---Singapore-Enterprise_JR355355"
+    },
+    {
+     "title": "Security GRC Senior Lead",
+     "locationsText": "Korea, Republic of - Seoul",
+     "externalPath": "/job/Korea-Republic-of---Seoul/Security-GRC-Senior-Lead_JR357826"
+    },
+    {
+     "title": "Partner Marketing Lead",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Partner-Marketing-Lead_JR360025"
+    },
+    {
+     "title": "Lead Solution Engineer  - Public Sector",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Lead-Solution-Engineer----Public-Sector_JR359714"
+    },
+    {
+     "title": "Instructors Senior-FY27-Q3",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/India---Hyderabad/Instructors-Senior-FY27-Q3_JR355901"
+    },
+    {
+     "title": "Instructors Senior-FY27-Q3",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/India---Hyderabad/Instructors-Senior-FY27-Q3_JR355904"
+    },
+    {
+     "title": "Principal, Industry Solution Engineer - Energy & Utilities",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Lead-Industry-Solution-Engineer_JR351402"
+    },
+    {
+     "title": "Named Account Executive - Public Sector (Singapore)",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Named-Account-Executive---Public-Sector--Singapore-_JR358691-1"
+    },
+    {
+     "title": "Principal, Industry Solution Engineer - Travel, Transport and Hospitality",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Principal--Industry-Solution-Engineer---Travel--Transport-and-Hospitality_JR358304"
+    },
+    {
+     "title": "Principal, Industry Solution Engineer - Insurance",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Principal--Industry-Solution-Engineer---Insurance_JR358307"
+    },
+    {
+     "title": "Account Executive - ESMB, Philippines market",
+     "locationsText": "Philippines - Metro Manila",
+     "externalPath": "/job/Philippines---Metro-Manila/Account-Executive---ESMB--Philippines-market_JR355878"
+    },
+    {
+     "title": "Business Development Representative, Indonesia Market",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Business-Development-Representative--Indonesia-Market_JR355888"
+    },
+    {
+     "title": "Business Development Representative, Vietnam Market",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Business-Development-Representative--Vietnam-Market_JR356370"
+    },
+    {
+     "title": "Senior Solution Engineer, Malaysia",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Senior-Solution-Engineer--Malaysia_JR355022"
+    },
+    {
+     "title": "Cloud Account Executive - Marketing Cloud, Malaysia Market",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Cloud-Account-Executive---Marketing-Cloud--Malaysia-Market_JR355706"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 1,
+   "first_page": [
+    {
+     "title": "AI Research Scientist, Singapore",
+     "locationsText": "Singapore - Singapore",
+     "externalPath": "/job/Singapore---Singapore/Research-Scientist-Senior-Research-Scientist---Salesforce-AI-Research-Singapore_JR274065"
+    }
+   ]
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 1523,
+ "sg_search_total": 31,
+ "sg_ds_first_page_matches": [],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

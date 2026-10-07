@@ -1,0 +1,279 @@
+{
+ "company_key": "globalfoundries",
+ "ats": "workday",
+ "identifiers": {
+  "host": "globalfoundries.wd1.myworkdayjobs.com",
+  "tenant": "globalfoundries",
+  "site": "External"
+ },
+ "checked_at": "2026-10-07T14:59:13+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://globalfoundries.wd1.myworkdayjobs.com/robots.txt",
+  "http_status": 200,
+  "path_checked": "/wday/cxs/globalfoundries/External/jobs",
+  "allowed": true,
+  "body_excerpt": "Sitemap: https://globalfoundries.wd1.myworkdayjobs.com/External/siteMap.xml\n\nUser-agent: *\nAllow: /External/\nDisallow: /refreshFacet/"
+ },
+ "endpoint": {
+  "method": "POST",
+  "url": "https://globalfoundries.wd1.myworkdayjobs.com/wday/cxs/globalfoundries/External/jobs",
+  "body": {
+   "appliedFacets": {},
+   "limit": 20,
+   "offset": 0,
+   "searchText": "<q>"
+  }
+ },
+ "calls": {
+  "all": {
+   "http_status": 200,
+   "total": 735,
+   "first_page": [
+    {
+     "title": "Silicon Photonic (SiPh) Sort Test Engineer",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Essex-Junction/Silicon-Photonic--SiPh--Sort-Test-Engineer_JR-2601311"
+    },
+    {
+     "title": "Principal Eng Reliability \u2013 RF Reliability",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/USA---New-York---Malta/Principal-Eng-Reliability---RF-Reliability_JR-2605519"
+    },
+    {
+     "title": "Photonics Technology Development FEOL Integration",
+     "locationsText": "USA - New York - Malta",
+     "externalPath": "/job/USA---New-York---Malta/Photonics-Technology-Development-FEOL-Integration_JR-2605447"
+    },
+    {
+     "title": "PMTS Application Engineering (MIPS)",
+     "locationsText": "Seoul",
+     "externalPath": "/job/Seoul/PMTS-Application-Engineering--MIPS-_JR-2603195"
+    },
+    {
+     "title": "Member of the Technical Staff, IP Engineering",
+     "locationsText": "Hsinchu",
+     "externalPath": "/job/Hsinchu/Member-of-the-Technical-Staff--IP-Engineering_JR-2605302"
+    },
+    {
+     "title": "Sr Manager / Deputy Director - Ecosystem Platform & Solutions",
+     "locationsText": "6 Locations",
+     "externalPath": "/job/Singapore/Sr-Manager---Deputy-Director---Ecosystem-Platform---Solutions_JR-2602967"
+    },
+    {
+     "title": "Director, Advanced Package Assembly and Test Engineering (Taiwan Supplier Development )",
+     "locationsText": "OFFSITE - TWN - Taiwan",
+     "externalPath": "/job/OFFSITE---TWN---Taiwan/Director--Advanced-Package-Assembly-and-Test-Engineering--Taiwan-Supplier-Development--_JR-2603512"
+    },
+    {
+     "title": "Sr Manager/Deputy Director - IP Engineering",
+     "locationsText": "Hsinchu",
+     "externalPath": "/job/Hsinchu/Principal-Member-of-the-Technical-Staff---IP-Engineering_JR-2602824"
+    },
+    {
+     "title": "SMTS -   Field Application Engineering",
+     "locationsText": "Hsinchu",
+     "externalPath": "/job/Hsinchu/SMTS-----Field-Application-Engineering_JR-2604959"
+    },
+    {
+     "title": "PMTS Application Engineering",
+     "locationsText": "Seoul",
+     "externalPath": "/job/Seoul/PMTS-Application-Engineering_JR-2602784-1"
+    },
+    {
+     "title": "Deputy Director / Sr Manager - IoT Segment Leader Physical AI",
+     "locationsText": "3 Locations",
+     "externalPath": "/job/SHANGHAI/Manager---Sr-Manager---IoT-Segment-Leader-Physical-AI_JR-2602558"
+    },
+    {
+     "title": "MTS - Design Enablement (PDK, Pcell developer)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/MTS---Design-Enablement--PDK-Technical-Program-Management-_JR-2600273"
+    },
+    {
+     "title": "Senior Member of the Technical Staff",
+     "locationsText": "Hsinchu",
+     "externalPath": "/job/Hsinchu/Senior-Member-of-the-Technical-Staff_JR-2602825"
+    },
+    {
+     "title": "Intern - Fab Engineering\u00a0(AE)",
+     "locationsText": "Penang",
+     "externalPath": "/job/Penang/Intern---Fab-Engineering--AE-_JR-2504307"
+    },
+    {
+     "title": "Associate Engineer (AE) Process Engineering  \u2013 New College Graduate (Diploma Graduate)",
+     "locationsText": "Penang",
+     "externalPath": "/job/Penang/Associate-Engineer---Engineer---Penang_JR-2501592"
+    },
+    {
+     "title": "Trainee - Associate Engineer Process Engineering (GTP)",
+     "locationsText": "Penang",
+     "externalPath": "/job/Penang/Trainee---Associate-Engineer-Process-Engineering--GTP-_JR-2504132"
+    },
+    {
+     "title": "Sr Analyst Information Security",
+     "locationsText": "IND - Karnataka - Bengaluru - North",
+     "externalPath": "/job/IND---Karnataka---Bengaluru---North/Sr-Analyst-Information-Security_JR-2605716-1"
+    },
+    {
+     "title": "Director of Product Management for Quantum Photonics, Quantum Technology Solutions",
+     "locationsText": "2 Locations",
+     "externalPath": "/job/Santa-Clara/Director-of-Product-Management-for-Quantum-Photonics--Quantum-Technology-Solutions_JR-2605488"
+    },
+    {
+     "title": "SMTS Process Module Engineer - Advanced Packaging Program (2.5D and 3D Heterogeneous Integration)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/SMTS-Process-Module-Engineer---Advanced-Packaging-Program--25D-and-3D-Heterogeneous-Integration-_JR-2600419"
+    },
+    {
+     "title": "Engineer, Equipment Engineering (Litho)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Engineer--Equipment-Engineering--Litho-_JR-2605369"
+    }
+   ]
+  },
+  "singapore": {
+   "http_status": 200,
+   "total": 243,
+   "first_page": [
+    {
+     "title": "Singapore Operations Training & Development, Senior Engineer",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Singapore-Operations-Training---Development--Senior-Engineer_JR-2600242"
+    },
+    {
+     "title": "GF Singapore Work Study Degree (WSDegree) Program",
+     "locationsText": null,
+     "externalPath": "/job/GF-Singapore-Work-Study-Degree--WSDegree--Program_JR-2504437"
+    },
+    {
+     "title": "Global Parts Solutions Repair Operations Leader \u2013 Singapore",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Global-Parts-Solutions-Repair-Operations-Leader---Singapore_JR-2603649"
+    },
+    {
+     "title": "Polytechnic Intern - Year 2026",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Polytechnic-Intern---Year-2026_JR-2503755"
+    },
+    {
+     "title": "University Intern - Year 2026",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/University-Intern---Year-2026_JR-2503754"
+    },
+    {
+     "title": "Engineer, Process Engineering (Litho)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Engineer--Process-Engineering--Litho-_JR-2503897"
+    },
+    {
+     "title": "2H University Intern - FR CMOS Device Engineering",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Intern---FR-CMOS_JR-2503753"
+    },
+    {
+     "title": "Platform Program Manager",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Program-manager---Power-Product-Development_JR-2501854"
+    },
+    {
+     "title": "Senior Member of Technical Staff \u2013 RRAM Technology and Architecture\u00a0",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Platform-Program-Manager_JR-2501882"
+    },
+    {
+     "title": "Principal Analyst Cost Accounting",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Principal-Analyst-Cost-Accounting_JR-2503874"
+    },
+    {
+     "title": "MTS of Process Integration",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/MTS-of-Process-Integration_JR-2504374"
+    },
+    {
+     "title": "Senior Engineer, Product Engineering (PVD)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Senior-Engineer--Process-Engineering--PVD-_JR-2504582-1"
+    },
+    {
+     "title": "Sr. Engineer, Process Engineering (SGP Fab 7, Photolithography)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Principal-Senior-Engineer--Process-Engineering--SGP-Fab7--Photolithography-_JR-2503909"
+    },
+    {
+     "title": "MTS -  RRAM Product Engineer",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/MTS----RRAM-Product-Engineer_JR-2503498"
+    },
+    {
+     "title": "MTS - Technology Development High Voltage Device",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/MTS---Technology-Development-High-Voltage-Device_JR-2504210"
+    },
+    {
+     "title": "Associate Engineer, Process Engineering (F7 Litho)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Associate-Engineer--Process-Engineering--F7-Litho-_JR-2504806"
+    },
+    {
+     "title": "Senior Engineer (Yield Defect Density)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Senior-Engineer--Yield-Defect-Density-_JR-2504657"
+    },
+    {
+     "title": "Associate Engineer, Equipment Engineering (Clean Tech)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Associate-Engineer--Equipment-Engineering--Clean-Tech-_JR-2504892"
+    },
+    {
+     "title": "Senior Engineer - Process Integration (RFSOI)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Principal-Device-Engineer---RFSOI_JR-2504782"
+    },
+    {
+     "title": "Associate Engineer, Equipment Engineering (F7 Implant)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Associate-Engineer--Equipment-Engineering--F7-Implant-_JR-2504912-1"
+    }
+   ]
+  },
+  "data_scientist_singapore": {
+   "http_status": 200,
+   "total": 4,
+   "first_page": [
+    {
+     "title": "Data Scientist",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Data-Scientist_JR-2601445"
+    },
+    {
+     "title": "Lead Java full stack developer- (Spring Boot, Angular)",
+     "locationsText": "IND - Karnataka - Bengaluru - North",
+     "externalPath": "/job/IND---Karnataka---Bengaluru---North/Lead-Java-full-stack-developer---Spring-Boot--Angular-_JR-2600051-1"
+    },
+    {
+     "title": "Software Engineer (AI Applications)",
+     "locationsText": "Singapore",
+     "externalPath": "/job/Singapore/Software-Engineer--AI-Applications-_JR-2605159"
+    },
+    {
+     "title": "Machine Learning & Generative AI Intern (Jan-Jun 2027)",
+     "locationsText": "SGP - Woodlands",
+     "externalPath": "/job/SGP---Woodlands/Machine-Learning---Generative-AI-Intern--Jan-Jun-2027-_JR-2604518"
+    }
+   ]
+  }
+ },
+ "http_status": 200,
+ "total_jobs": 735,
+ "sg_search_total": 243,
+ "sg_ds_first_page_matches": [
+  {
+   "title": "Data Scientist",
+   "locationsText": "Singapore",
+   "externalPath": "/job/Singapore/Data-Scientist_JR-2601445"
+  }
+ ],
+ "note": "Workday search totals are keyword-relevance counts, not an exact location filter; multi-location postings show 'N Locations'."
+}

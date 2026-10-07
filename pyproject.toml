@@ -9,7 +9,7 @@ description = "Daily EU job pipeline: fetch, filter, LLM fit-score, tailor, auto
 requires-python = ">=3.10"
 
 [tool.setuptools]
-packages = ["src", "src.sources", "src.apply"]
+packages = ["src", "src.sources", "src.apply", "src.singapore"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"

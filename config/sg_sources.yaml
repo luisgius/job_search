@@ -1,0 +1,175 @@
+# Singapore job boards and recruiters: access policy and manual-alert instructions.
+#
+# Evidence (robots.txt bodies and terms checks, 2026-10-07):
+#   tests/fixtures/sg_research/boards/board_policy_checks.json
+#   tests/fixtures/sg_research/boards/robots_*.txt
+# Details are in docs/SINGAPORE_RESEARCH.md.
+#
+# Policy rule: a source is polled automatically ONLY when automation_allowed is true.
+# Scraping is off whenever robots.txt or the terms prohibit it, or when the policy is unclear.
+# The monitor itself never uses accounts or logins; manual_alert steps are done by the user.
+# On 2026-10-07 no board qualifies, so every board below is a manual source with an
+# alert routine. The pipeline's company feeds come from config/sg_companies.yaml.
+#
+# frequency: daily | mwf (Mon/Wed/Fri) | weekly
+# source_type: mcf | board | recruiter
+
+sources:
+  - id: mcf
+    name: MyCareersFuture (Workforce Singapore)
+    type: manual
+    status: manual_check
+    automation_allowed: false
+    verified_url: https://www.mycareersfuture.gov.sg/search?search=data%20scientist&sortBy=new_posting_date
+    frequency: daily
+    source_type: mcf
+    fs: false
+    robots_url: https://www.mycareersfuture.gov.sg/robots.txt
+    terms_url: https://www.mycareersfuture.gov.sg/terms-of-use
+    terms_notes: >-
+      robots.txt allows everything (empty Disallow), and api.mycareersfuture.gov.sg/robots.txt is 404.
+      The Terms of Use page is a JS app whose text couldn't be read statically. A search snippet of the
+      MCF terms bars storing Website Content "in a retrieval system ... by any means ... without written
+      permission from WSG". Robots allows it but the terms are unclear-to-prohibitive, so it stays manual.
+      Don't call the internal api.mycareersfuture.gov.sg search endpoint.
+    manual_alert: >-
+      DAILY, about 5 minutes. Open verified_url (sorted newest first) and run each title in
+      config/sg_monitor.yaml search_terms; only look at postings from the last 7 days. Job-seeker
+      saved searches need a Singpass login, so bookmark the URLs instead. Treat any MCF ad as RADAR
+      ONLY. Under the Fair Consideration Framework employers advertise on MCF before filing an EP, so
+      an ad is NOT proof the employer will sponsor (MOM FCF page: employers "must first advertise on MyCareersFuture"). Shortlist only established employers with
+      a confirmed company identity outside government, statutory boards and defence. Record any
+      stated salary and flag it if below the configured EP minimum; unknown salary needs review.
+      Then check eligibility against MOM's official
+      EP page and COMPASS Self-Assessment Tool (see config/sg_monitor.yaml).
+
+  - id: efinancialcareers
+    name: eFinancialCareers Singapore
+    type: manual
+    status: manual_check
+    automation_allowed: false
+    verified_url: https://www.efinancialcareers.sg/jobs/data-scientist/in-singapore
+    frequency: mwf
+    source_type: board
+    fs: true
+    robots_url: https://www.efinancialcareers.sg/robots.txt
+    terms_url: https://www.efinancialcareers.com/terms-and-conditions
+    terms_notes: >-
+      robots.txt disallows /search, /v1 and /v3 for all agents, with crawl-delay 10. The terms page
+      served a CAPTCHA bot challenge (HTTP 405) to a plain client, so anti-bot protection is active.
+      No automation.
+    manual_alert: >-
+      MWF. Create an eFC account and email Job Alert for "data scientist" (also "machine learning
+      engineer" and "AI engineer"), location Singapore, daily frequency. Browse verified_url on
+      Mon/Wed/Fri. FS roles use the FS EP threshold.
+
+  - id: glints
+    name: Glints Singapore
+    type: manual
+    status: manual_check
+    automation_allowed: false
+    verified_url: https://glints.com/sg/opportunities/jobs/explore?keyword=data+scientist&country=SG
+    frequency: mwf
+    source_type: board
+    fs: false
+    robots_url: https://glints.com/robots.txt
+    terms_url: https://glints.com/sg/terms
+    terms_notes: >-
+      robots.txt disallows */opportunities/jobs/explore?*, which is the search results page. The
+      terms page returned 403 to a plain client. No automation.
+    manual_alert: >-
+      MWF. Sign in to Glints and turn on job alerts / "Job Recommendations" emails for Data Scientist
+      in Singapore, then open verified_url in a browser. Exclude unnamed companies; record company
+      size and flag fewer than 50 employees or unknown size as small_company, below established firms.
+
+  - id: techinasia
+    name: Tech in Asia Jobs
+    type: manual
+    status: manual_check
+    automation_allowed: false
+    verified_url: https://www.techinasia.com/jobs/search?query=data%20scientist&country_name[]=Singapore
+    frequency: mwf
+    source_type: board
+    fs: false
+    robots_url: https://www.techinasia.com/robots.txt
+    terms_url: https://www.techinasia.com/terms
+    terms_notes: >-
+      robots.txt and the terms page both returned HTTP 403 to a plain HTTPS client, so the policy can't
+      be determined and no automation is allowed.
+    manual_alert: >-
+      MWF. Browse verified_url in a browser (search parameters may need adjusting in the UI). Turn on
+      Tech in Asia job alert emails from a signed-in account if offered.
+
+  - id: michaelpage
+    name: Michael Page Singapore
+    type: manual
+    status: manual_check
+    automation_allowed: false
+    verified_url: https://www.michaelpage.com.sg/jobs/data-science
+    frequency: weekly
+    source_type: recruiter
+    fs: false
+    robots_url: https://www.michaelpage.com.sg/robots.txt
+    terms_url: https://www.michaelpage.com.sg/terms-and-conditions
+    terms_notes: >-
+      robots.txt for User-agent * ends with "Disallow: /", which blocks the whole site. No automation.
+    manual_alert: >-
+      WEEKLY. Register on michaelpage.com.sg and set a Job Alert for Data Science / Analytics,
+      Singapore. Recruiter ads often hide the employer; ask the consultant whether the client
+      sponsors EPs before investing time.
+
+  - id: robertwalters
+    name: Robert Walters Singapore
+    type: manual
+    status: manual_check
+    automation_allowed: false
+    verified_url: https://www.robertwalters.com.sg/jobs.html
+    frequency: weekly
+    source_type: recruiter
+    fs: false
+    robots_url: https://www.robertwalters.com.sg/robots.txt
+    terms_url: https://www.robertwalters.com.sg/
+    terms_notes: >-
+      robots.txt disallows every search-parameter URL (*?*q=, *?*specialization=, *?*location=, ...).
+      The guessed terms URLs returned 404, so the terms are unverified. No automation.
+    manual_alert: >-
+      WEEKLY. Set a Robert Walters job alert (account) for Data & Analytics / Technology, Singapore,
+      and browse verified_url.
+
+  - id: hays
+    name: Hays Singapore
+    type: manual
+    status: manual_check
+    automation_allowed: false
+    verified_url: https://www.hays.com.sg/
+    frequency: weekly
+    source_type: recruiter
+    fs: false
+    robots_url: https://www.hays.com.sg/robots.txt
+    terms_url: https://www.hays.com.sg/terms-and-conditions
+    terms_notes: >-
+      robots.txt disallows /job-search/* and /search?. The terms say verbatim: "No framing,
+      harvesting, "scraping" or other manipulation of the content of the Site is permitted." That is
+      prohibited, so no automation.
+    manual_alert: >-
+      WEEKLY. Create a Hays job alert for Data Scientist / Data & Analytics, Singapore.
+
+  - id: linkedin
+    name: LinkedIn Jobs (Singapore)
+    type: manual
+    status: manual_check
+    automation_allowed: false
+    verified_url: https://www.linkedin.com/jobs/search/?keywords=data%20scientist&location=Singapore&f_TPR=r604800
+    frequency: daily
+    source_type: board
+    fs: false
+    robots_url: https://www.linkedin.com/robots.txt
+    terms_url: https://www.linkedin.com/legal/user-agreement
+    terms_notes: >-
+      The User Agreement prohibits "software, devices, scripts, robots ... crawlers ... to scrape or
+      copy the Services", and robots.txt disallows job search for generic agents. Never fetch
+      linkedin.com.
+    manual_alert: >-
+      DAILY, done by the user only. In LinkedIn, the user creates Job Alerts for each title in
+      config/sg_monitor.yaml search_terms (location Singapore) and reads them personally. The
+      Singapore monitor never signs in to, reads or polls any account, mailbox or linkedin.com.

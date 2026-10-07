@@ -1,0 +1,54 @@
+{
+ "company_key": "openai",
+ "ats": "ashby",
+ "identifiers": {
+  "board": "openai"
+ },
+ "checked_at": "2026-10-07T15:05:47+00:00",
+ "user_agent": "JobHunterResearch/0.1 (personal job-search research; contact via repo owner; 1 req/s)",
+ "robots": {
+  "url": "https://api.ashbyhq.com/robots.txt",
+  "http_status": 401,
+  "path_checked": "/posting-api/job-board/openai",
+  "allowed": null,
+  "body_excerpt": "",
+  "robots_rules_present": false,
+  "access_basis": "No robots rules exist: HTTP 401 is 'Unavailable' under RFC 9309 s2.3.1.3 (4xx: crawler MAY access), combined with Ashby's documented public posting API (https://developers.ashbyhq.com/docs/public-job-posting-api). This is NOT an actual robots allow. The exception is limited to https://api.ashbyhq.com/posting-api/job-board/; robots 5xx/network (s2.3.1.4) and endpoint 401/403/429/5xx fail closed."
+ },
+ "endpoint": {
+  "method": "GET",
+  "url": "https://api.ashbyhq.com/posting-api/job-board/openai"
+ },
+ "http_status": 200,
+ "total_jobs": 823,
+ "sg_jobs": 38,
+ "sg_ds_matches": [
+  {
+   "title": "Applied AI Engineer",
+   "location": "[\"Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/openai/8acfba11-707e-4d8e-a860-88643fae24ba"
+  },
+  {
+   "title": "Applied AI Engineer, Cyber",
+   "location": "[\"Singapore\", []]",
+   "url": "https://jobs.ashbyhq.com/openai/29f15e50-1611-4256-afad-03b7df0b7aa7"
+  }
+ ],
+ "sg_sample_titles": [
+  "Child Safety Enforcement Specialist",
+  "Product Manufacturing Engineer",
+  "User Safety & Risk Operations Analyst - Global Response (Weekend Shift)",
+  "Senior Support Engineer - Singapore",
+  "Account Associate - Singapore (ANZ Market)",
+  "Applied AI Engineer",
+  "Applied AI Architect",
+  "Safety Response Operations Lead",
+  "Quality Engineer, Rack Infrastructure & Site Operations",
+  "Account Director, Large Enterprise (FSI)",
+  "Forward Deployed Engineer - Singapore",
+  "Deployment Lead (DL), FDE - Singapore",
+  "AI Support Engineer - Singapore (Korean Speaking)",
+  "APAC Sales Development Leader",
+  "APAC Vendor Lead, Ads - Sydney"
+ ]
+}
