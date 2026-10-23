@@ -114,9 +114,15 @@ sources:
   # freehire.me — keyless aggregator of ATS boards (Workday, Oracle, SAP …
   # employers no adapter here reaches). Its copies lose dedupe to the direct
   # record and never auto-apply. Queries in watchlist.yaml; docs/FREEHIRE_SOURCE.md.
-  freehire: false
+  # On since 2026-10-23: a live test returned 644 postings, 30 past the filters,
+  # the same morning every company board together passed 0.
+  freehire: true
   adzuna: false            # needs free keys from developer.adzuna.com
   linkedin_email: false    # needs gmail_credentials.json (see README)
+  # LinkedIn's public guest search. Breaks LinkedIn's Terms of Service; Luis
+  # accepted that on 2026-10-23. No account is used. Volume and back-off are
+  # set in watchlist.yaml (linkedin_search).
+  linkedin_search: true
 
 freshness:
   # 72, not 24 — and the reason is worth reading before you tighten it back.

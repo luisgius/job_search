@@ -402,12 +402,24 @@ def test_a_freehire_job_is_never_auto_applied_even_on_a_greenhouse_url(tmp_path)
 
 def test_the_source_is_off_by_default_and_a_cli_selection_cannot_turn_it_on(tmp_path):
     assert DEFAULTS["sources"]["freehire"] is False
-    shipped = Config.load(ROOT / "config.yaml", ROOT / "watchlist.yaml", root=ROOT, env={})
-    assert shipped.source_enabled("freehire") is False
-    assert shipped.watchlist["freehire"] == WATCHLIST_DEFAULTS["freehire"]
     cfg = write_config(tmp_path)
     assert "freehire" not in main_module._active_sources(cfg, None)
     assert "freehire" not in main_module._active_sources(cfg, ["freehire"])
+
+
+def test_the_shipped_config_turns_it_on_with_queries_that_validate():
+    """Switched on 2026-10-23, with queries for the non-Polish European
+    countries and for Singapore and Taiwan. A malformed query or a bound past
+    freehire's maximum would surface here, not as a digest error the next
+    morning."""
+    shipped = Config.load(ROOT / "config.yaml", ROOT / "watchlist.yaml", root=ROOT, env={})
+    assert shipped.source_enabled("freehire") is True
+    assert "freehire" in main_module._active_sources(shipped, None)
+    assert not [p for p in shipped.validate(require_llm=False) if "freehire" in p]
+    block = shipped.watchlist["freehire"]
+    assert len(block["queries"]) == 4
+    assert {"sg", "tw"} <= set(block["queries"][3]["countries"])
+    assert block["limit"] <= 100 and block["max_requests"] <= 20
 
 
 def test_when_on_it_is_dispatched_and_counted_like_any_source(tmp_path, monkeypatch):

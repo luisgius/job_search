@@ -30,7 +30,8 @@ sources ──┬─ Greenhouse boards ────┐
           ├─ No Fluff Jobs (PL)    │                               │
           ├─ freehire.me (opt-in)  │                               │
           ├─ Adzuna (optional)     │                               │
-          └─ LinkedIn email        ┘                               ▼
+          ├─ LinkedIn email        │                               │
+          └─ LinkedIn search (ToS) ┘                               ▼
    digest.html ◀── auto-apply ◀── PDF ◀── tailor CV + cover ◀── LLM fit score
    (source health · needs your click · auto-applied · dry-run · below threshold · run stats)
 ```

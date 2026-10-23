@@ -149,6 +149,10 @@ DEFAULTS: dict[str, Any] = {
         # copies lose dedupe to the direct record and never auto-apply.
         "freehire": False,
         "linkedin_email": False,
+        # LinkedIn's anonymous jobs-guest search. Against LinkedIn's Terms of
+        # Service (no account or cookie is sent; the risk is an IP block), so
+        # it ships OFF and is turned on only by someone who accepts that.
+        "linkedin_search": False,
     },
     "freshness": {
         "max_age_hours": DEFAULT_MAX_AGE_HOURS,
@@ -402,7 +406,7 @@ BOARD_SOURCE_NAMES: tuple[str, ...] = (
 #: Every source the config knows about, in fetch order.
 SOURCE_NAMES: tuple[str, ...] = BOARD_SOURCE_NAMES + (
     "adzuna", "arbeitnow", "landing_jobs", "justjoin_it", "nofluffjobs",
-    "allegro", "freehire", "linkedin_email",
+    "allegro", "freehire", "linkedin_email", "linkedin_search",
 )
 
 #: Search parameters `sources/freehire.py` sets itself. A query may not set
@@ -451,6 +455,18 @@ WATCHLIST_DEFAULTS: dict[str, Any] = {
         "max_days_old": 1,
         "results_per_page": 50,
         "distance_km": 0,
+    },
+    "linkedin_search": {
+        # keywords + location as typed into LinkedIn's search box; work_type
+        # is "remote", "hybrid" or "onsite" (LinkedIn's f_WT).
+        "queries": [
+            {"keywords": "data scientist", "location": "Poland"},
+            {"keywords": "machine learning engineer", "location": "Poland"},
+        ],
+        "past_hours": 24,       # LinkedIn's f_TPR window
+        "max_requests": 12,     # search pages per run, 10 cards each, shared
+        "max_descriptions": 30, # detail pages, only for cards past the filters
+        "delay_seconds": 2.0,   # between requests, jittered up to +50%
     },
     "linkedin_email": {
         "gmail_query": "from:jobalerts-noreply@linkedin.com newer_than:2d",
@@ -814,6 +830,39 @@ class Config:
                     f"sources.linkedin_email is on but {creds} is missing "
                     "(download OAuth desktop credentials from Google Cloud Console)"
                 )
+
+        if self.source_enabled("linkedin_search"):
+            settings = self.watchlist.get("linkedin_search")
+            settings = settings if isinstance(settings, dict) else {}
+            queries = settings.get("queries")
+            if not isinstance(queries, list) or not queries:
+                problems.append(
+                    "sources.linkedin_search is on but "
+                    "watchlist.linkedin_search.queries is empty"
+                )
+                queries = []
+            for index, query in enumerate(queries):
+                keywords = query.get("keywords") if isinstance(query, dict) else None
+                if not isinstance(keywords, str) or not keywords.strip():
+                    problems.append(
+                        f"watchlist.linkedin_search.queries[{index}] needs keywords"
+                    )
+                elif str(query.get("work_type") or "onsite").lower() not in (
+                    "remote", "hybrid", "onsite", "on-site"
+                ):
+                    problems.append(
+                        f"watchlist.linkedin_search.queries[{index}].work_type "
+                        "must be remote, hybrid or onsite"
+                    )
+            for name, maximum in (("max_requests", 40), ("max_descriptions", 80),
+                                  ("past_hours", 720)):
+                value = settings.get(name, WATCHLIST_DEFAULTS["linkedin_search"][name])
+                if isinstance(value, bool) or not isinstance(value, int) \
+                        or not 1 <= value <= maximum:
+                    problems.append(
+                        f"watchlist.linkedin_search.{name} must be an integer "
+                        f"1-{maximum}, got {value!r}"
+                    )
 
         # freehire's queries go to the API as written: a malformed one fetches
         # nothing, or the wrong market, every morning without a word.

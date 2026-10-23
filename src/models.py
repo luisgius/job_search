@@ -178,7 +178,7 @@ class Job:
     """
 
     # "greenhouse" | "lever" | "workable" | "ashby" | "smartrecruiters"
-    # | "personio" | "adzuna" | "linkedin_email"
+    # | "personio" | "adzuna" | "linkedin_email" | "linkedin_search" | …
     source: str
     company: str
     title: str

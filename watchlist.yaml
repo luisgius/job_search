@@ -76,7 +76,8 @@ greenhouse:
   - elastic          # VERIFIED 2026-09-01 · 345 · ML search/observability
   - canonical        # VERIFIED 2026-09-01 · 302 · all-remote EU
   - grafanalabs      # VERIFIED 2026-09-01 · 134 · remote EMEA
-  - remotecom        # VERIFIED 2026-09-01 · 206 · remote-EU DS roles
+  # remotecom removed 2026-10-23: HTTP 404 since mid-October. --discover found
+  # no new board; greenhouse/remote is an unrelated New York company.
   # --- Netherlands ---
   - adyen            # VERIFIED 2026-09-01 · 222 · payments DS/risk ML
   # --- Spain ---
@@ -90,7 +91,12 @@ greenhouse:
   - n26              # VERIFIED 2026-09-01 · 58 · fintech risk ML
   - getyourguide     # VERIFIED 2026-09-01 · 55 · marketplace ranking
   - celonis          # VERIFIED 2026-09-01 · 278 · process mining ML
-  - traderepublic    # VERIFIED 2026-09-01 · 1 · alive, quiet that day
+  # traderepublic answers but has been empty since late September; the live
+  # board moved to traderepublicbank (44 postings on 2026-10-23).
+  - traderepublicbank  # VERIFIED 2026-10-23 · 44 · Berlin fintech
+  - vinteden         # VERIFIED 2026-10-23 · 211 · Vinted; 4 Decision Scientist roles passed the filters
+  - feverup          # VERIFIED 2026-10-23 · 584 · Fever, Madrid; 1 passed
+  - swordhealth      # VERIFIED 2026-10-23 · 54 · Porto health ML, moved here from Lever
   - contentful       # VERIFIED 2026-09-01 · 3 · Berlin
   # --- Nordics + Denmark ---
   - trustpilot       # VERIFIED 2026-09-01 · 43 · review ML, Copenhagen
@@ -110,7 +116,8 @@ lever:
   # Round 1 (2026-09-01): swordhealth answered with a real board; the other
   # seven guesses 404'd (feverup seedtag clarityai wallbox unbabel scandit
   # factorial — likely on other vendors; feed them to --discover).
-  - swordhealth      # VERIFIED 2026-09-01 · 25 postings · Porto health ML
+  # swordhealth moved to Greenhouse (Lever board empty since September).
+  - spotify          # VERIFIED 2026-10-23 · 78 postings · Stockholm, left Greenhouse for Lever
 
 # ---------------------------------------------------------------------------
 # The four European boards.
@@ -133,16 +140,16 @@ workable:
   # a 200-with-zero here is a REAL tenant with nothing open today, worth one
   # request a day to catch the day that changes.
   - blueground       # VERIFIED 2026-09-01 · 20 postings · Athens/remote
-  - netdata          # VERIFIED 2026-09-01 · real tenant, 0 open that day
-  - hotjar           # VERIFIED 2026-09-01 · real tenant, 0 open that day
-  - toggl            # VERIFIED 2026-09-01 · real tenant, 0 open that day
-  - marfeel          # VERIFIED 2026-09-01 · real tenant, 0 open that day
+  - huggingface      # VERIFIED 2026-10-23 · 6 · EMEA-remote ML engineer passed
+  # netdata, hotjar, toggl and marfeel removed 2026-10-23: 0 open postings on
+  # every run in the logs (2026-10-08 onward) and on 2026-09-01.
 
 ashby:
   - ashby            # VERIFIED 2026-09-01 · 68 postings · the vendor itself
   - posthog          # VERIFIED 2026-09-01 · 13 · remote EU product analytics
   - linear           # VERIFIED 2026-09-01 · 28 · remote EU
   - supabase         # VERIFIED 2026-09-01 · 58 · remote EU
+  - photoroom        # VERIFIED 2026-10-23 · 11 · Paris; Product ML Engineer passed
   # deel answered 0 on 2026-09-01 — for a company hiring at Deel's volume an
   # empty board means "not their board", not "quiet day". Off until their
   # careers URL confirms the real address:
@@ -205,6 +212,7 @@ teamtailor:
   #   - https://careers.epidemicsound.com/jobs
   #   - https://careers.oda.com/jobs
   - https://career.teamtailor.com/jobs   # VERIFIED 2026-09-01 · 11 postings
+  - seedtag          # VERIFIED 2026-10-23 · 18 · Madrid adtech; Junior Data Scientist passed
 
 allegro:
   # Official public careers pages; no SAP credentials or application actions.
@@ -239,8 +247,16 @@ freehire:
     - work_mode: remote
       regions: [eu, global]
       category: [data_engineering, ai_engineering, data_analytics, data_science, ml_ai]
-  limit: 50          # hits per request; hard maximum 100
-  max_requests: 6    # per run, shared by the queries; hard maximum 20
+    # The rest of filters.countries. Added 2026-10-23: of 30 postings past the
+    # filters in a live test, 19 came from this query (IT, FR, BE, SE, DE, CH).
+    - countries: [es, nl, de, ie, pt, dk, se, fi, no, ch, at, be, fr, it, ee, cz, lu]
+      category: [data_engineering, ai_engineering, data_analytics, data_science, ml_ai]
+    # Singapore and Taiwan, added 2026-10-23 (1,367 postings in these
+    # categories that day).
+    - countries: [sg, tw]
+      category: [data_engineering, ai_engineering, data_analytics, data_science, ml_ai]
+  limit: 100         # hits per request; hard maximum 100
+  max_requests: 12   # per run, shared by the queries; hard maximum 20
   exclude_upstream: [whatjobs-pl, energyjobline]   # aggregators, not employers
 
 adzuna:
@@ -278,3 +294,28 @@ linkedin_email:
   credentials_file: gmail_credentials.json
   token_file: gmail_token.json
   fetch_descriptions: true
+
+linkedin_search:
+  # LinkedIn's anonymous jobs-guest search (sources.linkedin_search). Against
+  # LinkedIn's Terms of Service, accepted for personal use on 2026-10-23. No
+  # login or cookie is sent; the risk is LinkedIn refusing this IP for a while,
+  # and the first refusal stops LinkedIn requests for the rest of the run.
+  # keywords + location as typed into LinkedIn's search box; work_type is
+  # remote, hybrid or onsite.
+  queries:
+    - {keywords: "data scientist", location: "Poland"}
+    - {keywords: "machine learning engineer", location: "Poland"}
+    - {keywords: "AI engineer", location: "Poland"}
+    - {keywords: "data scientist", location: "European Union", work_type: remote}
+    - {keywords: "machine learning engineer", location: "European Union", work_type: remote}
+    - {keywords: "data scientist", location: "European Union"}
+    - {keywords: "data scientist", location: "Singapore"}
+    - {keywords: "machine learning engineer", location: "Singapore"}
+    - {keywords: "data scientist", location: "Taiwan"}
+    - {keywords: "machine learning engineer", location: "Taiwan"}
+  past_hours: 24        # LinkedIn's posted-within window; runs are daily
+  max_requests: 28      # search pages per run (10 cards each), shared; max 40
+  # A live run on 2026-10-23 had 41 cards past the filters; 30 left 14 of
+  # them undescribed, and an undescribed card is held back, not scored.
+  max_descriptions: 60  # detail pages, only for cards past title + location; max 80
+  delay_seconds: 2.0    # between LinkedIn requests, jittered up to +50%

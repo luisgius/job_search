@@ -36,7 +36,7 @@ from .db import Tracker
 from .models import ApplyStatus, Job, RunStats, ScoredJob, ensure_utc, utcnow
 from .sources import (
     adzuna, arbeitnow, ats_boards, justjoin_it, landing_jobs, linkedin_email,
-    nofluffjobs, allegro, freehire,
+    nofluffjobs, allegro, freehire, linkedin_search,
 )
 from .util import get_logger, open_in_browser, setup_logging
 
@@ -305,6 +305,9 @@ def _fetch_all(config: Any, active: set[str], stats: RunStats) -> list[Job]:
 
     if "linkedin_email" in active:
         jobs.extend(_safe_fetch("linkedin_email", linkedin_email.fetch, config, stats))
+
+    if "linkedin_search" in active:
+        jobs.extend(_safe_fetch("linkedin_search", linkedin_search.fetch, config, stats))
 
     # Seed a zero for every active source so the digest can tell "this board
     # had nothing today" apart from "this board was never asked".

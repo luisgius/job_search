@@ -21,8 +21,10 @@ from .models import Job, ensure_utc, utcnow
 MAX_DAYS = 90
 MAX_RESULTS = 500
 MAX_UNDATED = 50
-# Mail is excluded even when enabled in normal configuration.
-PUBLIC_SOURCES = tuple(name for name in SOURCE_NAMES if name != "linkedin_email")
+# Mail is excluded even when enabled in normal configuration, and so is
+# LinkedIn search: a 90-day exploration would multiply its request volume.
+PUBLIC_SOURCES = tuple(name for name in SOURCE_NAMES
+                       if name not in ("linkedin_email", "linkedin_search"))
 NOTICE = (
     "Unassessed opportunities; availability unknown. No fit scoring or availability "
     "checks were performed. Publication age does not establish that a role is open "

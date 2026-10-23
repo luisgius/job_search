@@ -235,6 +235,8 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         "sources.justjoin_it": _GLOBAL_FEEDS,
         "sources.nofluffjobs": _GLOBAL_FEEDS,
         "sources.allegro": "coverage roadmap: bounded collector replaces migrated tenant",
+        "sources.freehire": "on 2026-10-23: live test passed 30 postings, every company board 0",
+        "sources.linkedin_search": "on 2026-10-23: Luis accepted the LinkedIn ToS risk; live test passed 41",
         # Per-role presentations of the user's own CV — per-user identity,
         # like the applicant block: DEFAULTS ships no variants.
         "cv.variants": _APPLICANT,

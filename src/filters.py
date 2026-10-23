@@ -71,6 +71,7 @@ SOURCE_RANK: dict[str, int] = {
     "nofluffjobs": 2,
     "adzuna": 2,
     "linkedin_email": 1,
+    "linkedin_search": 1,
     # An aggregator of other boards: the lowest rank, and `_richness` also
     # lets any other source's full description beat its copy outright.
     "freehire": 1,
