@@ -165,12 +165,18 @@ def test_anchors_aliases_and_merge_keys_are_not_duplicates(tmp_path: Path):
 ROOT = Path(__file__).resolve().parent.parent
 
 
+#: Settings whose value may itself be a mapping: one chain entry
+#: ({model, base_url, timeout, …}), compared whole, never key by key.
+_ATOMIC = frozenset({"scoring.model", "tailoring.model"})
+
+
 def _flatten(data, prefix=""):
-    """Nested mapping -> {"a.b.c": value}. An empty dict is a leaf."""
+    """Nested mapping -> {"a.b.c": value}. An empty dict is a leaf, and so is
+    an `_ATOMIC` setting."""
     out = {}
     for key, value in (data or {}).items():
         dotted = f"{prefix}{key}"
-        if isinstance(value, dict) and value:
+        if isinstance(value, dict) and value and dotted not in _ATOMIC:
             out.update(_flatten(value, dotted + "."))
         else:
             out[dotted] = value
@@ -264,7 +270,7 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         "scoring.score_caps": _APPLICANT,
         # Validation period: a $0 OpenRouter model until the pipeline proves
         # itself on the user's machine; DEFAULTS keeps the real recommendation.
-        "scoring.model": "free-tier validation period",
+        "scoring.model": "local Qwen first since 2026-10-23; hosted :free ids behind it",
         # sources.lever was here while its watchlist had no verified tenant;
         # the Phase 3 round verified one and it flipped back to the default.
         "scoring.concurrency": "free-tier validation period (20 req/min cap)",

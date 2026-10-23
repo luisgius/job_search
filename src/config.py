@@ -712,7 +712,10 @@ class Config:
         # that once per job.
         if provider == "openrouter":
             for path in ("scoring.model", "tailoring.model"):
-                model = str(self.get(path) or "")
+                # The mapping form names its own endpoint; only a bare id
+                # goes to OpenRouter.
+                model = self.get(path)
+                model = "" if isinstance(model, dict) else str(model or "")
                 if model and "/" not in model:
                     problems.append(
                         f"{path} is {model!r}, but OpenRouter model ids are "
@@ -956,11 +959,16 @@ class Config:
         for role in ("scoring", "tailoring"):
             chain = self.get(f"{role}.fallback_models", [])
             if chain in (None, ""):
-                continue
+                chain = []
             if not isinstance(chain, list):
                 problems.append(f"{role}.fallback_models must be a list")
-                continue
-            for index, entry in enumerate(chain):
+                chain = []
+            # `<role>.model` in its mapping form gets the same checks.
+            primary = self.get(f"{role}.model")
+            labelled = ([(f"{role}.model", primary)] if isinstance(primary, dict) else [])
+            labelled += [(f"{role}.fallback_models[{index}]", entry)
+                         for index, entry in enumerate(chain)]
+            for label, entry in labelled:
                 if isinstance(entry, str) and entry.strip():
                     continue
                 if isinstance(entry, dict) and str(entry.get("model") or "").strip():
@@ -975,15 +983,15 @@ class Config:
                         or timeout < 1
                     ):
                         problems.append(
-                            f"{role}.fallback_models[{index}].timeout must be a "
+                            f"{label}.timeout must be a "
                             f"number of seconds, at least 1 — got {timeout!r}"
                         )
                     effort = entry.get("reasoning_effort")
                     if effort is not None and effort not in ("none", "low", "medium", "high"):
-                        problems.append(f"{role}.fallback_models[{index}].reasoning_effort must be none, low, medium or high")
+                        problems.append(f"{label}.reasoning_effort must be none, low, medium or high")
                     tokens = entry.get("max_tokens")
                     if tokens is not None and (type(tokens) is not int or not 1 <= tokens <= 32768):
-                        problems.append(f"{role}.fallback_models[{index}].max_tokens must be an integer from 1 to 32768")
+                        problems.append(f"{label}.max_tokens must be an integer from 1 to 32768")
                     retries = entry.get("max_retries")
                     if retries is not None and (
                         isinstance(retries, bool)
@@ -991,12 +999,12 @@ class Config:
                         or retries < 0
                     ):
                         problems.append(
-                            f"{role}.fallback_models[{index}].max_retries must "
+                            f"{label}.max_retries must "
                             f"be a whole number, 0 or more — got {retries!r}"
                         )
                     continue
                 problems.append(
-                    f"{role}.fallback_models[{index}] must be a model id or a "
+                    f"{label} must be a model id or a "
                     "mapping with `model` (and optional provider/base_url/"
                     "timeout/max_retries)"
                 )

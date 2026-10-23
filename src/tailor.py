@@ -29,7 +29,7 @@ from typing import Any
 
 from . import config as config_module
 from .filters import first_title_match
-from .llm import LLMError, chain_from_config
+from .llm import LLMError, chain_from_config, primary_model
 from .models import ApplyStatus, Artifacts, Job, ScoredJob, normalize_text
 from .posting_guard import clean_description, clean_field
 from .util import ensure_dir, get_logger, slugify, truncate
@@ -1299,7 +1299,7 @@ def tailor_job(
     it just arrives without documents.
     """
     job = scored.job
-    model = str(_cfg(config, "tailoring.model", DEFAULT_MODEL) or DEFAULT_MODEL)
+    model = primary_model(config, "tailoring", DEFAULT_MODEL)
     max_tokens = _int(_cfg(config, "tailoring.max_tokens", DEFAULT_MAX_TOKENS), DEFAULT_MAX_TOKENS)
     temperature = _float(
         _cfg(config, "tailoring.temperature", DEFAULT_TEMPERATURE), DEFAULT_TEMPERATURE

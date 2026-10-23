@@ -25,7 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from .llm import LLMError, chain_from_config, structured_mode, validate_json_result
+from .llm import LLMError, chain_from_config, primary_model, structured_mode, validate_json_result
 from .models import ApplyStatus, Job, Score, ScoredJob
 from .posting_guard import clean_description, clean_field, guard_job, is_flagged
 from .util import get_logger, truncate
@@ -628,7 +628,7 @@ def score_job(job: Job, cv_markdown: str, config: Any, *, client: Any = None) ->
             logger.warning("%s: %s", job.label, guard["verdict"])
     except Exception as exc:
         logger.warning("posting guard failed for %s: %s", job.label, exc)
-    model = str(_cfg(config, "scoring.model", DEFAULT_MODEL) or DEFAULT_MODEL)
+    model = primary_model(config, "scoring", DEFAULT_MODEL)
     max_tokens = _int(_cfg(config, "scoring.max_tokens", DEFAULT_MAX_TOKENS), DEFAULT_MAX_TOKENS)
     temperature = _float(
         _cfg(config, "scoring.temperature", DEFAULT_TEMPERATURE), DEFAULT_TEMPERATURE

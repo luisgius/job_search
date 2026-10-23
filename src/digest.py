@@ -42,6 +42,7 @@ from urllib.parse import urlsplit
 from . import health as health_module
 from . import posting_guard
 from .db import FINAL_STAGES, LABEL_STAGES, NON_SUBMITTING_STAGES, OUTCOME_STAGES
+from .llm import primary_model
 from .models import ApplyStatus, ScoredJob, ensure_utc, utcnow
 from .util import ensure_dir, get_logger, html_to_text, truncate
 
@@ -590,8 +591,8 @@ def _config_summary(config: Any) -> dict[str, Any]:
         "dry_run": bool(_cfg(config, "apply.dry_run", True)),
         "apply_enabled": bool(_cfg(config, "apply.enabled", False)),
         "apply_min_score": _int(_cfg(config, "apply.min_score", 80), 80),
-        "scoring_model": str(_cfg(config, "scoring.model", "") or ""),
-        "tailoring_model": str(_cfg(config, "tailoring.model", "") or ""),
+        "scoring_model": primary_model(config, "scoring", ""),
+        "tailoring_model": primary_model(config, "tailoring", ""),
         "tailoring_enabled": bool(_cfg(config, "tailoring.enabled", True)),
         "max_age_hours": _int(
             _cfg(config, "freshness.max_age_hours", DEFAULT_MAX_AGE_HOURS),

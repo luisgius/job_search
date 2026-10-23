@@ -1306,37 +1306,50 @@ def model_entries(config: Any, role: str) -> list[dict[str, Any]]:
           - google/gemma-4-31b-it:free
           - {model: "qwen3.8:27b", base_url: "http://localhost:11434/v1",
              timeout: 600, max_retries: 0}
+
+    `<role>.model` takes the same two forms, so the local model can lead the
+    chain with the hosted ones behind it.
     """
     entries: list[dict[str, Any]] = []
-    primary = str(_cfg(config, f"{role}.model", "") or "").strip()
-    if primary:
-        entries.append({"model": primary, "provider": None, "base_url": None,
-                        "timeout": None, "max_retries": None})
     raw = _cfg(config, f"{role}.fallback_models", []) or []
-    for item in raw if isinstance(raw, list) else []:
-        timeout = max_retries = None
-        if isinstance(item, Mapping):
-            model = str(item.get("model") or "").strip()
-            provider = str(item.get("provider") or "").strip().lower() or None
-            base_url = str(item.get("base_url") or "").strip() or None
-            # Whole seconds, at least one: int() would turn 0.5 into 0, which
-            # `LLMClient` reads as "not set" — the default, silently.
-            timeout = _entry_number(item.get("timeout"), minimum=1)
-            # 0 is a real value here, so None is the only "not set".
-            max_retries = _entry_number(item.get("max_retries"), minimum=0)
-        else:
-            model = str(item or "").strip()
-            provider = base_url = None
-        entry = {"model": model, "provider": provider, "base_url": base_url,
-                 "timeout": timeout, "max_retries": max_retries}
-        if isinstance(item, Mapping):
-            for key in ("reasoning_effort", "max_tokens"):
-                if key in item:
-                    entry[key] = item[key]
+    items = [_cfg(config, f"{role}.model", "")]
+    items += raw if isinstance(raw, list) else []
+    for item in items:
+        entry = _chain_entry(item)
         # A duplicate buys a second identical failure, nothing else.
-        if model and entry not in entries:
+        if entry["model"] and entry not in entries:
             entries.append(entry)
     return entries
+
+
+def _chain_entry(item: Any) -> dict[str, Any]:
+    """One chain entry from its config form: a model id, or a mapping."""
+    timeout = max_retries = None
+    if isinstance(item, Mapping):
+        model = str(item.get("model") or "").strip()
+        provider = str(item.get("provider") or "").strip().lower() or None
+        base_url = str(item.get("base_url") or "").strip() or None
+        # Whole seconds, at least one: int() would turn 0.5 into 0, which
+        # `LLMClient` reads as "not set" — the default, silently.
+        timeout = _entry_number(item.get("timeout"), minimum=1)
+        # 0 is a real value here, so None is the only "not set".
+        max_retries = _entry_number(item.get("max_retries"), minimum=0)
+    else:
+        model = str(item or "").strip()
+        provider = base_url = None
+    entry = {"model": model, "provider": provider, "base_url": base_url,
+             "timeout": timeout, "max_retries": max_retries}
+    if isinstance(item, Mapping):
+        for key in ("reasoning_effort", "max_tokens"):
+            if key in item:
+                entry[key] = item[key]
+    return entry
+
+
+def primary_model(config: Any, role: str, default: str) -> str:
+    """The name of the model `role` asks first, whichever form `<role>.model`
+    is written in."""
+    return _chain_entry(_cfg(config, f"{role}.model", "")).get("model") or default
 
 
 class ModelChain:
@@ -1478,7 +1491,11 @@ def chain_from_config(
         return client
     entries = model_entries(config, role)
     overrides = list(clients or [])
-    if len(entries) <= 1 and not overrides:
+    # A lone entry with its own transport (the local model, alone) still needs
+    # the chain's per-entry construction: `client_from_config` knows only the
+    # global provider and would send it to OpenRouter.
+    own_transport = bool(entries) and bool(entries[0]["base_url"] or entries[0]["provider"])
+    if len(entries) <= 1 and not overrides and not own_transport:
         return client if client is not None else client_from_config(config, **kwargs)
     pairs: list[tuple[Callable[[], Any], str]] = []
     kwargs.setdefault("limits", ProviderLimits())
