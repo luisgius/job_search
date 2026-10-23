@@ -848,6 +848,8 @@ def _persist(scored_jobs: list[ScoredJob], tracker: Any, now: datetime,
                 score=item.score_value,
                 score_reasons=(list(item.score.reasons)
                                if item.score and item.score.reasons else None),
+                score_gaps=(list(item.score.gaps)
+                            if item.score and item.score.gaps else None),
                 artifacts_dir=(item.artifacts.dir if item.artifacts else None),
                 full_text=_full_text(item.job),
                 now=now,

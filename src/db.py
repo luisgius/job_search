@@ -32,7 +32,7 @@ from .util import canonical_url, get_logger
 
 logger = get_logger(__name__)
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 MIGRATIONS: list[str] = [
     # v1 — initial schema
@@ -156,6 +156,13 @@ MIGRATIONS: list[str] = [
     # `handled_twin` reads unknown as "maybe only a snippet".
     """
     ALTER TABLE applications ADD COLUMN full_text INTEGER;
+    """,
+    # v7 — the scorer's gaps, kept beside its reasons. `python -m src.track
+    # gaps` counts which missing skills cost the most jobs; until this column
+    # the gaps list was printed in the digest and thrown away. JSON-encoded
+    # list, NULL when never scored or scored before v7.
+    """
+    ALTER TABLE applications ADD COLUMN score_gaps TEXT;
     """,
 ]
 
@@ -745,6 +752,7 @@ class Tracker:
         detail: str = "",
         score: int | None = None,
         score_reasons: list[str] | None = None,
+        score_gaps: list[str] | None = None,
         method: str = "",
         artifacts_dir: str | None = None,
         full_text: bool | None = None,
@@ -755,7 +763,8 @@ class Tracker:
         An `applied` row is never downgraded: once something has really been
         submitted, a later run recording `digest` must not erase that fact.
         `score_reasons` is the calibration data — JSON-encoded, and like the
-        score itself never erased by a later reason-less recording.
+        score itself never erased by a later reason-less recording; the same
+        holds for `score_gaps`.
         `full_text` says whether the copy judged had its full description;
         None keeps what is stored.
 
@@ -769,7 +778,8 @@ class Tracker:
         if existing in TERMINAL_APPLY_STATUSES and status_value not in TERMINAL_APPLY_STATUSES:
             return
         self._write_status(key, status_value, detail=detail, score=score,
-                           score_reasons=score_reasons, method=method,
+                           score_reasons=score_reasons, score_gaps=score_gaps,
+                           method=method,
                            artifacts_dir=artifacts_dir, full_text=full_text, stamp=stamp)
         self.conn.commit()
         if status_value in TERMINAL_APPLY_STATUSES and existing not in TERMINAL_APPLY_STATUSES:
@@ -786,6 +796,7 @@ class Tracker:
 
     def _write_status(self, key: str, status_value: str, *, detail: str = "",
                       score: int | None = None, score_reasons: list[str] | None = None,
+                      score_gaps: list[str] | None = None,
                       method: str = "", artifacts_dir: str | None = None,
                       full_text: bool | None = None, stamp: str) -> None:
         """The `applications` upsert alone: no downgrade check, no commit."""
@@ -793,18 +804,23 @@ class Tracker:
             json.dumps([str(r) for r in score_reasons], ensure_ascii=False)
             if score_reasons else None
         )
+        gaps_json = (
+            json.dumps([str(g) for g in score_gaps], ensure_ascii=False)
+            if score_gaps else None
+        )
         self.conn.execute(
             """
             INSERT INTO applications (key, status, detail, score, score_reasons,
-                                      method, artifacts_dir, full_text,
+                                      score_gaps, method, artifacts_dir, full_text,
                                       created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(key) DO UPDATE SET
                 status        = excluded.status,
                 detail        = excluded.detail,
                 score         = COALESCE(excluded.score, applications.score),
                 score_reasons = COALESCE(excluded.score_reasons,
                                          applications.score_reasons),
+                score_gaps    = COALESCE(excluded.score_gaps, applications.score_gaps),
                 method        = CASE WHEN excluded.method != ''
                                      THEN excluded.method ELSE applications.method END,
                 artifacts_dir = COALESCE(excluded.artifacts_dir,
@@ -812,7 +828,8 @@ class Tracker:
                 full_text     = COALESCE(excluded.full_text, applications.full_text),
                 updated_at    = excluded.updated_at
             """,
-            (key, status_value, detail, score, reasons_json, method, artifacts_dir,
+            (key, status_value, detail, score, reasons_json, gaps_json, method,
+             artifacts_dir,
              None if full_text is None else int(bool(full_text)), stamp, stamp),
         )
 
@@ -1216,6 +1233,33 @@ class Tracker:
             "VALUES (?,?,?,?,?)",
             (key, stage, str(note or "")[:2000], day, stamp),
         )
+
+    def scored_applications(self, since: str = "") -> list[dict[str, Any]]:
+        """Every job the model scored, recorded on or after the ISO timestamp
+        `since`: company, title, source, score, status and the decoded
+        `reasons` / `gaps` lists (empty when not stored)."""
+        rows = self.conn.execute(
+            """
+            SELECT j.key, j.company, j.title, j.source, a.status, a.score,
+                   a.score_reasons, a.score_gaps, a.updated_at
+            FROM applications a JOIN jobs j ON j.key = a.key
+            WHERE a.score IS NOT NULL AND a.updated_at >= ?
+            ORDER BY a.updated_at
+            """,
+            (since,),
+        ).fetchall()
+        scored = []
+        for row in rows:
+            item = dict(row)
+            for column, name in (("score_reasons", "reasons"), ("score_gaps", "gaps")):
+                try:
+                    decoded = json.loads(item.pop(column) or "[]")
+                except (TypeError, ValueError):
+                    decoded = []
+                item[name] = [str(entry) for entry in decoded] \
+                    if isinstance(decoded, list) else []
+            scored.append(item)
+        return scored
 
     def tracked_applications(self) -> list[dict[str, Any]]:
         """Every job with an outcome on record, oldest activity first.

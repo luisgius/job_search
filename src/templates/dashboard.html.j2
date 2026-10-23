@@ -1,0 +1,328 @@
+{#
+  The dashboard: the search in hindsight, from the tracker.
+
+  Rendered by src/dashboard.py with autoescape=True. Every value arrives
+  formatted, every bar arrives as a path; this template does no arithmetic.
+
+  NOTHING here may pass through |safe: companies, titles, URLs and sources are
+  text from the open internet, rendered in a file:// page.
+
+  Self-contained by requirement: inline CSS and inline SVG only. No script, no
+  font, no stylesheet, no CDN. It has to open from disk with the network off.
+#}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --bg: #f4f6f9;
+  --panel: #ffffff;
+  --panel-2: #f8fafc;
+  --ink: #14181f;
+  --muted: #5b6673;
+  --line: #e1e6ed;
+  --accent: #1b4dd8;
+  --bar: #2a78d6;
+  --marker: #14181f;
+  --warn: #9a6100;
+  --warn-bg: #fdf3e0;
+  --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 4px 16px rgba(16, 24, 40, .05);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --panel-2: #1c222b;
+    --ink: #e6ebf2;
+    --muted: #97a3b2;
+    --line: #262d38;
+    --accent: #7ba2ff;
+    --bar: #3987e5;
+    --marker: #e6ebf2;
+    --warn: #e5ad5a;
+    --warn-bg: #2c2213;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5);
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+a { color: var(--accent); }
+h1, h2, h3 { margin: 0; line-height: 1.25; }
+code {
+  font: 12.5px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+header { background: var(--panel); border-bottom: 1px solid var(--line); box-shadow: var(--shadow); }
+header .wrap { padding-top: 16px; padding-bottom: 14px; }
+header h1 { font-size: 20px; letter-spacing: -.01em; }
+.sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+nav { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 13px; }
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 20px 0 4px;
+}
+.tile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: var(--shadow);
+}
+.tile .v { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tile .k { color: var(--muted); font-size: 12.5px; }
+section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+  margin: 18px 0;
+}
+.sec-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 10px; }
+.sec-head h2 { font-size: 17px; }
+.sec-head .n { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+p { margin: 6px 0; }
+.empty, .note, .muted { color: var(--muted); }
+.note { font-size: 13px; }
+.chart { display: block; width: 100%; max-width: 720px; height: auto; margin: 8px 0 4px; }
+.chart text { font-size: 11.5px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.chart .value { fill: var(--ink); font-weight: 600; }
+/* A halo in the panel colour keeps a label legible where the marker crosses it. */
+.chart .value, .chart .marker-label { paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
+.chart .bar { fill: var(--bar); }
+.chart .hit { fill: transparent; }
+.chart .axis { stroke: var(--line); stroke-width: 1; }
+.chart .marker { stroke: var(--marker); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.chart .marker-label { fill: var(--ink); font-weight: 600; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.closed td { color: var(--muted); }
+.tag {
+  display: inline-block;
+  font-size: 11.5px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.handle { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); }
+.card { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 10px 0; background: var(--panel-2); }
+.card.stale { border-color: var(--warn); background: var(--warn-bg); }
+.card h3 { font-size: 15px; }
+.card .commands { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+footer { color: var(--muted); font-size: 12.5px; padding: 10px 0 30px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Job Hunter — the search so far</h1>
+    <div class="sub">Generated {{ generated }} from the tracker. Scores and skill gaps cover the last {{ days }} days (since {{ since }}). This page records nothing.</div>
+    <nav>
+      <a href="#funnel">Funnel</a>
+      <a href="#followups">Follow-ups</a>
+      <a href="#applications">Applications</a>
+      <a href="#scores">Scores</a>
+      <a href="#sources">Source yield</a>
+      <a href="#gaps">Skill gaps</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+
+<div class="tiles">
+  {% for tile in tiles %}
+  <div class="tile"><div class="v">{{ tile.value }}</div><div class="k">{{ tile.label }}</div></div>
+  {% endfor %}
+</div>
+
+<section id="funnel">
+  <div class="sec-head"><h2>Application funnel</h2><span class="n">each application at the furthest stage it reached</span></div>
+  {% if funnel %}
+  <svg class="chart" viewBox="0 0 {{ funnel.chart.width }} {{ funnel.chart.height }}" role="img" aria-label="{{ funnel.chart.label }}">
+    {% for bar in funnel.chart.bars %}
+    <g>
+      <title>{{ bar.label }}: {{ bar.value }}</title>
+      <text x="{{ bar.label_x }}" y="{{ bar.text_y }}" text-anchor="end">{{ bar.label }}</text>
+      {% if bar.path %}
+      <path class="bar" d="{{ bar.path }}"/>
+      {% endif %}
+      <text class="value" x="{{ bar.value_x }}" y="{{ bar.text_y }}">{{ bar.value }}</text>
+    </g>
+    {% endfor %}
+  </svg>
+  <p>Rejected or no response: <strong>{{ funnel.rejection_rate }}</strong>{% if funnel.final %} final outcomes{% endif %}.</p>
+  {% if funnel.by_source %}
+  <div class="scroll">
+    <table>
+      <thead><tr><th>source</th><th class="num">applied</th><th class="num">interview</th><th class="num">offer</th><th class="num">hired</th></tr></thead>
+      <tbody>
+        {% for row in funnel.by_source %}
+        <tr><td>{{ row.source }}</td><td class="num">{{ row.applied }}</td><td class="num">{{ row.interview }}</td><td class="num">{{ row.offer }}</td><td class="num">{{ row.hired }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% for stage in funnel.unrecognised %}<p class="note">Unrecognised stage in the tracker: {{ stage }}</p>{% endfor %}
+  {% else %}
+  <p class="empty">No application recorded yet. <code>python -m src.track mark HANDLE applied</code> records one; every digest card prints that line.</p>
+  {% endif %}
+</section>
+
+<section id="followups">
+  <div class="sec-head"><h2>Follow-ups due</h2><span class="n">{{ followups | length }}</span></div>
+  {% if followups %}
+  <p class="note">Quiet for {{ tracking.followup_days }}+ days is due a follow-up; {{ tracking.stale_days }}+ days is most likely closed. Run the command once you have acted.</p>
+  {% for row in followups %}
+  <div class="card {{ row.state }}">
+    <h3>{{ row.company }} — {{ row.title }}</h3>
+    <p class="muted">{{ row.summary }}{% if row.source %} · {{ row.source }}{% endif %}{% if row.link.href %} · <a href="{{ row.link.href }}" rel="noopener noreferrer">{{ row.link.text }}</a>{% endif %}</p>
+    <p>{{ row.advice }}</p>
+    <div class="commands">{% for command in row.commands %}<code>{{ command }}</code>{% endfor %}</div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="empty">Nothing due: no open application has been quiet for {{ tracking.followup_days }} days or more.</p>
+  {% endif %}
+</section>
+
+<section id="applications">
+  <div class="sec-head"><h2>Applications</h2><span class="n">{{ applications | length }} tracked, newest activity first</span></div>
+  {% if applications %}
+  <div class="scroll">
+    <table>
+      <thead><tr><th>handle</th><th>company</th><th>title</th><th>source</th><th>stage</th><th>last activity</th><th>posting</th></tr></thead>
+      <tbody>
+        {% for row in applications %}
+        <tr{% if row.closed %} class="closed"{% endif %}>
+          <td class="handle">{{ row.handle }}</td>
+          <td>{{ row.company }}</td>
+          <td>{{ row.title }}</td>
+          <td>{{ row.source or "—" }}</td>
+          <td>{{ row.stage or "—" }}{% if row.label %} <span class="tag">{{ row.label }}</span>{% endif %}</td>
+          <td>{{ row.last_activity or "—" }}</td>
+          <td>{% if row.link.href %}<a href="{{ row.link.href }}" rel="noopener noreferrer">{{ row.link.text }}</a>{% elif row.link.text %}<span class="muted">{{ row.link.text }}</span>{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">Nothing tracked yet: no application, dismissal or label has been recorded.</p>
+  {% endif %}
+</section>
+
+<section id="scores">
+  <div class="sec-head"><h2>Score distribution</h2><span class="n">last {{ days }} days</span></div>
+  {% if scores %}
+  <p><strong>{{ scores.passed }}</strong> of {{ scores.scored }} scored jobs at or above the threshold of {{ scores.threshold }}; median score {{ scores.median }}.</p>
+  <svg class="chart" viewBox="0 0 {{ scores.chart.width }} {{ scores.chart.height }}" role="img" aria-label="{{ scores.chart.label }}">
+    <line class="axis" x1="{{ scores.chart.left }}" x2="{{ scores.chart.right }}" y1="{{ scores.chart.baseline }}" y2="{{ scores.chart.baseline }}"/>
+    {# Bars, then the marker over them, then every label over both. #}
+    {% for column in scores.chart.columns %}
+    <g>
+      <title>{{ column.label }}: {{ column.count }} job{{ "" if column.count == 1 else "s" }}</title>
+      <rect class="hit" x="{{ column.hit_x }}" y="{{ scores.chart.top }}" width="{{ column.hit_w }}" height="{{ scores.chart.hit_h }}"/>
+      {% if column.path %}
+      <path class="bar" d="{{ column.path }}"/>
+      {% endif %}
+    </g>
+    {% endfor %}
+    <g class="threshold">
+      <title>threshold {{ scores.threshold }}: at or above it, a job reaches the digest's "needs your click"</title>
+      <line class="marker" x1="{{ scores.chart.marker_x }}" x2="{{ scores.chart.marker_x }}" y1="{{ scores.chart.marker_top }}" y2="{{ scores.chart.baseline }}"/>
+      <text class="marker-label" x="{{ scores.chart.marker_label_x }}" y="{{ scores.chart.marker_label_y }}" text-anchor="{{ scores.chart.marker_anchor }}">threshold {{ scores.threshold }}</text>
+    </g>
+    {% for column in scores.chart.columns %}
+    {% if column.count %}
+    <text class="value" x="{{ column.x }}" y="{{ column.count_y }}" text-anchor="middle">{{ column.count }}</text>
+    {% endif %}
+    <text x="{{ column.x }}" y="{{ scores.chart.axis_y }}" text-anchor="middle">{{ column.label }}</text>
+    {% endfor %}
+  </svg>
+  {% else %}
+  <p class="empty">No job scored in the last {{ days }} days.</p>
+  {% endif %}
+</section>
+
+<section id="sources">
+  <div class="sec-head"><h2>Source yield</h2>{% if sources %}<span class="n">{{ sources.runs }} finished run{{ "" if sources.runs == 1 else "s" }}, {{ sources.since }} to {{ sources.last }}</span>{% endif %}</div>
+  {% if sources %}
+  <div class="scroll">
+    <table>
+      <thead><tr><th>source</th><th class="num">runs</th><th class="num">fetched</th><th class="num">passed filters</th><th class="num">pass rate</th><th class="num">last run fetched</th><th class="num">last run passed</th></tr></thead>
+      <tbody>
+        {% for row in sources.rows %}
+        <tr>
+          <td>{{ row.name }}</td>
+          <td class="num">{{ row.runs }}</td>
+          <td class="num">{{ row.fetched }}</td>
+          <td class="num">{{ row.passed }}</td>
+          <td class="num">{{ row.rate }}</td>
+          <td class="num">{{ "—" if row.last_fetched is none else row.last_fetched }}</td>
+          <td class="num">{{ "—" if row.last_passed is none else row.last_passed }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="note">"Passed filters" is what reached dedupe and scoring. "—" under last run: the source was not in the most recent run.</p>
+  {% else %}
+  <p class="empty">No finished run with per-source counts in the last {{ runs_read }} runs. Run the pipeline once.</p>
+  {% endif %}
+</section>
+
+<section id="gaps">
+  <div class="sec-head"><h2>Skill gaps</h2><span class="n">{{ gaps.scored }} scored job{{ "" if gaps.scored == 1 else "s" }}, last {{ days }} days</span></div>
+  {% if gaps.rows %}
+  <div class="scroll">
+    <table>
+      <thead><tr><th>skill</th><th>kind</th><th class="num">jobs</th><th class="num">near misses</th><th class="num">avg score</th><th>best-scored jobs behind it</th></tr></thead>
+      <tbody>
+        {% for row in gaps.rows %}
+        <tr>
+          <td>{{ row.name }}</td>
+          <td>{{ row.kind }}{% if row.minor %} <span class="tag">minor</span>{% endif %}</td>
+          <td class="num">{{ row.jobs }}</td>
+          <td class="num">{{ row.near_misses }}</td>
+          <td class="num">{{ row.average }}</td>
+          <td class="muted">{{ row.examples | join("; ") }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Near misses are jobs scored {{ gaps.near_low }}–{{ gaps.threshold - 1 }}: one gap closed there is the difference between the digest and the bin. "minor" is listed in <code>scoring.minor_gaps</code>, so it already costs only a few points.{% if gaps.total > gaps.rows | length %} Top {{ gaps.rows | length }} of {{ gaps.total }}; <code>python -m src.track gaps</code> prints the rest.{% endif %}</p>
+  {% if gaps.unrecognised %}<p class="note">{{ gaps.unrecognised }} job(s) had gaps no vocabulary term matched (src/skill_gaps.py VOCABULARY).</p>{% endif %}
+  {% elif gaps.scored %}
+  <p class="empty">No gap from the vocabulary was found in {{ gaps.scored }} scored job{{ "" if gaps.scored == 1 else "s" }}.</p>
+  {% else %}
+  <p class="empty">No job scored in the last {{ days }} days, so no gaps to count.</p>
+  {% endif %}
+</section>
+
+</main>
+<footer class="wrap">Built by <code>python -m src.track dashboard</code>. A view of the tracker: re-run it to refresh.</footer>
+</body>
+</html>

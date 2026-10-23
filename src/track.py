@@ -7,6 +7,11 @@ Run ``python -m src.track <command>``:
   list [--open]
   report
   export [--out PATH]
+  gaps [--days N]      which missing skills cost the most jobs (src/skill_gaps.py)
+  prep HANDLE          interview prep pack from a local model (src/interview_prep.py)
+  dashboard [--out PATH] [--days N]
+                       one offline HTML page: funnel, follow-ups, scores, source
+                       yield, skill gaps (src/dashboard.py)
 
 HANDLE is a full job key, a unique key prefix (6+ characters) or the posting
 URL (tracking parameters such as ?gh_src= ignored); the digest prints the
@@ -37,15 +42,16 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import parse_qsl, urlsplit
 
-from . import digest
+from . import dashboard, digest, interview_prep, skill_gaps
 from .config import Config, ConfigError
 from .db import (
     LABEL_STAGES, MIN_KEY_PREFIX, OUTCOME_STAGES, TERMINAL_APPLY_STATUSES,
     NON_SUBMITTING_STAGES, OutcomeClosedError, Tracker, normalize_stage,
 )
+from .llm import LLMError
 from .models import ApplyStatus, Job, ensure_utc, utcnow
 
-COMMANDS = ("mark", "add", "list", "report", "export")
+COMMANDS = ("mark", "add", "list", "report", "export", "gaps", "prep", "dashboard")
 
 #: One row per event, so a spreadsheet can pivot on stage or source.
 EXPORT_COLUMNS: tuple[str, ...] = (
@@ -267,6 +273,27 @@ def funnel_lines(funnel: Mapping[str, Any] | None) -> list[str]:
     return lines
 
 
+def _prep(tracker: Tracker, args: argparse.Namespace, config: Config) -> int:
+    if not args.handle:
+        raise _UsageError("prep needs a HANDLE: a job key, key prefix or posting URL")
+    row = _resolve(tracker, args.handle)
+    application = tracker.get_application(row["key"]) or {}
+    folder = application.get("artifacts_dir")
+    if not folder or not Path(folder).is_dir():
+        print(f"refused: {_job_line(row)} has no application folder; prep is built "
+              "from the posting, CV and cover letter the pipeline saved there",
+              file=sys.stderr)
+        return 1
+    print(f"{_job_line(row)}\nwriting the prep pack with the local model — a few minutes")
+    try:
+        path = interview_prep.write_prep(Path(folder), config)
+    except (interview_prep.PrepError, LLMError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 1
+    print(f"wrote {path}")
+    return 0
+
+
 def _export(tracker: Tracker, args: argparse.Namespace, config: Config) -> int:
     path = Path(args.out) if args.out else config.output_dir / "applications.csv"
     rows = tracker.outcome_events()
@@ -286,7 +313,7 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("command", choices=COMMANDS)
-    parser.add_argument("handle", nargs="?", help="mark: job key, 6+ character key prefix, or posting URL")
+    parser.add_argument("handle", nargs="?", help="mark, prep: job key, 6+ character key prefix, or posting URL")
     parser.add_argument("stage", nargs="?", help="mark: one of " + ", ".join(OUTCOME_STAGES + LABEL_STAGES))
     parser.add_argument("--on", type=_day, metavar="YYYY-MM-DD", help="when it happened (default: today)")
     parser.add_argument("--note", default="", help="free text kept with the event")
@@ -296,7 +323,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--location", help="add: city, country — the city is what matches a repost")
     parser.add_argument("--url", help="add: the posting you applied through")
     parser.add_argument("--open", action="store_true", help="list: only applications still waiting on an outcome")
-    parser.add_argument("--out", help="export: CSV path (default: <output.dir>/applications.csv)")
+    parser.add_argument("--out", help="export: CSV path (default: <output.dir>/applications.csv); "
+                        "dashboard: HTML path (default: <output.dir>/dashboard.html)")
+    parser.add_argument("--days", type=int, default=90, help="gaps, dashboard: look back this many days (default: %(default)s)")
     parser.add_argument("--config", default="config.yaml", help="path to config.yaml (default: %(default)s)")
     parser.add_argument("--watchlist", default="watchlist.yaml", help="path to watchlist.yaml (default: %(default)s)")
     return parser
@@ -327,6 +356,21 @@ def main(argv: list[str] | None = None, *, today: date | None = None,
                 return _list(tracker, args)
             if args.command == "report":
                 print("\n".join(funnel_lines(digest.application_funnel(tracker.outcome_events()))))
+                return 0
+            if args.command == "prep":
+                return _prep(tracker, args, config)
+            if args.command == "dashboard":
+                if args.days < 1:
+                    raise _UsageError("--days must be at least 1")
+                out = Path(args.out) if args.out else config.output_dir / "dashboard.html"
+                path = dashboard.write_dashboard(tracker, config, out, now=moment, days=args.days)
+                print(f"wrote {path}")
+                return 0
+            if args.command == "gaps":
+                if args.days < 1:
+                    raise _UsageError("--days must be at least 1")
+                report = skill_gaps.gap_report(tracker, config, days=args.days, now=moment)
+                print("\n".join(skill_gaps.report_lines(report)))
                 return 0
             return _export(tracker, args, config)
     except _UsageError as exc:

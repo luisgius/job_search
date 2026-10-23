@@ -133,7 +133,27 @@ python -m src.track add --company "Acme" --title "Data Scientist" \
 python -m src.track list --open                  # still waiting on an answer
 python -m src.track report                       # applied -> interview -> offer -> hired
 python -m src.track export                       # output/applications.csv, one row per event
+python -m src.track gaps --days 90               # which missing skills cost the most jobs
+python -m src.track prep 3f9c2a1b                # interview prep pack, local Ollama model only
+python -m src.track dashboard                    # output/dashboard.html: funnel, follow-ups, scores, source yield, gaps
 ```
+
+`gaps` counts the scorer's gaps (stored since tracker schema v7; older rows
+are read from the "does not mention …" clauses of their reasons) against your
+CV: a skill the CV shows is never a gap. Near misses, jobs within 15 points
+under the threshold, rank first: one gap closed there would have put a job in
+the digest. `(minor)` marks skills listed in `scoring.minor_gaps`.
+
+`prep` writes `interview_prep.md` into the job's application folder from the
+posting and the CV and cover letter that were sent — what the interviewer has
+read. It runs only on a `scoring`/`tailoring` chain entry served from
+localhost (the Ollama fallback) and refuses rather than use a hosted model.
+It takes a few minutes on a 27B model.
+
+`dashboard` writes one offline HTML page (no scripts, no CDN) from the
+tracker: the application funnel, follow-ups due, the score distribution with
+the threshold marked, per-source yield over the last 30 runs, and the skill
+gaps. Open it from disk.
 
 The handle is a full key, a unique key prefix of six or more characters
 (the digest prints eight) or the posting URL (tracking parameters such as

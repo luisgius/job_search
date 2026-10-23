@@ -1178,7 +1178,7 @@ def test_migration_v5_keeps_every_row_and_backfills_applied_events(tmp_path):
     conn.close()
 
     with Tracker(path) as tracker:
-        assert tracker.conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS) == 6
+        assert tracker.conn.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS) == 7
         assert tracker.counts_by_status() == {
             "applied": 1, "submitted_unconfirmed": 1, "digest": 1, "filtered": 1}
         assert tracker.conn.execute("SELECT count(*) FROM jobs").fetchone()[0] == 4
