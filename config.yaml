@@ -435,13 +435,15 @@ scoring:
   # The positioning states what a CV structurally cannot: total experience
   # ("1.5 years" — the CV lists jobs, not a sum) and the honest gap.
   candidate_context: |
-    Total experience: ~1.5 years as a Data Scientist (Uber: supply/driver
-    forecasting for marketplace operations; Buynomics: revenue prediction and
-    clustering for a Tier-1 CPG client). Strengths: tabular ML, time-series
-    forecasting, LightGBM, SQL at scale, product analytics, causal inference
-    and experimental design. Real gap: no deep NLP or LLM *research*
-    experience — one production RAG project (thesis), no transformer
-    fine-tuning, no publications.
+    Total experience: ~1.5 years as a Data Scientist (Uber, Mar–Oct 2026:
+    driver-reactivation forecasting with conformal intervals and a
+    difference-in-differences churn study; Buynomics: price-response
+    simulation, purchase-decision models and clustering for a CPG client).
+    Available now. Strengths: tabular ML, time-series forecasting, LightGBM,
+    SQL at scale, causal inference, honest validation. Real gap: no deep NLP
+    or LLM *research* experience — one RAG project (thesis, offline
+    evaluation), no transformer fine-tuning, no publications; no PyTorch or
+    production deep-learning work on the CV.
     Search preference: European roles, Singapore and Taiwan (relocating; needs
     an employer-sponsored work pass there), plus fully remote roles explicitly
     open worldwide. Works in English and Spanish only. Worldwide remote is an accepted work arrangement, not proof of
@@ -459,13 +461,12 @@ scoring:
   # costs a few points instead of sinking the score. 2026-10-23: P&G Warsaw
   # scored 45 mostly for "no GCP, BigQuery, Kubernetes, Databricks".
   minor_gaps:
-    - Google Cloud (GCP), Vertex AI (CV has AWS and Azure)
+    - Google Cloud (GCP), Vertex AI, Azure (CV has AWS)
     - BigQuery, Snowflake, Redshift, Databricks, Hive, Trino (CV has Spark,
       Presto and SQL at scale)
     - Airflow, Cloud Composer, Dagster, Prefect (CV has Python ETL pipelines)
-    - Kubernetes for deploying models, MLflow, SageMaker (CV has Docker,
+    - Kubernetes for deploying models, MLflow (CV has Docker, AWS SageMaker,
       FastAPI and API deployment)
-    - TensorFlow, Keras, JAX (CV has PyTorch)
     - XGBoost, CatBoost (CV has LightGBM)
     - Tableau, Looker, Superset (CV has Power BI)
   # Ceilings the model must respect, each one a lesson a real rejection
