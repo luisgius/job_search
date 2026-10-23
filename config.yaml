@@ -429,6 +429,20 @@ scoring:
     - marketplace or operations analytics
     - experimentation, A/B testing
     - causal inference
+  # Tools you lack but would pick up fast from what the CV shows. Missing one
+  # still shows in `gaps` (and is never claimed in a CV or letter); it just
+  # costs a few points instead of sinking the score. 2026-10-23: P&G Warsaw
+  # scored 45 mostly for "no GCP, BigQuery, Kubernetes, Databricks".
+  minor_gaps:
+    - Google Cloud (GCP), Vertex AI (CV has AWS and Azure)
+    - BigQuery, Snowflake, Redshift, Databricks, Hive, Trino (CV has Spark,
+      Presto and SQL at scale)
+    - Airflow, Cloud Composer, Dagster, Prefect (CV has Python ETL pipelines)
+    - Kubernetes for deploying models, MLflow, SageMaker (CV has Docker,
+      FastAPI and API deployment)
+    - TensorFlow, Keras, JAX (CV has PyTorch)
+    - XGBoost, CatBoost (CV has LightGBM)
+    - Tableau, Looker, Superset (CV has Power BI)
   # Ceilings the model must respect, each one a lesson a real rejection
   # taught. Samba TV: interviewed, rejected for exactly this — an hour of
   # tailoring on such a loop is spent knowing the ending. The job still
@@ -437,6 +451,11 @@ scoring:
     - when: "requires deep NLP research, LLM research, or transformer
         fine-tuning experience (not merely using LLM APIs or RAG)"
       cap: 60
+    # A role built on a language the CV does not have is not a gap to close
+    # on the job. A nice-to-have mention does not count.
+    - when: "is built mainly in a programming language the CV does not list
+        (Rust, Scala, Java, C++, Go, C#) and requires it"
+      cap: 40
 
 tailoring:
   enabled: true

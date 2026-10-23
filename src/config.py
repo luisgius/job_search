@@ -278,6 +278,7 @@ DEFAULTS: dict[str, Any] = {
         # the shipped example. None of these move threshold or max_jobs.
         "candidate_context": "",
         "positive_signals": [],
+        "minor_gaps": [],
         "score_caps": [],
         # Off: caps stay prompt-only, exactly as above. On: each cap is named
         # by its `id` (default `cap-<n>`) and a score is held, in code, to

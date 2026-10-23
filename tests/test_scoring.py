@@ -420,6 +420,33 @@ def test_a_bare_string_signal_is_one_signal_not_zero():
     assert "- time-series forecasting" in rules
 
 
+def test_minor_gaps_render_as_a_reported_but_cheap_gap():
+    """A posting asking for GCP when the CV has AWS is a few points, not a
+    skip — but the gap is still reported, never treated as satisfied."""
+    cfg = {"scoring": {"minor_gaps": ["GCP (CV has AWS)", "  ", "BigQuery"]}}
+    rules = _candidate_rules(cfg)
+    assert "MINOR GAPS" in rules
+    assert "- GCP (CV has AWS)\n- BigQuery" in rules
+    assert "still list it in `gaps`" in rules
+    assert "never as a reason to skip" in rules
+    assert _candidate_rules({"scoring": {"minor_gaps": "GCP"}}).endswith("- GCP")
+    assert _candidate_rules({"scoring": {"minor_gaps": {"GCP": 1}}}) == ""
+
+
+def test_the_rubric_weighs_a_missing_language_above_a_missing_cloud():
+    """The tiers are in the generic rubric, so they apply with no config."""
+    from src.models import Job
+
+    job = Job(source="t", company="Acme", title="Data Scientist", url="https://x",
+              description="Python, GCP.")
+    prompt = build_prompt(job, "# CV", None)
+    tiers = prompt[prompt.index("Missing tools are not equal"):prompt.index("3. Required years")]
+    assert tiers.index("Minor:") < tiers.index("Moderate:") < tiers.index("Major:")
+    assert "GCP for\n     AWS" in tiers
+    assert "main programming language" in tiers.split("Major:")[1]
+    assert "how much it costs is rule 2's call" in prompt
+
+
 def test_malformed_caps_are_skipped_not_fatal():
     cfg = {"scoring": {"score_caps": [
         "not-a-mapping",

@@ -188,12 +188,14 @@ What actually goes wrong:
   the pipeline flags this in `raw["snippet_only"]`, but the model is working
   from less text and its confidence is unwarranted.
 
-Calibration lessons now have a place to live: three **prompt-only** knobs in
+Calibration lessons now have a place to live: four **prompt-only** knobs in
 `config.yaml`. `scoring.candidate_context` states what the CV structurally
 cannot (total years, the honest gap), `positive_signals` names the themes
-that should pull a score up, and `score_caps` turns what a real rejection
+that should pull a score up, `minor_gaps` names tools you lack but have a
+close equivalent for (GCP when the CV has AWS: still a reported gap, a few
+points rather than a skip), and `score_caps` turns what a real rejection
 taught into a ceiling — a role demanding what you demonstrably lack stops
-costing evenings while still appearing below threshold. None of the three
+costing evenings while still appearing below threshold. None of the four
 move `scoring.threshold` or `scoring.max_jobs`. `scoring.enforce_caps: true`
 (off by default) also holds a score to the smallest cap the model lists in
 `caps_fired`, in code. Each cap is named by its `id`, which defaults to

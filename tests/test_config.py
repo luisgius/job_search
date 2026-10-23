@@ -255,6 +255,7 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         # empty because there is no generic candidate.
         "scoring.candidate_context": _APPLICANT,
         "scoring.positive_signals": _APPLICANT,
+        "scoring.minor_gaps": _APPLICANT,
         "scoring.score_caps": _APPLICANT,
         # Validation period: a $0 OpenRouter model until the pipeline proves
         # itself on the user's machine; DEFAULTS keeps the real recommendation.

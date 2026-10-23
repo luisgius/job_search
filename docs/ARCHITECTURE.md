@@ -529,10 +529,18 @@ never silently dropped. Respects `scoring.max_jobs`.
 
 `rules` is `_candidate_rules(config)` rendered into the prompt's CANDIDATE
 block: `scoring.candidate_context` (positioning the CV cannot state),
-`scoring.positive_signals` (themes that weigh a score up) and
+`scoring.positive_signals` (themes that weigh a score up),
+`scoring.minor_gaps` (tools the candidate lacks but has a close equivalent
+for: still listed in `gaps`, costing a few points rather than the score) and
 `scoring.score_caps` (`{when, cap}` ceilings the model must respect, naming
-the cap that fired in `reasons`). All three are **prompt-only** — they never
+the cap that fired in `reasons`). All four are **prompt-only** — they never
 move `scoring.threshold` or `scoring.max_jobs`.
+
+The rubric itself grades a missing must-have by how long the candidate would
+take to be productive with it: minor (a sibling of a CV tool: GCP for AWS),
+moderate (a supporting tool with no counterpart: Kubernetes for a data
+scientist), major (the role's main language or specialism: Rust for a Python
+CV). Every gap is still reported; only its weight differs.
 
 ### `src/tailor.py`
 ```python

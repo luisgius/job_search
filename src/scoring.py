@@ -209,12 +209,17 @@ def _applicant_line(applicant: Mapping[str, Any] | None) -> str:
 def _candidate_rules(config: Any) -> str:
     """The per-candidate scoring rules block, rendered from config.
 
-    Three knobs, all prompt-only and all empty by default:
+    Four knobs, all prompt-only and all empty by default:
 
     * `scoring.candidate_context` — a paragraph of positioning the CV alone
       does not state ("1.5 years total", "gap: no NLP research");
     * `scoring.positive_signals` — themes that should weigh UP when the
       posting matches them;
+    * `scoring.minor_gaps` — tools the candidate lacks but would pick up
+      quickly from what the CV shows ("GCP — CV has AWS"). Still reported in
+      `gaps`, never claimed; they only cost a few points, so a posting asking
+      for a different cloud is not scored like one asking for a different
+      language;
     * `scoring.score_caps` — `{when, cap}` pairs: when the posting matches
       the condition, the score must not exceed the cap. This is the lesson a
       rejection teaches ("requires transformer research" -> cap 60): the cap
@@ -231,17 +236,21 @@ def _candidate_rules(config: Any) -> str:
     if context:
         lines.append(f"POSITIONING (from the candidate, not in the CV)\n{context}")
 
-    signals = _cfg(config, "scoring.positive_signals", []) or []
-    if isinstance(signals, str):
-        # One signal written as a bare YAML string instead of a one-item
-        # list — the same coercion `_string_list` applies to model output.
-        signals = [signals]
-    signal_terms = [str(item).strip() for item in signals if str(item).strip()] \
-        if isinstance(signals, list) else []
+    signal_terms = _term_list(_cfg(config, "scoring.positive_signals", []))
     if signal_terms:
         lines.append(
             "POSITIVE SIGNALS — weigh the score UP when the posting matches:\n"
             + "\n".join(f"- {term}" for term in signal_terms)
+        )
+
+    minor_terms = _term_list(_cfg(config, "scoring.minor_gaps", []))
+    if minor_terms:
+        lines.append(
+            "MINOR GAPS — the candidate lacks these but works with a close "
+            "equivalent the CV shows. When the posting asks for one, still list "
+            "it in `gaps`, but count it as a minor gap under \"Must-have "
+            "technologies\" (a few points at most), never as a reason to skip:\n"
+            + "\n".join(f"- {term}" for term in minor_terms)
         )
 
     enforce = _enforce_caps(config)
@@ -265,6 +274,17 @@ def _candidate_rules(config: Any) -> str:
         lines.append(block)
 
     return "\n\n".join(lines)
+
+
+def _term_list(value: Any) -> list[str]:
+    """A config list of prompt terms, blanks dropped. One term written as a
+    bare YAML string instead of a one-item list counts as that one item — the
+    same coercion `_string_list` applies to model output."""
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
 
 
 def _enforce_caps(config: Any) -> bool:
@@ -389,6 +409,21 @@ strongest predictor of whether this application goes anywhere at all.
    not penalised because their employer used an unusual title. Equally,
    "Data Engineer" and "Data Scientist" share a word and are not the same job.
 2. Must-have technologies: are the named ones in the CV, or only adjacent ones?
+   Missing tools are not equal. Weigh each by how long this candidate would
+   take to be productive with it, given what the CV already shows:
+   - Minor: a sibling of something in the CV. One cloud for another (GCP for
+     AWS), one warehouse or query engine for another (BigQuery or Snowflake
+     for Presto), a managed platform over a framework the CV has (Databricks
+     over Spark), one orchestrator, BI tool or ML library for its sibling.
+     A few points each, at most.
+   - Moderate: a supporting tool with no counterpart in the CV that sits
+     beside the role rather than being it (Kubernetes, Terraform or dbt for
+     a data scientist).
+   - Major: the role's main programming language (Rust, Scala, C++ or Java
+     for a CV that is Python), or the specialism the role is about (computer
+     vision for a CV with none). This dominates the score.
+   A long tool list usually means "some of these"; judge the core of the
+   role, not the length of the list.
 3. Required years of experience and seniority, against what the CV shows.
 4. Domain overlap between the CV's experience and this team's problem.
 5. Language requirements (a posting written in or demanding German, French,
@@ -406,7 +441,8 @@ RULES
   a phrase from the posting. "Strong fit" and "good culture match" are not
   reasons; "CV shows 8y Python, posting asks for 5+" is.
 - Never invent CV facts. If the CV does not mention Kubernetes, the candidate
-  does not know Kubernetes, however obvious it seems from the rest.
+  does not know Kubernetes, however obvious it seems from the rest. List it in
+  `gaps`; how much it costs is rule 2's call.
 - If the posting is vague, say so in `gaps` and score conservatively.
 
 OUTPUT
