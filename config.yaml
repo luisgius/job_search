@@ -521,6 +521,18 @@ apply:
   require_pdf: true        # no tailored PDF -> digest instead of auto-apply
   block_on_posting_guard: true  # posting talks to the AI -> digest, never a live submit
 
+# Company research + a hiring-manager review of each new tailored application,
+# written beside the CV as company_research.md and review.md and linked from
+# the digest card. Local model only (the Ollama entry in scoring.fallback_
+# models); advisory, the CV and letter are never changed. Research reads
+# Wikipedia, Wikidata and the company's own site (robots.txt honoured, at most
+# 8 requests, cached per company). On since 2026-10-23 at Luis's request;
+# each review is a few minutes of local-model time.
+review:
+  enabled: true
+  max_per_run: 3           # highest-scored new applications first
+  research_cache_days: 30  # reuse output/companies/<slug>.md this long
+
 output:
   dir: output
   open_browser: true

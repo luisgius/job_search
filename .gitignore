@@ -59,3 +59,8 @@ htmlcov/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# Profile expansion inputs (python -m src.expand): personal documents, never
+# committed; only the README that explains the folder ships.
+documents/*
+!documents/README.md

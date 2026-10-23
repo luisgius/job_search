@@ -364,6 +364,15 @@ DEFAULTS: dict[str, Any] = {
         "stale_days": 60,       # quiet this long -> suggest no_response instead
         "max_followups": 2,     # nudges per stage before the page stops asking
     },
+    "review": {
+        # Company research + a hiring-manager review of each new tailored
+        # application (src/reviewer.py), local model only, written next to the
+        # CV as review.md. Advisory: the documents are never changed. Off by
+        # default — each review is minutes of local-model time.
+        "enabled": False,
+        "max_per_run": 3,          # highest-scored new applications first
+        "research_cache_days": 30, # output/companies/<slug>.md is reused this long
+    },
     "cv": {
         "path": "cv/base_cv.md",
         # Optional per-role presentations of the SAME facts, picked per job at

@@ -51,3 +51,28 @@ this landed.
 3. The CI workflow runs only once this branch is pushed — GitHub's default branch is an older, divergent history.
 
 Not verified here: live runs of any source, a real model's behaviour with `enforce_caps`, and the workflow on GitHub's runners (the suite passed locally under 3.12 and, with borrowed packages, 3.10).
+
+## Second pass — 23 October 2026
+
+Upstream unchanged (`e16acee`). Two reasons for not adopting changed: Luis
+accepted LinkedIn's Terms-of-Service risk for personal use, and a local
+Ollama model makes per-job LLM work free. Added:
+
+| Area | Change | Default |
+|---|---|---|
+| Sources | `src/sources/linkedin_search.py`: LinkedIn's anonymous `jobs-guest` search, parsing ported from their `linkedin-search` CLI. Detail pages only for cards that pass the title and location filters; the first 403/429/999 stops LinkedIn requests for the run; a promising card left undescribed is held back rather than scored on its title. Live test: 127 cards, 41 past the filters. | `sources.linkedin_search: false` (on in this config) |
+| Tracking | Tracker schema v7 stores the scorer's `gaps`. `python -m src.track gaps` counts them against the CV, near misses first (their `/upskill` heatmap, without the model call or web search). | — |
+| Interview | `python -m src.track prep HANDLE` writes `interview_prep.md` from the posting and the CV and cover letter that were sent (their `/interview` and interview-prep guide). Local model only. | — |
+
+Same day, at Luis's request, the rest of what was left:
+
+| Area | Change | Default |
+|---|---|---|
+| Dashboard | `python -m src.track dashboard`: one offline HTML page (their `/html-report`) with the funnel, follow-ups, score distribution, per-source yield and skill gaps, built from the tracker. | — |
+| Profile | `python -m src.expand` (their `/expand`): reads `documents/` (git-ignored) and recent public GitHub repos; the local model proposes skills, tools, projects and achievements with a verbatim evidence quote; quotes not found in the named source, and items the CV already shows, are dropped. Never edits the CV. | — |
+| Review | Company research (Wikipedia/Wikidata and the company's own site, no search-engine scraping) and a hiring-manager review of each tailored CV and letter (their `application-reviewer`), local model only, advisory `review.md`. | `review.enabled: false` |
+| Language | `filters.work_languages`: a posting that demands any other language (English or native phrasing: "maîtrise du français", "biegła znajomość języka polskiego"), or is written only in one, is dropped before scoring; a score cap backs it up. | `[]` (here `[en, es]`) |
+| Location | Singapore and Taiwan resolve as countries (`geo.TARGETS_ABROAD`); LinkedIn and freehire search them. | in this config |
+
+Still not adopted: the four Danish portals (Danish-language market, now
+filtered out by `work_languages` anyway) and salary lookup (Danish union data).

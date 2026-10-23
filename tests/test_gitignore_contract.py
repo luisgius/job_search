@@ -56,6 +56,9 @@ MUST_IGNORE = [
     ".claude/scheduled_tasks.lock",
     ".claude/projects/session.jsonl",
     ".claude/worktrees/agent-1/README.md",
+    # personal documents read by `python -m src.expand`
+    "documents/old_cv.pdf",
+    "documents/linkedin/Profile.csv",
 ]
 
 MUST_TRACK = [
@@ -69,6 +72,7 @@ MUST_TRACK = [
     # `.claude/` is not ignored wholesale: shared settings and skills can ship.
     ".claude/settings.json",
     ".claude/skills/example/SKILL.md",
+    "documents/README.md",
 ]
 
 

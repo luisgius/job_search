@@ -328,6 +328,9 @@ class Artifacts:
     cv_pdf: str | None = None
     cover_pdf: str | None = None
     screenshot: str | None = None
+    # Written by src/reviewer.py when `review.enabled`: advisory only.
+    review_md: str | None = None
+    research_md: str | None = None
 
 
 class ApplyStatus(str, Enum):

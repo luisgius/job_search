@@ -135,7 +135,9 @@ python -m src.track report                       # applied -> interview -> offer
 python -m src.track export                       # output/applications.csv, one row per event
 python -m src.track gaps --days 90               # which missing skills cost the most jobs
 python -m src.track prep 3f9c2a1b                # interview prep pack, local Ollama model only
+python -m src.track review 3f9c2a1b              # company research + hiring-manager review, local model
 python -m src.track dashboard                    # output/dashboard.html: funnel, follow-ups, scores, source yield, gaps
+python -m src.expand                             # output/profile_expansion.md: skills your documents/GitHub show and the CV doesn't
 ```
 
 `gaps` counts the scorer's gaps (stored since tracker schema v7; older rows
@@ -150,10 +152,28 @@ read. It runs only on a `scoring`/`tailoring` chain entry served from
 localhost (the Ollama fallback) and refuses rather than use a hosted model.
 It takes a few minutes on a 27B model.
 
+`review` researches the company (Wikipedia, Wikidata and its own site;
+robots.txt honoured, at most 8 requests, cached 30 days in
+`output/companies/`) and writes `company_research.md` and `review.md` into the
+application folder: a verdict (send as-is / edit first / don't send), the top
+five edits as quote → replacement, requirements the CV under-sells that the
+base CV supports, claims the base CV does not back, and an opening line built
+on the research. With `review.enabled` the daily run does this for the
+`review.max_per_run` best new applications and links both files from the
+digest card. Advisory: the CV and letter are never changed.
+
 `dashboard` writes one offline HTML page (no scripts, no CDN) from the
 tracker: the application funnel, follow-ups due, the score distribution with
 the threshold marked, per-source yield over the last 30 runs, and the skill
 gaps. Open it from disk.
+
+`python -m src.expand [--no-github] [--github USER]` reads `documents/` (old
+CVs, write-ups, a LinkedIn data export — see `documents/README.md`; the folder
+is git-ignored) and your most recently pushed public GitHub repositories, and
+writes `output/profile_expansion.md`: skills, tools, projects and achievements
+the CV does not show yet. Each proposal quotes its evidence verbatim from a
+named source; a quote not found there, or an item the CV already shows, is
+dropped and listed with the reason. Local model only; it never edits the CV.
 
 The handle is a full key, a unique key prefix of six or more characters
 (the digest prints eight) or the posting URL (tracking parameters such as

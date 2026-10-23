@@ -459,6 +459,8 @@ def _item(
     cv_pdf = _artifact_href(getattr(artifacts, "cv_pdf", None), digest_dir)
     cover_pdf = _artifact_href(getattr(artifacts, "cover_pdf", None), digest_dir)
     screenshot = _artifact_href(getattr(artifacts, "screenshot", None), digest_dir)
+    review_md = _artifact_href(getattr(artifacts, "review_md", None), digest_dir)
+    research_md = _artifact_href(getattr(artifacts, "research_md", None), digest_dir)
 
     # Descriptions arrive as HTML from Greenhouse and as plain text elsewhere;
     # flatten first so the excerpt is prose rather than escaped markup.
@@ -567,6 +569,8 @@ def _item(
         "cv_pdf": cv_pdf,
         "cover_pdf": cover_pdf,
         "screenshot": screenshot,
+        "review_md": review_md,
+        "research_md": research_md,
         "has_artifacts": bool(cv_md or cover_md or cv_pdf or cover_pdf),
         "description_excerpt": excerpt,
         "cover_preview": cover_preview,

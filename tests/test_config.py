@@ -239,6 +239,7 @@ def test_the_shipped_config_never_drifts_away_from_the_defaults():
         "sources.linkedin_search": "on 2026-10-23: Luis accepted the LinkedIn ToS risk; live test passed 41",
         "filters.work_languages": "Luis works in English and Spanish only (2026-10-23)",
         "filters.description_exclude": "Singapore citizens-only phrases, added with SG (2026-10-23)",
+        "review.enabled": "on 2026-10-23 at Luis's request; local model only",
         # Per-role presentations of the user's own CV — per-user identity,
         # like the applicant block: DEFAULTS ships no variants.
         "cv.variants": _APPLICANT,

@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
 
 from . import config as config_module
-from . import digest, filters, health, llm as llm_module, notify, pdf, scoring, tailor
+from . import digest, filters, health, llm as llm_module, notify, pdf, reviewer, scoring, tailor
 from .apply import autoapply
 from .config import Config, ConfigError
 from .db import Tracker
@@ -320,6 +320,21 @@ def _fetch_all(config: Any, active: set[str], stats: RunStats) -> list[Job]:
     stats.fetched = len(jobs)
     logger.info("fetched %d postings from %s", len(jobs), ", ".join(sorted(active)) or "nothing")
     return jobs
+
+
+def _attach_reviews(scored_jobs: Iterable[Any]) -> None:
+    """Point each card at the reviewer's files when they exist, so the digest
+    links them without touching the disk itself."""
+    for item in scored_jobs:
+        artifacts = getattr(item, "artifacts", None)
+        folder = getattr(artifacts, "dir", None)
+        if not folder:
+            continue
+        for attr, name in (("review_md", reviewer.REVIEW_FILE),
+                           ("research_md", reviewer.RESEARCH_FILE)):
+            path = Path(folder) / name
+            if path.is_file():
+                setattr(artifacts, attr, str(path))
 
 
 def _safe_fetch(label: str, fn: Any, config: Any, stats: RunStats) -> list[Job]:
@@ -1105,6 +1120,16 @@ def run_pipeline(
     except Exception as exc:
         logger.warning("PDF rendering failed: %s", exc)
         stats.errors.append(f"PDF rendering failed: {exc}")
+
+    # -- 8b. review: advisory, local model only ---------------------------
+    # Off unless review.enabled. Writes review.md (+ company_research.md)
+    # beside the tailored documents and never edits them; never raises.
+    if scored_jobs and not skip_llm and not queue_failed:
+        try:
+            reviewer.review_new_applications(scored_jobs, config, now=moment)
+        except Exception as exc:  # belt and braces: the hook already swallows
+            logger.warning("application review failed: %s", exc)
+        _attach_reviews(scored_jobs)
 
     # -- 9. auto-apply ----------------------------------------------------
     if skip_llm:

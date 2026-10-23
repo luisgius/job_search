@@ -9,6 +9,7 @@ Run ``python -m src.track <command>``:
   export [--out PATH]
   gaps [--days N]      which missing skills cost the most jobs (src/skill_gaps.py)
   prep HANDLE          interview prep pack from a local model (src/interview_prep.py)
+  review HANDLE        company research + hiring-manager review, local model (src/reviewer.py)
   dashboard [--out PATH] [--days N]
                        one offline HTML page: funnel, follow-ups, scores, source
                        yield, skill gaps (src/dashboard.py)
@@ -42,7 +43,7 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import parse_qsl, urlsplit
 
-from . import dashboard, digest, interview_prep, skill_gaps
+from . import dashboard, digest, interview_prep, reviewer, skill_gaps
 from .config import Config, ConfigError
 from .db import (
     LABEL_STAGES, MIN_KEY_PREFIX, OUTCOME_STAGES, TERMINAL_APPLY_STATUSES,
@@ -51,7 +52,7 @@ from .db import (
 from .llm import LLMError
 from .models import ApplyStatus, Job, ensure_utc, utcnow
 
-COMMANDS = ("mark", "add", "list", "report", "export", "gaps", "prep", "dashboard")
+COMMANDS = ("mark", "add", "list", "report", "export", "gaps", "prep", "review", "dashboard")
 
 #: One row per event, so a spreadsheet can pivot on stage or source.
 EXPORT_COLUMNS: tuple[str, ...] = (
@@ -294,6 +295,28 @@ def _prep(tracker: Tracker, args: argparse.Namespace, config: Config) -> int:
     return 0
 
 
+def _review(tracker: Tracker, args: argparse.Namespace, config: Config,
+            now: datetime) -> int:
+    if not args.handle:
+        raise _UsageError("review needs a HANDLE: a job key, key prefix or posting URL")
+    row = _resolve(tracker, args.handle)
+    application = tracker.get_application(row["key"]) or {}
+    folder = application.get("artifacts_dir")
+    if not folder or not Path(folder).is_dir():
+        print(f"refused: {_job_line(row)} has no application folder; the review reads "
+              "the posting, CV and cover letter the pipeline saved there", file=sys.stderr)
+        return 1
+    print(f"{_job_line(row)}\nresearching the company and reviewing with the local "
+          "model — a few minutes")
+    try:
+        path = reviewer.review_folder(Path(folder), config, now=now)
+    except (reviewer.ReviewError, LLMError) as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 1
+    print(f"wrote {path} (advisory; cv.md and cover_letter.md are unchanged)")
+    return 0
+
+
 def _export(tracker: Tracker, args: argparse.Namespace, config: Config) -> int:
     path = Path(args.out) if args.out else config.output_dir / "applications.csv"
     rows = tracker.outcome_events()
@@ -313,7 +336,7 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("command", choices=COMMANDS)
-    parser.add_argument("handle", nargs="?", help="mark, prep: job key, 6+ character key prefix, or posting URL")
+    parser.add_argument("handle", nargs="?", help="mark, prep, review: job key, 6+ character key prefix, or posting URL")
     parser.add_argument("stage", nargs="?", help="mark: one of " + ", ".join(OUTCOME_STAGES + LABEL_STAGES))
     parser.add_argument("--on", type=_day, metavar="YYYY-MM-DD", help="when it happened (default: today)")
     parser.add_argument("--note", default="", help="free text kept with the event")
@@ -359,6 +382,8 @@ def main(argv: list[str] | None = None, *, today: date | None = None,
                 return 0
             if args.command == "prep":
                 return _prep(tracker, args, config)
+            if args.command == "review":
+                return _review(tracker, args, config, moment)
             if args.command == "dashboard":
                 if args.days < 1:
                     raise _UsageError("--days must be at least 1")
