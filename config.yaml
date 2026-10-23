@@ -208,6 +208,12 @@ filters:
     - EE   # Estonia
     - CZ   # Czechia
     - LU   # Luxembourg
+    # Outside Europe, added 2026-10-23 at Luis's request. Unlike the list
+    # above these need a work pass the employer applies for (Singapore
+    # Employment Pass, Taiwan work permit); postings reserved for citizens
+    # are dropped by description_exclude below.
+    - SG   # Singapore
+    - TW   # Taiwan
   allow_remote: true
   # Keep bare "Remote" ambiguous; explicit worldwide eligibility is separate.
   remote_requires_eu_hint: true
@@ -254,6 +260,10 @@ filters:
     - decision science analyst
     - causal inference scientist
   language_levels: {en: C1, es: native, de: A2, pl: beginner}
+  # The languages Luis works in (2026-10-23): a posting that requires any
+  # other — Polish, German, French, Mandarin… — or is written only in one is
+  # dropped before scoring. Optional ("a plus", "mile widziana") never counts.
+  work_languages: [en, es]
   title_junior_markers:
     - junior
     - associate
@@ -333,6 +343,15 @@ filters:
     - security clearance
     - must be a us citizen
     - ts/sci
+    # Singapore roles closed to a foreign hire (added with SG, 2026-10-23).
+    - singaporeans only
+    - singaporean only
+    - only singaporeans
+    - singapore citizens only
+    - singapore citizen only
+    - singapore citizens and prs only
+    - singapore citizens or prs only
+    - sc/pr only
   # Read only from what the board states as structured data — Lever's
   # categories.commitment, Adzuna's contract_type — never from the title.
   # This catches the roles whose title is neutral but whose type is not.
@@ -424,8 +443,9 @@ scoring:
     and experimental design. Real gap: no deep NLP or LLM *research*
     experience — one production RAG project (thesis), no transformer
     fine-tuning, no publications.
-    Search preference: European roles plus fully remote roles explicitly open
-    worldwide. Worldwide remote is an accepted work arrangement, not proof of
+    Search preference: European roles, Singapore and Taiwan (relocating; needs
+    an employer-sponsored work pass there), plus fully remote roles explicitly
+    open worldwide. Works in English and Spanish only. Worldwide remote is an accepted work arrangement, not proof of
     work authorization or an available employment/contractor arrangement.
     Report explicit residence, hiring-country and time-zone restrictions; keep
     unstated eligibility requirements unknown.
@@ -462,6 +482,11 @@ scoring:
     - when: "is built mainly in a programming language the CV does not list
         (Rust, Scala, Java, C++, Go, C#) and requires it"
       cap: 40
+    # Backstop for filters.work_languages: Luis works in English and Spanish
+    # only. The filter drops what it can read; this catches the rest.
+    - when: "requires a spoken language other than English or Spanish (not
+        merely a plus), or the posting is written only in such a language"
+      cap: 25
 
 tailoring:
   enabled: true

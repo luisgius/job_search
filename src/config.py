@@ -239,6 +239,10 @@ DEFAULTS: dict[str, Any] = {
         ],
         "require_keywords_any": [],
         "min_description_chars": 0,
+        # ISO 639-1 codes the candidate works in. Non-empty turns on the strict
+        # rule: a posting that requires any other language, or is written only
+        # in one, is rejected (filters._check_language). Empty = off.
+        "work_languages": [],
         # Metadata stamp, never a gate: an included title that also carries
         # one of these markers gets `raw["level"] = "junior"`, so scoring and
         # the digest can say what the ad itself declares. A plain title is

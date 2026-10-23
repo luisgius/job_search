@@ -429,9 +429,14 @@ def _check_location(job: Job, config: Any) -> _Check:
     # take. Only a European mention that lives solely in the prose is
     # discounted.
     if resolved.us and not resolved.eu_stated:
+        # The same veto covers a named non-European country ("Buenos Aires,
+        # Argentina"); calling that the United States misled the reader.
+        where = ("names a country outside the search"
+                 if geo.names_a_non_european_country(job.location)
+                 else "looks like the United States")
         return _Check(
             False,
-            f"location {job.location!r} looks like the United States",
+            f"location {job.location!r} {where}",
             "location_outside_eu",
         )
 
@@ -550,9 +555,16 @@ def _check_language(job: Job, config: Any) -> _Check:
     Advertisement language is recorded separately and never proves a mandatory
     spoken language. A requirement or candidate level not stated stays unknown.
     """
-    from .requirements import language_requirements
+    from .requirements import (
+        LANGUAGE_NAMES, is_required, language_requirements,
+        native_language_requirements, posting_language,
+    )
     levels = _cfg(config, "filters.language_levels", {}) or {}
+    work = {str(code).strip().lower()
+            for code in (_cfg(config, "filters.work_languages", []) or []) if str(code).strip()}
     required = language_requirements(job.description)
+    if work:
+        required += native_language_requirements(job.description)
     job.raw["language_requirements"] = required
     job.raw["work_language_status"] = "explicit" if required else "unknown"
     for requirement in required:
@@ -560,6 +572,22 @@ def _check_language(job: Job, config: Any) -> _Check:
         if requirement["requirement"] == "professional" and level in {"a1", "a2", "b1", "beginner", "none"}:
             return _Check(False, "explicit work-language requirement incompatible with known "
                           f"{requirement['language']} level {level}: {requirement['evidence']}", "language_requirement")
+    if not work:
+        return _Check(True, "")
+    # `filters.work_languages` is the stricter rule: a demand for any other
+    # language rejects, whatever level the CV states for it.
+    allowed = ", ".join(sorted(work))
+    for requirement in required:
+        if requirement["language"] not in work and is_required(requirement):
+            name = LANGUAGE_NAMES.get(requirement["language"], requirement["language"])
+            return _Check(False, f"requires {name}, outside filters.work_languages "
+                          f"({allowed}): {requirement['evidence'][:200]}", "language_requirement")
+    written = posting_language(job.description)
+    job.raw["posting_language"] = written
+    if written and written not in work:
+        name = LANGUAGE_NAMES.get(written, written)
+        return _Check(False, f"posting is written in {name} with no English version; "
+                      f"filters.work_languages is {allowed}", "language_requirement")
     return _Check(True, "")
 
 

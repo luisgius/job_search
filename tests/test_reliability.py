@@ -139,10 +139,13 @@ def test_cv_backed_adjacent_roles_require_functions_and_compatible_level(title, 
     ('No German required. English is our working language.', True, 'unknown'),
     ('German is not required.', True, 'unknown'),
     ('German or English fluency required.', True, 'unknown'),
-    ('German required; level not specified.', True, 'explicit'),
-    ('Professional French required.', True, 'explicit'),  # candidate French level unknown
+    # These three passed while only `language_levels` gated. Since
+    # 2026-10-23 `filters.work_languages: [en, es]` drops any demanded
+    # language outside English and Spanish, whatever its level.
+    ('German required; level not specified.', False, 'explicit'),
+    ('Professional French required.', False, 'explicit'),
     ('Fluent Spanish required.', True, 'explicit'),
-    ('Basic German required.', True, 'explicit'),
+    ('Basic German required.', False, 'explicit'),
 ])
 def test_advertisement_language_is_not_work_language(description, keep, status):
     job = make_job(title='Data Scientist', description=description)

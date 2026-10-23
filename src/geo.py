@@ -1,4 +1,5 @@
-"""EU / EEA / UK location resolution.
+"""EU / EEA / UK location resolution, plus the few places outside Europe the
+user also hunts in (`TARGETS_ABROAD`: Singapore and Taiwan).
 
 Job boards hand us free-text locations: ``"Berlin, Germany"``, ``"Munich, DE"``,
 ``"Remote (EMEA)"``, ``"Hybrid - Berlin"``, ``"Boston, MA or Berlin"``. This
@@ -88,7 +89,15 @@ OTHER_EUROPE: dict[str, str] = {
     "UA": "Ukraine",
 }
 
-ALL_COUNTRIES: dict[str, str] = {**EU_COUNTRIES, **OTHER_EUROPE}
+#: Outside Europe but inside the search (added 2026-10-23: Luis is open to
+#: Singapore and Taiwan). They resolve like any European country, so
+#: `filters.countries` decides; they are never a Europe hint.
+TARGETS_ABROAD: dict[str, str] = {
+    "SG": "Singapore",
+    "TW": "Taiwan",
+}
+
+ALL_COUNTRIES: dict[str, str] = {**EU_COUNTRIES, **OTHER_EUROPE, **TARGETS_ABROAD}
 
 
 def is_eu(code: str | None) -> bool:
@@ -163,6 +172,9 @@ _COUNTRY_ALIAS_SOURCE: dict[str, tuple[str, ...]] = {
     "RS": ("Serbia", "Srbija", "Serbian"),
     "TR": ("Türkiye", "Turkiye", "Turkey", "Turkish"),
     "UA": ("Ukraine", "Ukraina", "Ukrainian"),
+    "SG": ("Singapore", "Republic of Singapore", "Singapura", "SG", "SGP"),
+    # Not "Republic of China": "China" is a non-European veto below.
+    "TW": ("Taiwan", "Taiwan ROC", "Taiwan R.O.C.", "台灣", "臺灣", "TW", "TWN"),
 }
 
 COUNTRY_ALIASES: dict[str, str] = {}
@@ -304,6 +316,9 @@ _CITY_SOURCE: dict[str, tuple[str, ...]] = {
     "ME": ("Podgorica",),
     "MD": ("Chisinau", "Chișinău"),
     "BY": ("Minsk",),
+    "TW": ("Taipei", "Taipei City", "New Taipei", "New Taipei City", "Neihu",
+           "Hsinchu", "Hsinchu City", "Hsinchu Science Park", "Taichung",
+           "Kaohsiung", "Tainan", "Taoyuan", "台北", "臺北", "新竹"),
 }
 
 CITY_TO_COUNTRY: dict[str, str] = {}
@@ -561,7 +576,7 @@ NON_EUROPEAN_COUNTRIES: frozenset[str] = frozenset(
         "El Salvador", "Guatemala", "Honduras", "India", "Indonesia", "Israel",
         "Japan", "Kenya", "Malaysia", "Mexico", "México", "Morocco",
         "New Zealand", "Nicaragua", "Nigeria", "Pakistan", "Panama",
-        "Paraguay", "Peru", "Perú", "Philippines", "Filipinas", "Singapore",
+        "Paraguay", "Peru", "Perú", "Philippines", "Filipinas",
         "South Africa", "South Korea", "Thailand", "Uruguay", "Venezuela",
         "Vietnam", "UAE", "United Arab Emirates", "Saudi Arabia", "Qatar",
         "Ontario", "Quebec", "Québec", "British Columbia", "Alberta",

@@ -10,6 +10,38 @@ LANGUAGES = {
     "de": r"german|deutsch(?:kenntnisse)?",
     "pl": r"polish|polski|polskiego",
     "fr": r"french|français",
+    # Added 2026-10-23 with `filters.work_languages`: every language a posting
+    # in the search area (Europe, Singapore, Taiwan) commonly asks for.
+    "nl": r"dutch|nederlands",
+    "it": r"italian|italiano",
+    "pt": r"portuguese|português",
+    "da": r"danish|dansk",
+    "sv": r"swedish|svenska",
+    "no": r"norwegian|norsk",
+    "fi": r"finnish|suomi",
+    "cs": r"czech|čeština",
+    "sk": r"slovak|slovenčina",
+    "hu": r"hungarian|magyar",
+    "ro": r"romanian|română",
+    "el": r"greek",
+    "lt": r"lithuanian",
+    "lv": r"latvian",
+    "et": r"estonian",
+    "uk": r"ukrainian",
+    "ru": r"russian",
+    "zh": r"mandarin|chinese|cantonese",
+    "ja": r"japanese",
+    "ko": r"korean",
+    "ms": r"malay|bahasa melayu",
+}
+
+LANGUAGE_NAMES = {
+    "en": "English", "es": "Spanish", "de": "German", "pl": "Polish", "fr": "French",
+    "nl": "Dutch", "it": "Italian", "pt": "Portuguese", "da": "Danish",
+    "sv": "Swedish", "no": "Norwegian", "fi": "Finnish", "cs": "Czech",
+    "sk": "Slovak", "hu": "Hungarian", "ro": "Romanian", "el": "Greek",
+    "lt": "Lithuanian", "lv": "Latvian", "et": "Estonian", "uk": "Ukrainian",
+    "ru": "Russian", "zh": "Chinese", "ja": "Japanese", "ko": "Korean", "ms": "Malay",
 }
 _LANGUAGE = r"\b(?:" + "|".join(LANGUAGES.values()) + r")\b"
 _GROUP = rf"{_LANGUAGE}(?:\s+(?:and|&)\s+{_LANGUAGE})*"
@@ -78,6 +110,159 @@ def language_requirements(description: str) -> list[dict[str, str]]:
                                       "requirement": "professional" if member_professional else "level_unknown",
                                       "evidence": clause.strip()[:400]})
     return found
+
+
+#: A "level_unknown" claim is a language requirement — not "experience in
+#: the German market is required" — when the clause talks about language, or
+#: the language name sits right against the mandatory word.
+_LANGUAGE_CONTEXT = re.compile(
+    r"\b(?:language|languages|speak\w*|spoken|written|writing|fluen\w*|"
+    r"proficien\w*|skills?|knowledge|communicat\w*|level|native|verbal|"
+    r"kenntnisse|sprach\w*)\b",
+    re.I,
+)
+_ATTACHED_MANDATORY = re.compile(
+    rf"{_LANGUAGE}\s*(?:is\s+|are\s+)?(?:required|mandatory|essential|a\s+must|must)\b"
+    rf"|\b(?:required|mandatory|must\s+have|must\s+speak)\s*:?\s*{_LANGUAGE}",
+    re.I,
+)
+
+
+def is_required(requirement: dict[str, str]) -> bool:
+    """Does this extracted claim demand the language, rather than mention it?
+
+    A proficiency word bound to the language ("fluent French") always does.
+    A bare mandatory claim ("German required", "German language skills are
+    essential") does when it reads as language; "experience in the German
+    market is required" does not.
+    """
+    if requirement.get("requirement") == "professional":
+        return True
+    evidence = str(requirement.get("evidence") or "")
+    return bool(_LANGUAGE_CONTEXT.search(evidence) or _ATTACHED_MANDATORY.search(evidence))
+
+
+#: Requirements phrased in the language itself — the way a French, German,
+#: Polish, Dutch, Italian or Portuguese ad states them. Each is a demand by
+#: construction (a proficiency word or a mandatory word bound to the name).
+_NATIVE_PHRASES: dict[str, re.Pattern[str]] = {
+    "fr": re.compile(
+        r"\b(?:ma[iî]trise|courant|bilingue|parfait\w*|excellent\w*|bon(?:ne)?\s+niveau)"
+        r"\b[^.\n;:]{0,30}?\bfran[cç]ais\w*"
+        r"|\bfran[cç]ais\w*\s+(?:courant|bilingue|exig[ée]e?|requise?|obligatoire|"
+        r"indispensable|imp[ée]ratif|\(?(?:c1|c2|b2)\)?)", re.I),
+    "de": re.compile(
+        r"\b(?:sehr\s+gute|gute|flie(?:ß|ss)end\w*|verhandlungssicher\w*|ausgezeichnet\w*|"
+        r"exzellent\w*)\s+deutsch\w*"
+        r"|\bdeutsch\w*\s+(?:in\s+wort\s+und\s+schrift|flie(?:ß|ss)end|verhandlungssicher|"
+        r"(?:auf\s+)?\(?(?:c1|c2|b2)\)?|(?:ist\s+|sind\s+)?(?:erforderlich|zwingend|vorausgesetzt))",
+        re.I),
+    "pl": re.compile(
+        r"\b(?:biegł\w*|płynn\w*|bardzo\s+dobr\w*|dobr\w*|komunikatywn\w*)\s+"
+        r"(?:znajomoś\w+\s+)?(?:język\w*\s+)?polsk\w*"
+        r"|\bznajomoś\w+\s+język\w*\s+polsk\w*"
+        r"|\bjęzyk\w*\s+polsk\w*\s+(?:na\s+poziomie|w\s+stopniu|\(?(?:c1|c2|b2)\)?|ojczyst\w*)",
+        re.I),
+    "nl": re.compile(
+        r"\b(?:vloeiend\w*|uitstekend\w*|goed\w*|perfect\w*)\s+"
+        r"(?:beheersing\s+van\s+(?:de\s+|het\s+)?)?nederlands\w*"
+        r"|\bnederlands\w*\s+(?:vloeiend|is\s+een\s+must|vereist|verplicht|\(?(?:c1|c2|b2)\)?)",
+        re.I),
+    "it": re.compile(
+        r"\b(?:ottim\w*|buon\w*|fluente|madrelingua|perfett\w*)\s+"
+        r"(?:conoscenza\s+(?:della\s+lingua\s+)?)?italian\w*"
+        r"|\bitalian\w*\s+(?:fluente|madrelingua|obbligatori\w*|richiest\w*)", re.I),
+    "pt": re.compile(
+        r"\b(?:fluente|flu[eê]ncia|dom[ií]nio|nativo)\s+(?:em\s+|de\s+|do\s+)?portugu[eê]s"
+        r"|\bportugu[eê]s\s+(?:fluente|nativo|obrigat[oó]rio)", re.I),
+}
+#: Optional, in the languages the native phrases are written in.
+_OPTIONAL_NATIVE = re.compile(
+    r"\b(?:mile\s+widzian\w*|atut\w*|plusem|un\s+plus|appr[ée]ci[ée]e?|souhait[ée]e?|"
+    r"von\s+vorteil|w[üu]nschenswert|pluspunt|een\s+pr[ée]|gradit[aoe]|preferibil\w*|"
+    r"desej[áa]vel|valoriza\w*|optional|preferred|plus|bonus|advantage)\b", re.I)
+#: "... or English" in the same clause: an alternative, not a demand.
+_ALTERNATIVE_NATIVE = re.compile(
+    r"\b(?:ou|or|oder|lub|albo|of|o|ou\s+bien)\s+(?:en\s+|in\s+)?(?:anglais|english|englisch|"
+    r"angielski\w*|engels|inglese|ingl[eê]s)\b"
+    r"|\b(?:anglais|english|englisch|angielski\w*|engels|inglese|ingl[eê]s)\s+"
+    r"(?:ou|or|oder|lub|albo|of|o)\b", re.I)
+
+
+def native_language_requirements(description: str) -> list[dict[str, str]]:
+    """Requirements written in the language they demand ("maîtrise du
+    français", "biegła znajomość języka polskiego"), which the English-phrased
+    extractor above cannot read. Same shape as `language_requirements`."""
+    text = html_to_text(description)
+    found = []
+    for clause in re.split(r"[\n.;!?]", text):
+        if _OPTIONAL_NATIVE.search(clause) or _ALTERNATIVE_NATIVE.search(clause):
+            continue
+        for code, pattern in _NATIVE_PHRASES.items():
+            if pattern.search(clause):
+                found.append({"language": code, "requirement": "professional",
+                              "evidence": clause.strip()[:400]})
+    return found
+
+
+#: Function words distinctive enough to tell an ad's language. Words shared
+#: between languages ("de", "en", "a", "con", "para") are left out on purpose.
+_STOPWORDS: dict[str, frozenset[str]] = {
+    code: frozenset(words.split()) for code, words in {
+        "en": "the and with you will our your are this that have from we be is of for "
+              "an as on at about who what experience team work",
+        "es": "el los las del para por como más nuestro nuestra equipo buscamos "
+              "conocimientos también sobre ofrecemos años trabajo experiencia",
+        "fr": "le les des du et est pour avec dans vous nous sur votre notre au aux "
+              "sont être expérience équipe poste cette qui",
+        "de": "der die das und ist mit für wir sie ein eine den dem auf bei zu von "
+              "nicht oder ihre unser unsere erfahrung kenntnisse sowie",
+        "pl": "się oraz jest dla nie od jak lub przez które który która doświadczenie "
+              "znajomość pracy będzie oferujemy wymagania zespół",
+        "nl": "het een van voor met zijn wij je jij onze ons bij naar ook niet werk "
+              "ervaring kennis wat hoe als dat",
+        "it": "il lo gli della delle dei degli per che sono nel nella alla esperienza "
+              "lavoro nostro nostra siamo anche cerchiamo conoscenza offriamo",
+        "pt": "não você nossa nosso uma com experiência trabalho equipe ao aos das "
+              "dos pelo pela são está conhecimento oferecemos vaga",
+        "sv": "och att är för med som på av vi du det inte har kommer erfarenhet "
+              "arbete din våra vår",
+        "da": "og er med som på af vi du det ikke har vil erfaring arbejde din vores til",
+        "fi": "ja on että tai kanssa sinä meidän työ kokemus osaaminen olet olemme",
+        "cs": "je se na pro jako nebo který která které zkušenosti práce znalost nabízíme",
+    }.items()
+}
+_WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
+_SCRIPTS = (("zh", re.compile(r"[一-鿿]")),
+            ("ja", re.compile(r"[぀-ヿ]")),
+            ("ko", re.compile(r"[가-힯]")))
+
+
+def posting_language(description: str) -> str | None:
+    """The language an ad is written in, when it is unmistakably one that is
+    not English and the ad carries no English version; else None.
+
+    Conservative on purpose — this can reject a job: the winner needs 20
+    function words and twice the runner-up, or (a short ad) 6 and three times
+    the runner-up; English must stay under a quarter of the winner (a Polish
+    ad with a full English section is bilingual, not Polish-only). A script
+    language wins on 30% of letters, unless English is substantial too.
+    """
+    text = html_to_text(description)
+    letters = sum(ch.isalpha() for ch in text)
+    if letters < 300:
+        return None
+    words = [w.lower() for w in _WORD_RE.findall(text)]
+    hits = {code: sum(w in stop for w in words) for code, stop in _STOPWORDS.items()}
+    for code, script in _SCRIPTS:
+        if len(script.findall(text)) >= 0.3 * letters and hits["en"] < 20:
+            return code
+    ranked = sorted(hits.items(), key=lambda item: -item[1])
+    (best, top), (_second, runner) = ranked[0], ranked[1]
+    clear = (top >= 20 and top >= 2 * runner) or (top >= 6 and top >= 3 * max(runner, 1))
+    if best == "en" or not clear or hits["en"] >= 0.25 * top:
+        return None
+    return best
 
 
 def adjacent_role_evidence(description: str) -> dict[str, object]:
