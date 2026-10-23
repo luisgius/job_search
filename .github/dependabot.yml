@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # Keeps the SHA-pinned actions in .github/workflows current; Dependabot
+  # rewrites both the SHA and its trailing `# vX.Y.Z` comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  # requirements.txt ranges are ceilinged (<next major); this proposes raising
+  # a ceiling, which still needs the suite to pass before it is merged.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly

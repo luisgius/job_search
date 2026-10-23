@@ -28,6 +28,7 @@ sources ──┬─ Greenhouse boards ────┐
           ├─ Landing.jobs (global) │                               │
           ├─ Just Join IT (PL)     │                               │
           ├─ No Fluff Jobs (PL)    │                               │
+          ├─ freehire.me (opt-in)  │                               │
           ├─ Adzuna (optional)     │                               │
           └─ LinkedIn email        ┘                               ▼
    digest.html ◀── auto-apply ◀── PDF ◀── tailor CV + cover ◀── LLM fit score
@@ -652,11 +653,14 @@ deliberately conservative — public APIs, one request per board, no scraping
 behind a login — but read the terms of any site that matters to you, and
 apply by hand where automated submission is not welcome.
 
-**The tracker only knows about applications *it* made.** Every job you apply
-to yourself — from the digest link, from LinkedIn, from a referral — is
-invisible to it, so it will keep showing you that job and would happily
-auto-apply to it later. It is also a single SQLite file at
-`output/tracker.sqlite3`, and `output/` is git-ignored: back it up, because
+**The tracker only knows about applications *it* made, unless you tell it.**
+A job you apply to yourself (from the digest link, from LinkedIn, from a
+referral) stays invisible until you record it with
+`python -m src.track mark <key> applied` or `python -m src.track add …`
+(see `docs/RUNNING.md`, "Recording outcomes"). Until then the pipeline will
+keep showing you that job and would happily auto-apply to it later. It is
+also a single SQLite file at `output/tracker.sqlite3`, and `output/` is
+git-ignored: back it up, because
 losing it resets the never-apply-twice guarantee to zero.
 
 ---

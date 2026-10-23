@@ -26,7 +26,7 @@ import argparse
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Callable, Iterable, Sequence
 
 from . import config as config_module
 from . import digest, filters, health, llm as llm_module, notify, pdf, scoring, tailor
@@ -36,7 +36,7 @@ from .db import Tracker
 from .models import ApplyStatus, Job, RunStats, ScoredJob, ensure_utc, utcnow
 from .sources import (
     adzuna, arbeitnow, ats_boards, justjoin_it, landing_jobs, linkedin_email,
-    nofluffjobs, allegro,
+    nofluffjobs, allegro, freehire,
 )
 from .util import get_logger, open_in_browser, setup_logging
 
@@ -300,6 +300,9 @@ def _fetch_all(config: Any, active: set[str], stats: RunStats) -> list[Job]:
     if "allegro" in active:
         jobs.extend(_safe_fetch("allegro", allegro.fetch, config, stats))
 
+    if "freehire" in active:
+        jobs.extend(_safe_fetch("freehire", freehire.fetch, config, stats))
+
     if "linkedin_email" in active:
         jobs.extend(_safe_fetch("linkedin_email", linkedin_email.fetch, config, stats))
 
@@ -348,6 +351,11 @@ def _gate_on_tracker(
 
     `record_job` has to come first in both branches: `applications.key` is a
     foreign key onto `jobs.key`.
+
+    A job whose own key is new but whose twin on another board was already
+    handled inside the window (`Tracker.handled_twin`) is the same posting
+    shown again: it gets a `FILTERED` row naming the twin and counts as
+    already seen — it passed the hard filters, so it is no filter rejection.
     """
     if tracker is None:
         return list(kept)
@@ -359,7 +367,15 @@ def _gate_on_tracker(
         try:
             tracker.record_job(job, now=now)
             if tracker.should_surface(job.key, within_days=skip_days, now=now):
-                surviving.append(job)
+                twin = tracker.handled_twin(job.dedupe_key, key=job.key, source=job.source,
+                                            within_days=skip_days, now=now,
+                                            full_text=_full_text(job))
+                if twin is None:
+                    surviving.append(job)
+                else:
+                    tracker.record_status(job.key, ApplyStatus.FILTERED,
+                                          detail=_twin_detail(twin), now=now)
+                    stats.already_seen += 1
             else:
                 stats.already_seen += 1
         except Exception as exc:  # one bad row must not cost the whole batch
@@ -380,6 +396,125 @@ def _gate_on_tracker(
         len(surviving), stats.already_seen, skip_days,
     )
     return surviving
+
+
+def _twin_detail(twin: dict[str, Any]) -> str:
+    """The tracker detail for a posting stopped by its cross-source twin."""
+    return (f"cross-source duplicate of {str(twin['key'])[:8]} "
+            f"({twin['source']}, {twin['status']} {str(twin['updated_at'] or '')[:10]})")
+
+
+def _full_text(job: Job) -> bool:
+    """Whether this copy carries its full description rather than a teaser."""
+    return not job.raw.get("snippet_only") and bool(job.description.strip())
+
+
+def _variant_standing(tracker: Tracker, config: Any, stats: RunStats,
+                      now: datetime) -> Callable[[Job], int]:
+    """`collapse_variants(known=)`: how much the tracker holds one copy.
+
+    The gates' own questions, strongest first: anything that blocks an
+    application; a handled row or handled cross-source twin inside the
+    window; pending scoring work queued by an earlier run. A `filtered` row
+    is not handling — it is often this posting's own earlier collapse. A
+    read that fails ranks next to applied: not knowing is no licence to
+    pick a sibling in its place, and it is reported, not swallowed.
+    """
+    skip_days = _int(_cfg(config, "db.skip_seen_days", 30), 30)
+
+    def standing(job: Job) -> int:
+        try:
+            if tracker.has_applied(job.key) or tracker.submit_attempted(job.key) \
+                    or tracker.has_applied_similar(job.dedupe_key):
+                return filters.TRACKED_APPLIED
+            status = tracker.get_status(job.key)
+            if status not in (None, ApplyStatus.FILTERED.value) and not \
+                    tracker.should_surface(job.key, within_days=skip_days, now=now):
+                return filters.TRACKED_HANDLED
+            if tracker.handled_twin(job.dedupe_key, key=job.key, source=job.source,
+                                    within_days=skip_days, now=now,
+                                    full_text=_full_text(job)) is not None:
+                return filters.TRACKED_HANDLED
+            row = tracker.get_scoring(job.key)
+            if row is not None and row["state"] == "pending" \
+                    and datetime.fromisoformat(row["queued_at"]) < now:
+                return filters.TRACKED_QUEUED
+        except Exception as exc:
+            stats.errors.append(f"tracker state unknown for {job.label}: {exc}")
+            return filters.TRACKED_UNVERIFIED
+        return filters.TRACKED_NONE
+
+    return standing
+
+
+def _settle_variant_holds(kept: list[Job], tracker: Tracker, config: Any,
+                          stats: RunStats, now: datetime) -> list[Job]:
+    """Re-judge copies that won today's collapse but were held back before.
+
+    A copy held back as another's city variant only wins when that copy is
+    not seen today or no longer outranks it (`Tracker.settle_variant_hold`).
+    If that copy was applied to, the hold is renewed and the copy dropped
+    here: the gate's reminder window must never let it through. A read that
+    fails leaves the hold for the gate, inside its window, and is reported.
+    """
+    skip_days = _int(_cfg(config, "db.skip_seen_days", 30), 30)
+    settled: list[Job] = []
+    for job in kept:
+        try:
+            if tracker.settle_variant_hold(job.key, within_days=skip_days, now=now) == "applied":
+                tracker.record_job(job, now=now)
+                detail = (tracker.get_application(job.key) or {}).get("detail") or ""
+                tracker.record_status(job.key, ApplyStatus.FILTERED, detail=detail, now=now)
+                stats.already_seen += 1
+                continue
+        except Exception as exc:
+            stats.errors.append(f"could not re-check the city-variant hold on {job.label}: {exc}")
+        settled.append(job)
+    return settled
+
+
+def _release_held_copies(tracker: Tracker, key: str, stats: RunStats) -> str:
+    """Free the city copies held back for `key`, which will not be scored.
+
+    Returns a note for the error line that reports the stop, so a released
+    copy is never a silent change. Best effort: the stop itself stands.
+    """
+    try:
+        released = tracker.release_variant_copies(key)
+    except Exception as exc:
+        stats.errors.append(f"copies held back for {key} not released: {exc}")
+        return ""
+    return (f"; {released} copy/copies of the same posting held back for it "
+            "will be evaluated when next seen") if released else ""
+
+
+def _collapse_ready(
+    ready: list[Job], observed: dict[str, Job], tracker: Tracker,
+    config: Any, stats: RunStats, now: datetime,
+) -> list[Job]:
+    """One copy per posting across both admission paths.
+
+    Step 3 collapsed today's new copies only: queued work skips the filters
+    and the collapse, so a copy queued yesterday and today's city sibling
+    would both be scored, and both could be applied to. Every other
+    observed copy is context, so a sibling applied to (or shown) earlier
+    stops queued work too. Losers stop as `protected` with the collapse
+    reason, and move from "eligible" to `same_posting_other_city` in the
+    counts, exactly where a step-3 loser is counted.
+    """
+    ready_keys = {job.key for job in ready}
+    variants = filters.collapse_variants(
+        ready, config, known=_variant_standing(tracker, config, stats, now),
+        context=[job for key, job in observed.items() if key not in ready_keys],
+    )
+    for job, reason in variants.rejected:
+        tracker.stop_scoring(job.key, "protected", reason)
+        stats.after_filters -= 1
+        name = (job.source or "unknown").lower()
+        stats.source_after_filters[name] = max(0, stats.source_after_filters.get(name, 0) - 1)
+    for reason, count in variants.counts.items():
+        stats.filter_counts[reason] = stats.filter_counts.get(reason, 0) + count
+    return variants.kept
 
 
 def _newest_first(jobs: list[Job]) -> list[Job]:
@@ -440,15 +575,21 @@ def _prepare_scoring_backlog(
 
     Source results are not authoritative closed-job lists (some are partial,
     some swallow board failures). Absence always means availability unknown.
+    The combined list — queued and newly admitted — leaves through
+    `_collapse_ready`, so one posting is scored once whichever path its
+    copies took. Work that stops without a score releases the city copies
+    held back for it (`Tracker.release_variant_copies`).
     """
     max_attempts = _backlog_policy(config, "retry_max_attempts", 10)
+    skip_days = _int(_cfg(config, "db.skip_seen_days", 30), 30)
     ready: list[Job] = []
     for row in tracker.pending_scoring():
         key = row["key"]
         if now >= datetime.fromisoformat(row["expires_at"]):
             detail = "queue lifetime expired; availability unknown, not confirmed closed"
             tracker.stop_scoring(key, "expired", detail)
-            stats.errors.append(f"scoring backlog {key}: {detail}")
+            stats.errors.append(f"scoring backlog {key}: {detail}"
+                                f"{_release_held_copies(tracker, key, stats)}")
             continue
         if tracker.has_applied(key) or tracker.submit_attempted(key):
             tracker.stop_scoring(key, "protected", "application or submit attempt already recorded")
@@ -461,7 +602,8 @@ def _prepare_scoring_backlog(
             continue
         if row["attempts"] >= max_attempts:
             tracker.stop_scoring(key, "exhausted", "scoring attempt limit reached")
-            stats.errors.append(f"scoring backlog {key}: scoring attempt limit reached")
+            stats.errors.append(f"scoring backlog {key}: scoring attempt limit reached"
+                                f"{_release_held_copies(tracker, key, stats)}")
             continue
         if key not in observed:
             tracker.scoring_detail(
@@ -475,6 +617,13 @@ def _prepare_scoring_backlog(
             if tracker.has_applied_similar(job.dedupe_key):
                 tracker.stop_scoring(key, "protected", "similar role already applied")
                 continue
+            twin = tracker.handled_twin(job.dedupe_key, key=key, source=job.source,
+                                        within_days=skip_days, now=now,
+                                        full_text=_full_text(job))
+            if twin is not None:
+                tracker.stop_scoring(key, "protected", _twin_detail(twin))
+                stats.already_seen += 1
+                continue
             checked = filters.apply_filters([job], _QueuedFilters(config), now=now)
             if not checked.kept:
                 detail = checked.rejected[0][1] if checked.rejected else "eligibility not established"
@@ -485,7 +634,8 @@ def _prepare_scoring_backlog(
                     stats.errors.append(f"scoring backlog {key}: revalidation failed: {detail}")
                     continue
                 tracker.stop_scoring(key, "ineligible", detail)
-                stats.errors.append(f"scoring backlog {key}: no longer eligible: {detail}")
+                stats.errors.append(f"scoring backlog {key}: no longer eligible: {detail}"
+                                    f"{_release_held_copies(tracker, key, stats)}")
                 continue
             stats.after_filters += 1
             source = (job.source or "unknown").lower()
@@ -515,7 +665,7 @@ def _prepare_scoring_backlog(
                 stats.errors.append(f"scoring backlog full ({capacity}); not queued: {job.label}")
         except Exception as exc:
             stats.errors.append(f"scoring backlog could not retain {job.label}: {exc}")
-    return ready
+    return _collapse_ready(ready, observed, tracker, config, stats, now)
 
 
 def _record_scoring_attempts(
@@ -533,7 +683,8 @@ def _record_scoring_attempts(
         if row["attempts"] >= _backlog_policy(config, "retry_max_attempts", 10):
             detail = f"scoring retry limit reached: {error}"
             tracker.stop_scoring(job.key, "exhausted", detail)
-            stats.errors.append(f"scoring {job.label}: {detail}")
+            stats.errors.append(f"scoring {job.label}: {detail}"
+                                f"{_release_held_copies(tracker, job.key, stats)}")
         else:
             detail = f"pending scoring retry after {row['next_attempt_at']}: {error}"
             tracker.scoring_detail(job.key, detail)
@@ -568,12 +719,18 @@ def _read_cv(config: Any) -> str:
     return text
 
 
-def _render_pdfs(scored_jobs: list[ScoredJob], stats: RunStats) -> int:
+def _render_pdfs(
+    scored_jobs: list[ScoredJob], stats: RunStats, config: Any = None
+) -> int:
     """Turn tailored markdown into PDFs, when the user's hook exists.
 
     No hook is a supported state, not an error, so it is reported once per run
     rather than once per job — and `apply.require_pdf` then routes every match
     to the digest instead of auto-applying with no CV attached.
+
+    With `pdf.verify` on, each PDF is read back as text: `warn` records what
+    is wrong in the run's errors and the job's status; `block` also withholds
+    the PDF, so a CV that failed goes to the digest instead of into a form.
     """
     candidates = [
         item for item in scored_jobs
@@ -588,21 +745,49 @@ def _render_pdfs(scored_jobs: list[ScoredJob], stats: RunStats) -> int:
         )
         return 0
 
+    # YAML reads a bare `off` as False, hence the `or`.
+    verify_mode = str(_cfg(config, "pdf.verify", "off") or "off").strip().lower()
+    name = str(_cfg(config, "applicant.name", "") or "")
+    email = str(_cfg(config, "applicant.email", "") or "")
+
+    def passes(item: ScoredJob, what: str, path: str, markdown: str,
+               max_pages: int, require: tuple[str, ...]) -> bool:
+        """False only when `block` is on and the PDF read back wrong."""
+        if verify_mode not in ("warn", "block"):
+            return True
+        problems = pdf.verify(
+            path, require=require, max_pages=max_pages,
+            headings=pdf.headings_of(markdown),
+            pdftotext=str(_cfg(config, "pdf.pdftotext", "") or ""),
+        )
+        if not problems:
+            return True
+        note = f"{what} PDF check: " + "; ".join(problems)
+        stats.errors.append(f"{note} ({item.job.label})")
+        item.status_detail = f"{item.status_detail}; {note}".lstrip("; ")
+        return verify_mode != "block"
+
     rendered = 0
     for item in candidates:
         directory = Path(item.artifacts.dir)
-        cv_pdf = pdf.render_if_available(item.tailored_cv_md or "", directory / "cv.pdf")
-        if cv_pdf:
+        cv_md = item.tailored_cv_md or ""
+        cv_pdf = pdf.render_if_available(cv_md, directory / "cv.pdf")
+        if not cv_pdf:
+            stats.errors.append(f"PDF render failed for {item.job.label}")
+        elif passes(item, "CV", cv_pdf, cv_md,
+                    _int(_cfg(config, "pdf.cv_max_pages", 2), 2), (name, email)):
             item.artifacts.cv_pdf = cv_pdf
             rendered += 1
-        else:
-            stats.errors.append(f"PDF render failed for {item.job.label}")
         cover_md = (item.cover_letter_md or "").strip()
         if cover_md:
             # A missing cover-letter PDF is cosmetic — nothing gates on it, so
             # it is not worth an entry in the run's error list.
             cover_pdf = pdf.render_if_available(cover_md, directory / "cover_letter.pdf")
-            if cover_pdf:
+            # Letters often leave the email to the form, so only the name.
+            if cover_pdf and passes(
+                item, "cover letter", cover_pdf, cover_md,
+                _int(_cfg(config, "pdf.cover_max_pages", 1), 1), (name,),
+            ):
                 item.artifacts.cover_pdf = cover_pdf
     logger.info("rendered %d of %d CV PDFs", rendered, len(candidates))
     return rendered
@@ -661,6 +846,7 @@ def _persist(scored_jobs: list[ScoredJob], tracker: Any, now: datetime,
                 score_reasons=(list(item.score.reasons)
                                if item.score and item.score.reasons else None),
                 artifacts_dir=(item.artifacts.dir if item.artifacts else None),
+                full_text=_full_text(item.job),
                 now=now,
             )
             if hasattr(tracker, "complete_scoring") and item.score and item.score.ok:
@@ -773,6 +959,23 @@ def run_pipeline(
             kept = []
         logger.warning("filtering failed (%s)", exc)
         stats.errors.append(f"filtering failed: {exc}")
+    # One posting listed once per city: score one copy, record the others as
+    # rejected under their own slug so the funnel still adds up. Every other
+    # copy seen today — stale, filtered, queued — is context, so the copy the
+    # tracker already holds (applied, shown, queued) stands for the posting.
+    try:
+        standing, context = None, []
+        if durable:
+            standing = _variant_standing(tracker, config, stats, moment)
+            candidates = {job.key for job in kept}
+            context = [job for key, job in observed.items() if key not in candidates]
+        variants = filters.collapse_variants(kept, config, known=standing, context=context)
+        kept, rejected = variants.kept, rejected + variants.rejected
+        for reason, count in variants.counts.items():
+            stats.filter_counts[reason] = stats.filter_counts.get(reason, 0) + count
+    except Exception as exc:
+        logger.warning("collapsing city variants failed (%s) — keeping every copy", exc)
+        stats.errors.append(f"collapsing city variants failed: {exc}")
     stats.after_filters = len(kept)
     for job in kept:
         name = (job.source or "unknown").lower()
@@ -783,6 +986,8 @@ def run_pipeline(
         stats.source_after_filters.setdefault(name, 0)
 
     # -- 4. tracker gate --------------------------------------------------
+    if durable:
+        kept = _settle_variant_holds(kept, tracker, config, stats, moment)
     fresh = _gate_on_tracker(kept, rejected, tracker, config, stats, moment)
     if durable and not queue_failed:
         try:
@@ -891,7 +1096,7 @@ def run_pipeline(
 
     # -- 8. PDFs ----------------------------------------------------------
     try:
-        _render_pdfs(scored_jobs, stats)
+        _render_pdfs(scored_jobs, stats, config)
     except Exception as exc:
         logger.warning("PDF rendering failed: %s", exc)
         stats.errors.append(f"PDF rendering failed: {exc}")

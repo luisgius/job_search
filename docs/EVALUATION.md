@@ -194,7 +194,11 @@ cannot (total years, the honest gap), `positive_signals` names the themes
 that should pull a score up, and `score_caps` turns what a real rejection
 taught into a ceiling — a role demanding what you demonstrably lack stops
 costing evenings while still appearing below threshold. None of the three
-move `scoring.threshold` or `scoring.max_jobs`.
+move `scoring.threshold` or `scoring.max_jobs`. `scoring.enforce_caps: true`
+(off by default) also holds a score to the smallest cap the model lists in
+`caps_fired`, in code. Each cap is named by its `id`, which defaults to
+`cap-<n>`. The card's `reasons` then say `cap <id> enforced: 78→60`. A cap
+the model does not declare is still only a prompt instruction.
 
 **Do this in week one:** open the "Below threshold" section every day and
 look for jobs you would have applied to. If you find them, the threshold is

@@ -209,6 +209,36 @@ def test_expiry_undated_empty_and_remote_jsonld():
     assert parse().raw["description_status"] == "missing"
 
 
+def jsonld(value):
+    return '<script type="application/ld+json">' + json.dumps(value) + '</script>'
+
+
+def test_jsonld_posting_after_an_organization_block_is_read():
+    """Each block is parsed on its own: joining them into one string made
+    the page invalid JSON and rejected it as a non-job page."""
+    body = (jsonld({"@context": "https://schema.org", "@type": "Organization", "name": "Allegro"})
+            + jsonld({"@context": "https://schema.org", "@type": "JobPosting", "title": "Data Scientist",
+                      "description": "Python machine learning", "jobLocationType": "TELECOMMUTE"}))
+    job = allegro.parse_detail(body, AI_URL, now=NOW)
+    assert job.title == "Data Scientist" and job.description == "Python machine learning"
+    assert job.remote is True and job.raw["description_status"] == "full"
+
+
+def test_jsonld_type_written_as_a_list_is_a_job_posting():
+    data = {"@type": ["JobPosting"], "title": "Data Scientist", "description": "Python machine learning",
+            "validThrough": "2026-09-10T12:00:00Z"}
+    job = allegro.parse_detail(jsonld(data), AI_URL, now=NOW)
+    assert job.title == "Data Scientist" and job.description == "Python machine learning"
+    assert job.remote is None and job.posted_at is None
+    later = datetime(2026, 9, 11, tzinfo=timezone.utc)
+    assert allegro.parse_detail(jsonld(data), AI_URL, now=later) is None
+
+
+def test_non_job_jsonld_still_rejects_the_page():
+    with pytest.raises(ValueError, match="unrecognized non-job"):
+        allegro.parse_detail(jsonld({"@type": "Organization", "name": "Allegro"}), AI_URL, now=NOW)
+
+
 def test_downstream_identity_location_and_freshness_funnel():
     public = payload()["offers"] + json.loads(fixture("listing_page2.json"))["offers"]
     jobs = [job for item in public if (job := allegro.parse_offer(item))]

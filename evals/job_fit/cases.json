@@ -170,7 +170,7 @@
         "expected": {
           "value": 0,
           "error": true,
-          "error_contains": "response.score has wrong type"
+          "error_contains": "response.score does not match its pattern"
         }
       }
     },
@@ -275,6 +275,36 @@
           "value": 79,
           "error": false,
           "model": "fake/fallback"
+        }
+      }
+    },
+    {
+      "id": "cap_declared_but_exceeded",
+      "title": "Backend Engineer",
+      "description": "Required: two years of Python backend development, SQL and English. Remote work in Poland is supported. German C1 is mandatory for daily customer calls.",
+      "snippet_only": false,
+      "live_eligible": false,
+      "scoring": {
+        "enforce_caps": true
+      },
+      "labels": {
+        "pursue": null,
+        "rationale": "With scoring.enforce_caps on, a cap the reply declares in caps_fired must hold the score to that cap even when the reply's own number exceeds it.",
+        "evidence": "German C1 is mandatory for daily customer calls.",
+        "review_criteria": []
+      },
+      "offline": {
+        "responses": [
+          {
+            "reply": "{\"score\": 75, \"caps_fired\": [\"cap-1\"], \"reasons\": [\"Posting requires German C1; CV states English only.\"], \"strengths\": [], \"gaps\": [\"No German proficiency is evidenced.\"], \"verdict\": \"Missing a required language.\"}"
+          }
+        ],
+        "expected": {
+          "value": 40,
+          "error": false,
+          "reasons_contain": [
+            "cap cap-1 enforced: 75→40"
+          ]
         }
       }
     }

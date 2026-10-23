@@ -21,3 +21,4 @@ tests:
   - vars: {case_id: copied_verdict_only}
   - vars: {case_id: provider_error}
   - vars: {case_id: provider_fallback}
+  - vars: {case_id: cap_declared_but_exceeded}

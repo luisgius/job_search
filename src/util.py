@@ -9,11 +9,13 @@ from __future__ import annotations
 import html as html_module
 import logging
 import os
+import random
 import re
 import sys
 import time
 from collections.abc import Mapping
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable, TypeVar
 
@@ -79,6 +81,42 @@ class HttpError(RuntimeError):
         self.error = error if isinstance(error, dict) else {}
 
 
+#: The most `http_get` sleeps across all retries of one request. Its own
+#: backoff schedule stays well under it; a `Retry-After` that would push past
+#: it fails the request at once, so one rate-limited board costs the run
+#: seconds, not the minutes a server may ask for.
+DEFAULT_MAX_WAIT = 30.0
+
+
+def _jitter() -> float:
+    """Up to half a second on top of each backoff wait, so requests that
+    failed together do not all retry in the same instant."""
+    return random.uniform(0.0, 0.5)
+
+
+def retry_after_seconds(value: Any, now: float | None = None) -> float | None:
+    """The wait a `Retry-After` header asks for, in seconds, or None.
+
+    Accepts both RFC 9110 forms, delta-seconds and an HTTP-date; a date
+    already past means 0. Anything else is unreadable, and None tells the
+    caller to keep its own backoff.
+    """
+    # Adapted from ai-job-search (https://github.com/ai-job-search-dev/ai-job-search),
+    # .agents/skills/freehire-search/cli/src/helpers.ts, MIT License, © 2026 Mads Lorentzen.
+    text = value.strip() if isinstance(value, str) else ""
+    if not text:
+        return None
+    if re.fullmatch(r"[0-9]+", text):
+        return float(text)
+    try:
+        moment = parsedate_to_datetime(text)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return None
+    if moment.tzinfo is None:  # "-0000": UTC with no claim about local time
+        moment = moment.replace(tzinfo=timezone.utc)
+    return max(0.0, moment.timestamp() - (time.time() if now is None else now))
+
+
 def http_get(
     url: str,
     *,
@@ -89,12 +127,18 @@ def http_get(
     backoff: float = 1.5,
     session: Any = None,
     sleep: Callable[[float], None] = time.sleep,
+    max_wait: float = DEFAULT_MAX_WAIT,
+    jitter: Callable[[], float] = _jitter,
 ) -> Any:
     """GET with bounded exponential backoff.
 
-    Retries on transport errors and on 429/5xx. Raises `HttpError` when the
-    budget is spent; callers are expected to log-and-skip, never to crash the
-    run over one flaky endpoint.
+    Retries on transport errors and on 429/5xx, waiting `backoff ** n` plus
+    `jitter()` seconds, or longer when the response's `Retry-After` asks for
+    more. All waits together stay within `max_wait`: a retry that would pass
+    it is not attempted. Raises `HttpError` (with `status_code` and limit
+    headers of the last response, when there was one) when the budget is
+    spent; callers are expected to log-and-skip, never to crash the run over
+    one flaky endpoint.
     """
     import requests  # local import: keeps stdlib-only tests importable
 
@@ -103,9 +147,24 @@ def http_get(
     merged.update(headers or {})
 
     last_error: Exception | None = None
+    waited = 0.0
     for attempt in range(max(1, retries)):
         if attempt:
-            sleep(backoff ** attempt)
+            wait = backoff ** attempt + jitter()
+            if isinstance(last_error, HttpError):
+                asked = retry_after_seconds(last_error.headers.get("retry-after"))
+                wait = max(wait, asked or 0.0)
+            if waited + wait > max_wait:
+                # The status line and the "failed after" sentence are both
+                # kept: ats_boards and adzuna classify errors by them.
+                raise HttpError(
+                    f"GET {url} failed after {attempt} attempts: {last_error}; "
+                    f"waiting {wait:.0f}s more would pass the {max_wait:g}s retry budget",
+                    status_code=getattr(last_error, "status_code", None),
+                    headers=getattr(last_error, "headers", None),
+                )
+            sleep(wait)
+            waited += wait
         try:
             response = sess.get(url, params=params, headers=merged, timeout=timeout)
         except Exception as exc:  # transport-level failure
@@ -113,13 +172,17 @@ def http_get(
             continue
         status = getattr(response, "status_code", 0)
         if status == 429 or 500 <= status < 600:
-            last_error = HttpError(f"{url} -> HTTP {status}")
+            last_error = HttpError(f"{url} -> HTTP {status}", status_code=status,
+                                   headers=getattr(response, "headers", None))
             continue
         if status >= 400:
             # 404/403 will not improve by trying again.
-            raise HttpError(f"{url} -> HTTP {status}")
+            raise HttpError(f"{url} -> HTTP {status}", status_code=status,
+                            headers=getattr(response, "headers", None))
         return response
-    raise HttpError(f"GET {url} failed after {retries} attempts: {last_error}")
+    raise HttpError(f"GET {url} failed after {retries} attempts: {last_error}",
+                    status_code=getattr(last_error, "status_code", None),
+                    headers=getattr(last_error, "headers", None))
 
 
 def http_get_json(url: str, **kwargs: Any) -> Any:

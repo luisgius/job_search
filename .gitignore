@@ -1,8 +1,20 @@
 # --- secrets: never commit these ---
+# This repo is public. tests/test_gitignore_contract.py pins these rules.
 gmail_credentials.json
 gmail_token.json
+token.json
+credentials.json
+client_secret*.json
 config.local.yaml
 .env
+.env.*
+!.env.example
+
+# --- local state: tracker databases and backups, wherever they land ---
+*.sqlite3*
+*.db
+*.db-*
+*.bak
 
 # --- your CV is personal data; keep the template, ignore real ones ---
 cv/*.md
@@ -10,6 +22,9 @@ cv/*.md
 !cv/base_cv_ml.md
 !cv/base_cv_product.md
 cv/*.pdf
+cv/*.docx
+# a CV exported next to the code
+/*.pdf
 
 # --- pipeline output: regenerated every run ---
 # `output/*` rather than `output/`: git does not descend into an ignored
@@ -35,6 +50,12 @@ htmlcov/
 
 # --- os ---
 .DS_Store
+
+# --- agent-local state; shared .claude/ config stays committable ---
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/projects/
+.claude/worktrees/
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/

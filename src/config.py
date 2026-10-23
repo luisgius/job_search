@@ -60,6 +60,31 @@ DEFAULT_MAX_AGE_HOURS = 72
 #: it never maximises one.
 DEFAULT_REPOST_MIN_GAP_DAYS = 14
 
+#: Phrases the opt-in cover-letter style lint (`tailoring.style`) reports.
+#: The first six are adapted from ai-job-search
+#: (https://github.com/ai-job-search-dev/ai-job-search),
+#: .claude/skills/job-application-assistant/03-writing-style.md, MIT License,
+#: © 2026 Mads Lorentzen. The rest are what `tailor.build_cover_prompt`
+#: already forbids, so the lint can tell when the model ignored it.
+DEFAULT_BANNED_PHRASES: tuple[str, ...] = (
+    "I am passionate about",
+    "I believe I would be a great fit",
+    "leverage my skills",
+    "hit the ground running",
+    "drive results",
+    "synergies",
+    "I am writing to apply",
+    "I'm writing to apply",
+    "I am writing to express",
+    "innovative culture",
+)
+
+#: CV sections whose bullets are facts to copy, never to re-word: a tailored
+#: CV may drop or reorder them, but every bullet it keeps must be found in the
+#: base CV (`tailoring.entity_check`). Matched case-insensitively against the
+#: `## ` heading text.
+DEFAULT_VERBATIM_SECTIONS: tuple[str, ...] = ("Certifications", "Languages")
+
 DEFAULTS: dict[str, Any] = {
     "applicant": {
         "name": "",
@@ -119,6 +144,10 @@ DEFAULTS: dict[str, Any] = {
         "justjoin_it": False,
         "nofluffjobs": False,
         "allegro": False,
+        # An aggregator of ATS boards (Workday, Oracle, SuccessFactors, …
+        # that no adapter here reaches). Off like every global feed; its
+        # copies lose dedupe to the direct record and never auto-apply.
+        "freehire": False,
         "linkedin_email": False,
     },
     "freshness": {
@@ -140,6 +169,11 @@ DEFAULTS: dict[str, Any] = {
         "allow_remote": True,
         "remote_requires_eu_hint": True,
         "allow_remote_worldwide": False,
+        # One posting listed once per city (No Fluff Jobs rotates the city
+        # list per copy) is scored once: the profile-city copy is kept, the
+        # rest are recorded as `same_posting_other_city`. See
+        # `filters.collapse_variants`; it only ever merges eligible copies.
+        "collapse_city_variants": True,
         "title_include": [],
         # Whole-word, accent-folded and case-insensitive (`filters._matches`),
         # so "intern" cannot reject "International Sales" — which is why this
@@ -245,6 +279,10 @@ DEFAULTS: dict[str, Any] = {
         "candidate_context": "",
         "positive_signals": [],
         "score_caps": [],
+        # Off: caps stay prompt-only, exactly as above. On: each cap is named
+        # by its `id` (default `cap-<n>`) and a score is held, in code, to
+        # the smallest cap the model lists in `caps_fired`.
+        "enforce_caps": False,
     },
     "tailoring": {
         "enabled": True,
@@ -254,6 +292,23 @@ DEFAULTS: dict[str, Any] = {
         "max_per_run": 10,
         "max_tokens": 4000,
         "temperature": 0.2,
+        # Replace everything above the first `## ` heading with the base CV's
+        # header plus the `applicant` contact fields it lacks. The header is
+        # identity, never tailoring, and models mangle it ("Name: …" lines).
+        "pin_header": True,
+        # Reject a CV whose `###` headings (employer, title, degree) match no
+        # base-CV heading, or whose `cv.verbatim_sections` bullets are new.
+        "entity_check": True,
+        # "Mar 2026 – Present" -> "Mar 2026 - Present"; some ATS parsers only
+        # split ranges on the ASCII hyphen. Quantity ranges are left alone.
+        "ascii_date_ranges": False,
+        "style": {
+            # off | flag | repair. `flag` adds cover-letter flags (which block
+            # live apply); `repair` spends one corrective call first.
+            "mode": "off",
+            "banned_phrases": list(DEFAULT_BANNED_PHRASES),
+            "max_em_dashes": 1,
+        },
     },
     "apply": {
         "enabled": True,
@@ -263,6 +318,20 @@ DEFAULTS: dict[str, Any] = {
         "headless": True,
         "timeout_seconds": 60,
         "require_pdf": True,
+        # A posting the posting guard flagged (instruction-shaped text, hidden
+        # tag characters) is never submitted live; dry runs still fill it.
+        "block_on_posting_guard": True,
+    },
+    "pdf": {
+        # Read each rendered PDF back as text: missing glyphs (■), name or
+        # email absent, too many pages, a heading stranded at a page foot.
+        # off | warn (run errors + job status) | block (also withhold the
+        # PDF, so apply.require_pdf sends the job to the digest).
+        "verify": "off",
+        # pdftotext binary; empty = PATH, then /opt/homebrew/bin, /usr/local/bin.
+        "pdftotext": "",
+        "cv_max_pages": 2,
+        "cover_max_pages": 1,
     },
     "output": {
         "dir": "output",
@@ -277,6 +346,15 @@ DEFAULTS: dict[str, Any] = {
         # digest. Applications are blocked forever regardless.
         "skip_seen_days": 30,
     },
+    "tracking": {
+        # The digest's "Follow-ups due" section, fed by what you record with
+        # `python -m src.track`. Read-only: the page suggests a command, it
+        # never records anything. 0 turns a check off; max_followups: 0
+        # means never suggest a follow-up.
+        "followup_days": 10,    # quiet this long since the last activity -> due
+        "stale_days": 60,       # quiet this long -> suggest no_response instead
+        "max_followups": 2,     # nudges per stage before the page stops asking
+    },
     "cv": {
         "path": "cv/base_cv.md",
         # Optional per-role presentations of the SAME facts, picked per job at
@@ -286,6 +364,7 @@ DEFAULTS: dict[str, Any] = {
         # buy nothing and cost a second copy of the truth to keep in sync.
         # Each entry: {path: cv/base_cv_ml.md, title_terms: [ml engineer, …]}.
         "variants": [],
+        "verbatim_sections": list(DEFAULT_VERBATIM_SECTIONS),
     },
     "notify": {
         # The failure this exists for is the quiet one: a morning where every
@@ -322,8 +401,15 @@ BOARD_SOURCE_NAMES: tuple[str, ...] = (
 #: Every source the config knows about, in fetch order.
 SOURCE_NAMES: tuple[str, ...] = BOARD_SOURCE_NAMES + (
     "adzuna", "arbeitnow", "landing_jobs", "justjoin_it", "nofluffjobs",
-    "allegro", "linkedin_email",
+    "allegro", "freehire", "linkedin_email",
 )
+
+#: Search parameters `sources/freehire.py` sets itself. A query may not set
+#: them: paging and format are the adapter's, and `posted_within_days`
+#: filters on freehire's re-dated `posted_at`, not on when a posting appeared.
+FREEHIRE_RESERVED_PARAMS: frozenset[str] = frozenset({
+    "limit", "offset", "description_format", "posted_within_days",
+})
 
 WATCHLIST_DEFAULTS: dict[str, Any] = {
     "greenhouse": [],
@@ -340,6 +426,23 @@ WATCHLIST_DEFAULTS: dict[str, Any] = {
         "max_requests": 12,
         "timeout_seconds": 20,
         "detail_urls": [],
+    },
+    "freehire": {
+        # Search facets, sent as given (a list becomes a repeated param):
+        # Poland, and remote roles open to the EU or worldwide, both cut to
+        # freehire's data/AI categories.
+        "queries": [
+            {"countries": ["pl"],
+             "category": ["data_engineering", "ai_engineering", "data_analytics",
+                          "data_science", "ml_ai"]},
+            {"work_mode": "remote", "regions": ["eu", "global"],
+             "category": ["data_engineering", "ai_engineering", "data_analytics",
+                          "data_science", "ml_ai"]},
+        ],
+        "limit": 50,
+        "max_requests": 6,
+        # Upstreams that are themselves aggregators: reposts, not employers.
+        "exclude_upstream": ["whatjobs-pl", "energyjobline"],
     },
     "adzuna": {
         "countries": [],
@@ -627,6 +730,30 @@ class Config:
                 or not 0 <= threshold <= 100:
             problems.append(f"scoring.threshold must be 0-100, got {threshold!r}")
 
+        # A quoted "true" would read as on to a human and as off to scoring,
+        # which only honours a real boolean.
+        enforce_caps = self.get("scoring.enforce_caps", False)
+        if enforce_caps is not None and not isinstance(enforce_caps, bool):
+            problems.append(
+                f"scoring.enforce_caps must be true or false, got {enforce_caps!r}"
+            )
+        # A cap's id is what the model names in `caps_fired`; two caps
+        # answering to one id would make the enforced ceiling ambiguous.
+        caps = self.get("scoring.score_caps", [])
+        cap_ids: list[str] = []
+        for index, entry in enumerate(caps if isinstance(caps, list) else [], 1):
+            if not isinstance(entry, dict):
+                continue
+            cap_id = entry.get("id")
+            if cap_id is not None and (not isinstance(cap_id, str) or not cap_id.strip()):
+                problems.append(
+                    f"scoring.score_caps[{index}].id must be a non-empty string, got {cap_id!r}"
+                )
+                continue
+            cap_ids.append(str(cap_id or "").strip() or f"cap-{index}")
+        for duplicate in sorted({i for i in cap_ids if cap_ids.count(i) > 1}):
+            problems.append(f"scoring.score_caps has more than one cap with id {duplicate!r}")
+
         max_age = self.get("freshness.max_age_hours", DEFAULT_MAX_AGE_HOURS)
         for name, minimum, maximum in (
             ("backlog_max_jobs", 0, 10000),
@@ -656,6 +783,19 @@ class Config:
                 f"freshness.repost_min_gap_days must be >= 0 (0 = off), got {gap!r}"
             )
 
+        collapse = self.get("filters.collapse_city_variants", True)
+        if not isinstance(collapse, bool):
+            problems.append(
+                f"filters.collapse_city_variants must be true or false, got {collapse!r}"
+            )
+        # Advisory like the repost flag: a wrong value costs a wrong nudge.
+        for name, default in DEFAULTS["tracking"].items():
+            value = self.get(f"tracking.{name}", default)
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                problems.append(
+                    f"tracking.{name} must be a whole number >= 0 (0 = off), got {value!r}"
+                )
+
         if self.source_enabled("adzuna") and not (
             self.get("keys.adzuna_app_id") and self.get("keys.adzuna_app_key")
         ):
@@ -672,6 +812,49 @@ class Config:
                 problems.append(
                     f"sources.linkedin_email is on but {creds} is missing "
                     "(download OAuth desktop credentials from Google Cloud Console)"
+                )
+
+        # freehire's queries go to the API as written: a malformed one fetches
+        # nothing, or the wrong market, every morning without a word.
+        if self.source_enabled("freehire"):
+            settings = self.watchlist.get("freehire")
+            settings = settings if isinstance(settings, dict) else {}
+            queries = settings.get("queries")
+            if not isinstance(queries, list) or not queries:
+                problems.append(
+                    "sources.freehire is on but watchlist.freehire.queries is empty"
+                )
+                queries = []
+            for index, query in enumerate(queries):
+                if not isinstance(query, dict) or not query:
+                    problems.append(
+                        f"watchlist.freehire.queries[{index}] must be a mapping "
+                        "of search facets"
+                    )
+                    continue
+                owned = sorted({str(k) for k in query} & FREEHIRE_RESERVED_PARAMS)
+                if owned:
+                    problems.append(
+                        f"watchlist.freehire.queries[{index}] sets "
+                        f"{', '.join(owned)} — paging and format are the "
+                        "adapter's, and posted_within_days filters on "
+                        "freehire's re-dated posted_at"
+                    )
+            for name, maximum in (("limit", 100), ("max_requests", 20)):
+                value = settings.get(name, WATCHLIST_DEFAULTS["freehire"][name])
+                if isinstance(value, bool) or not isinstance(value, int) \
+                        or not 1 <= value <= maximum:
+                    problems.append(
+                        f"watchlist.freehire.{name} must be an integer "
+                        f"1-{maximum}, got {value!r}"
+                    )
+            excluded = settings.get("exclude_upstream", [])
+            if not isinstance(excluded, list) or not all(
+                isinstance(name, str) for name in excluded
+            ):
+                problems.append(
+                    "watchlist.freehire.exclude_upstream must be a list of "
+                    "upstream source names"
                 )
 
         enabled = [n for n in SOURCE_NAMES if self.source_enabled(n)]
@@ -692,6 +875,20 @@ class Config:
             problems.append(
                 f"llm.structured_output must be auto, native or prompt — got {mode!r}"
             )
+
+        # YAML reads a bare `off` as False; a bare `on` (True) is ambiguous
+        # between warn and block, so it is refused rather than guessed.
+        verify = self.get("pdf.verify", "off")
+        if verify is not False and str(verify).strip().lower() not in (
+            "off", "warn", "block"
+        ):
+            problems.append(f"pdf.verify must be off, warn or block — got {verify!r}")
+        for name in ("cv_max_pages", "cover_max_pages"):
+            pages = self.get(f"pdf.{name}", DEFAULTS["pdf"][name])
+            if isinstance(pages, bool) or not isinstance(pages, int) or pages < 1:
+                problems.append(
+                    f"pdf.{name} must be a whole number, 1 or more — got {pages!r}"
+                )
 
         for role in ("scoring", "tailoring"):
             chain = self.get(f"{role}.fallback_models", [])
@@ -740,6 +937,40 @@ class Config:
                     "mapping with `model` (and optional provider/base_url/"
                     "timeout/max_retries)"
                 )
+
+        # A quoted "false" is a truthy string: the gate would stay on while the
+        # user believes they turned it off. Say so instead.
+        block = self.get("apply.block_on_posting_guard", True)
+        if not isinstance(block, bool):
+            problems.append(
+                f"apply.block_on_posting_guard must be true or false, got {block!r}"
+            )
+        # A quoted "false" is a truthy string, so a check the user believes
+        # is off would silently stay on (or the reverse).
+        for name in ("pin_header", "entity_check", "ascii_date_ranges"):
+            value = self.get(f"tailoring.{name}", DEFAULTS["tailoring"][name])
+            if not isinstance(value, bool):
+                problems.append(f"tailoring.{name} must be true or false, got {value!r}")
+        # YAML reads a bare `off` as False, which is what the user meant.
+        style_mode = self.get("tailoring.style.mode", "off")
+        if style_mode is not False and str(style_mode).strip().lower() not in (
+            "off", "flag", "repair"
+        ):
+            problems.append(
+                f"tailoring.style.mode must be off, flag or repair — got {style_mode!r}"
+            )
+        dashes = self.get("tailoring.style.max_em_dashes", 1)
+        if isinstance(dashes, bool) or not isinstance(dashes, int) or dashes < 0:
+            problems.append(
+                f"tailoring.style.max_em_dashes must be a whole number, 0 or more — "
+                f"got {dashes!r}"
+            )
+        for path in ("tailoring.style.banned_phrases", "cv.verbatim_sections"):
+            value = self.get(path, [])
+            if not isinstance(value, list) or not all(
+                isinstance(item, str) and item.strip() for item in value
+            ):
+                problems.append(f"{path} must be a list of non-empty strings")
 
         # Loud about the one setting that can send email on the user's behalf.
         if self.get("apply.enabled") and not self.get("apply.dry_run"):

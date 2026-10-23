@@ -308,6 +308,10 @@ class Score:
     verdict: str = ""                # one-line summary from the model
     model: str = ""
     error: str | None = None         # set when the call failed / was unparseable
+    # Set only by `scoring.enforce_caps`: the model's own value when a cap it
+    # declared lowered `value`, and the ids of the caps that did the lowering.
+    raw_value: int | None = None
+    caps_applied: list[str] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:

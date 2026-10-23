@@ -855,11 +855,17 @@ class LLMClient:
         schema: Mapping[str, Any] | None = None,
         structured: str = "auto",
         sleep: Callable[[float], None] | None = None,
+        accept_schema: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """`complete()` plus `extract_json()`.
 
         `schema_hint` is appended to the prompt when given — a literal example
         of the wanted object buys more compliance than any amount of prose.
+
+        `accept_schema`, when given, replaces `schema` as the validator of the
+        reply; the provider still receives `schema`. It is for a caller whose
+        own parser forgives shapes the grammar should never produce — scoring
+        asks for an integer and can still read 72.0 or "82/100".
 
         `schema` + `structured` choose the transport for the object itself.
         When the (mode, provider) pair supports it, the schema is enforced by
@@ -872,6 +878,7 @@ class LLMClient:
         the existing prompt + `extract_json` route is unchanged. Never delete
         that route: it is the fallback and the second validation layer.
         """
+        accept = accept_schema or schema
         if schema and _native_schema_wanted(structured, self.provider):
             try:
                 reply = self.complete(
@@ -900,7 +907,7 @@ class LLMClient:
                         "the structured reply reproduces the job posting "
                         "verbatim — refusing planted text as an answer"
                     )
-                return validate_json_result(candidate, require_keys=require_keys, schema=schema)
+                return validate_json_result(candidate, require_keys=require_keys, schema=accept)
 
         text = prompt
         if schema_hint:
@@ -919,7 +926,7 @@ class LLMClient:
             ),
             require_keys=require_keys,
             forbid_verbatim=forbid_verbatim,
-        ), require_keys=require_keys, schema=schema)
+        ), require_keys=require_keys, schema=accept)
 
 
 def validate_json_result(value: Any, *, require_keys=None, schema=None) -> dict[str, Any]:
@@ -943,6 +950,9 @@ def validate_json_result(value: Any, *, require_keys=None, schema=None) -> dict[
             raise LLMError(f"invalid JSON result: {path} has wrong type")
         if "enum" in spec and node not in spec["enum"]:
             raise LLMError(f"invalid JSON result: {path} is not an allowed value")
+        # JSON Schema `pattern`: strings only, and unanchored (a search).
+        if isinstance(node, str) and "pattern" in spec and not re.search(spec["pattern"], node):
+            raise LLMError(f"invalid JSON result: {path} does not match its pattern")
         if isinstance(node, Mapping):
             if spec.get("additionalProperties") is False and set(node) - set(spec.get("properties", {})):
                 raise LLMError(f"invalid JSON result: {path} has unexpected fields")
@@ -1371,7 +1381,8 @@ class ModelChain:
                 result = target(**{**kwargs, "model": model})
                 if method == "complete_json":
                     result = validate_json_result(result, require_keys=kwargs.get("require_keys"),
-                                                  schema=kwargs.get("schema"))
+                                                  schema=kwargs.get("accept_schema")
+                                                  or kwargs.get("schema"))
             except LLMError as exc:
                 logger.warning("model chain: %s failed (%s) — trying the next "
                                "entry", model, exc)

@@ -22,10 +22,12 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from .llm import LLMError, chain_from_config, structured_mode, validate_json_result
 from .models import ApplyStatus, Job, Score, ScoredJob
+from .posting_guard import clean_description, clean_field, guard_job, is_flagged
 from .util import get_logger, truncate
 
 logger = get_logger(__name__)
@@ -61,7 +63,23 @@ RESPONSE_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
 }
 
+#: The key `scoring.enforce_caps` adds to that contract: the ids of the score
+#: caps the model says fired. Sent required but nullable, with an item type:
+#: strict structured output (OpenAI's `strict: true`) rejects an optional
+#: property, and an array with no `items`.
+CAPS_FIRED_SCHEMA: dict[str, Any] = {"type": ["array", "null"], "items": {"type": "string"}}
+
+#: What a reply's `caps_fired` is validated against. Never required — a reply
+#: without it simply enforces nothing — a bare string counts as a one-item
+#: list, and `false` as none fired.
+CAPS_FIRED_ACCEPT: dict[str, Any] = {"type": ["array", "string", "boolean", "null"]}
+
 _NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
+
+#: The only score strings a reply may carry: a 0-100 value, optionally with a
+#: decimal part and "/100" or "%". Anchored, because a search found a number
+#: in "8/10" (8), "N/A (0 of 3 requirements)" (0) and "-20" (clamped to 0).
+_SCORE_TEXT_RE = re.compile(r"^\s*(?:100|\d{1,2})(?:[.,]\d+)?\s*(?:/\s*100|%)?\s*$")
 
 #: Wrapped around every job description before it enters a prompt.
 #:
@@ -201,7 +219,10 @@ def _candidate_rules(config: Any) -> str:
       the condition, the score must not exceed the cap. This is the lesson a
       rejection teaches ("requires transformer research" -> cap 60): the cap
       spends zero tailoring hours on a loop the candidate cannot pass, while
-      still showing the job in the digest below threshold.
+      still showing the job in the digest below threshold. With
+      `scoring.enforce_caps: true` each line also names the cap's id, and
+      `_apply_caps` holds the score to any cap the model lists in
+      `caps_fired` — in code, not only in the prompt.
 
     The threshold (65) and max_jobs stay untouched by any of this.
     """
@@ -223,23 +244,54 @@ def _candidate_rules(config: Any) -> str:
             + "\n".join(f"- {term}" for term in signal_terms)
         )
 
-    caps = _cfg(config, "scoring.score_caps", []) or []
+    enforce = _enforce_caps(config)
     cap_lines: list[str] = []
+    for cap_id, when, cap in _score_caps(config):
+        # The id is named only when code enforces the caps; with the flag
+        # off every line stays byte-for-byte what it has always been.
+        label = f"[{cap_id}] " if enforce else ""
+        declare = " and list its id in `caps_fired`" if enforce else ""
+        cap_lines.append(
+            f"- {label}If the posting {when}: the score MUST NOT exceed "
+            f"{cap}. Say which cap fired in `reasons`{declare}."
+        )
+    if cap_lines:
+        block = "HARD CAPS — non-negotiable ceilings:\n" + "\n".join(cap_lines)
+        if enforce:
+            block += (
+                "\n`caps_fired` is an optional sixth key beside the five under "
+                "OUTPUT: the ids of every cap that fired, [] when none did."
+            )
+        lines.append(block)
+
+    return "\n\n".join(lines)
+
+
+def _enforce_caps(config: Any) -> bool:
+    """`scoring.enforce_caps`: hold scores to the caps the model declares, in
+    code. Only a real `true` turns it on; `Config.validate` flags the rest."""
+    return _cfg(config, "scoring.enforce_caps", False) is True
+
+
+def _score_caps(config: Any) -> list[tuple[str, str, int]]:
+    """The well-formed `scoring.score_caps` entries, as `(id, when, cap)`.
+
+    Malformed entries are skipped, not fatal. `id` is optional and defaults
+    to `cap-<n>`, n counting entries as written (1-based), so a skipped entry
+    does not renumber the ones after it.
+    """
+    caps = _cfg(config, "scoring.score_caps", []) or []
+    found: list[tuple[str, str, int]] = []
     if isinstance(caps, list):
-        for entry in caps:
+        for index, entry in enumerate(caps, 1):
             if not isinstance(entry, Mapping):
                 continue
             when = str(entry.get("when") or "").strip()
             cap = _int(entry.get("cap"), -1)
             if when and 0 <= cap <= 100:
-                cap_lines.append(
-                    f"- If the posting {when}: the score MUST NOT exceed "
-                    f"{cap}. Say which cap fired in `reasons`."
-                )
-    if cap_lines:
-        lines.append("HARD CAPS — non-negotiable ceilings:\n" + "\n".join(cap_lines))
-
-    return "\n\n".join(lines)
+                cap_id = str(entry.get("id") or "").strip() or f"cap-{index}"
+                found.append((cap_id, when, cap))
+    return found
 
 
 def build_prompt(
@@ -248,6 +300,7 @@ def build_prompt(
     applicant: Mapping[str, Any] | None,
     *,
     rules: str = "",
+    caps_fired: bool = False,
 ) -> str:
     """The scoring prompt: candidate header + full CV + one posting + rubric.
 
@@ -255,17 +308,22 @@ def build_prompt(
     while the posting is truncated — the ad's second half is benefits copy,
     and the CV is what the score is actually about. `rules` is
     `_candidate_rules(config)`: positioning, positive signals and hard caps
-    the user configured for themselves.
+    the user configured for themselves. `caps_fired` is true when those caps
+    ask for the sixth key (`scoring.enforce_caps`), so OUTPUT offers it too.
     """
     posted = (
         job.posted_at.strftime("%Y-%m-%d %H:%M UTC")
         if job.posted_at
         else "unknown (the source published no date)"
     )
+    # Every posting field is cleaned of invisible characters; the one-line
+    # fields are kept on one line, and the description cannot carry a copy of
+    # the fence it is about to be wrapped in. The words themselves pass
+    # through — what the posting says is evidence (see `posting_guard`).
     facts = [
-        f"Company: {job.company or 'unknown'}",
-        f"Title: {job.title or 'unknown'}",
-        f"Location: {job.location or 'unstated'}",
+        f"Company: {clean_field(job.company) or 'unknown'}",
+        f"Title: {clean_field(job.title) or 'unknown'}",
+        f"Location: {clean_field(job.location) or 'unstated'}",
         f"Posted: {posted}",
         f"URL: {job.url}",
         f"Source: {job.source}",
@@ -273,9 +331,9 @@ def build_prompt(
     if job.remote is not None:
         facts.append(f"Remote: {'yes' if job.remote else 'no'}")
     if job.salary:
-        facts.append(f"Salary: {job.salary}")
+        facts.append(f"Salary: {clean_field(job.salary)}")
 
-    description = truncate(job.description or "", DESCRIPTION_LIMIT)
+    description = truncate(clean_description(job.description), DESCRIPTION_LIMIT)
     if not description.strip():
         description = "(no description available — judge on title and company only)"
     caveat = ""
@@ -290,6 +348,8 @@ def build_prompt(
     if rules.strip():
         candidate_block += f"{rules.strip()}\n\n"
     facts_block = "\n".join(facts)
+    keys = ("Use these five keys, plus the optional sixth, `caps_fired`, "
+            "described under HARD CAPS" if caps_fired else "Use exactly these five keys")
 
     return f"""\
 Score how well this candidate fits this specific posting.
@@ -351,7 +411,7 @@ RULES
 
 OUTPUT
 Return STRICT JSON and nothing else — no prose before or after, no markdown,
-no code fences. Use exactly these five keys:
+no code fences. {keys}:
 {SCHEMA_HINT}
 
 `reasons`, `strengths` and `gaps` are lists of short strings (0-5 entries
@@ -410,17 +470,29 @@ def parse_score(payload: Mapping[str, Any] | Any) -> Score:
         return Score(value=0, error=f"model returned {type(payload).__name__}, not an object")
 
     number = _coerce_number(payload.get("score"))
+    error = None
     if number is None:
+        error = f"no numeric 'score' in model response (got {payload.get('score')!r})"
+    elif 0 < number < 10 and not number.is_integer():
+        # 0.85 or 8.5 is another scale's answer (0-1, 0-10), not a 0-100
+        # score; rounding it to 1 or 9 would rank the job on a number the
+        # model never meant.
+        error = f"'score' {payload.get('score')!r} reads as a 0-1 or 0-10 scale, not 0-100"
+    if error:
         return Score(
             value=0,
             reasons=_string_list(payload.get("reasons")),
             strengths=_string_list(payload.get("strengths")),
             gaps=_string_list(payload.get("gaps")),
             verdict=str(payload.get("verdict") or "").strip(),
-            error=f"no numeric 'score' in model response (got {payload.get('score')!r})",
+            error=error,
         )
 
-    value = int(round(max(0.0, min(100.0, number))))
+    # Half-up, on the decimal the model wrote: 64.5 is 65. `round()` rounds
+    # half to even, which put 64.5 at 64 — one point under the default
+    # threshold of 65.
+    clamped = max(0.0, min(100.0, number))
+    value = int(Decimal(str(clamped)).quantize(Decimal(1), rounding=ROUND_HALF_UP))
     return Score(
         value=value,
         reasons=_string_list(payload.get("reasons")),
@@ -428,6 +500,74 @@ def parse_score(payload: Mapping[str, Any] | Any) -> Score:
         gaps=_string_list(payload.get("gaps")),
         verdict=str(payload.get("verdict") or "").strip(),
     )
+
+
+def _response_schema(enforce_caps: bool) -> dict[str, Any]:
+    """What the provider is asked for. With caps enforced, `RESPONSE_SCHEMA`
+    plus a required, nullable `caps_fired`; otherwise `RESPONSE_SCHEMA`
+    itself."""
+    if not enforce_caps:
+        return RESPONSE_SCHEMA
+    return {**RESPONSE_SCHEMA,
+            "properties": {**RESPONSE_SCHEMA["properties"], "caps_fired": CAPS_FIRED_SCHEMA},
+            "required": [*RESPONSE_SCHEMA["required"], "caps_fired"]}
+
+
+def _accepting(schema: Mapping[str, Any]) -> dict[str, Any]:
+    """A copy of `schema` whose `score` admits every shape `parse_score` reads.
+
+    The provider is still sent `schema`: an integer is what grammar-
+    constrained decoding should produce. But the reply is validated before
+    `parse_score` sees it, and checking 72.0, 64.5, "72" or "82/100" against
+    "integer" turned each into "response.score has wrong type" — a burned
+    fallback attempt, or SCORING_PENDING. A string must be a 0-100 value
+    and nothing else (`_SCORE_TEXT_RE`): "8/10" or "N/A (0 of 3)" fails
+    here, so a chain can still ask its next model; numbers keep the 0-100
+    range and finiteness checks, and `parse_score` refuses a fraction.
+
+    `caps_fired` goes back to optional and lenient: a bare string or `false`
+    is read, not refused (`_apply_caps`).
+    """
+    properties = dict(schema["properties"])
+    properties["score"] = {**properties["score"],
+                           "type": ["integer", "number", "string"],
+                           "pattern": _SCORE_TEXT_RE.pattern}
+    if "caps_fired" in properties:
+        properties["caps_fired"] = CAPS_FIRED_ACCEPT
+    return {**schema, "properties": properties,
+            "required": [key for key in schema["required"] if key != "caps_fired"]}
+
+
+def _apply_caps(score: Score, fired: Any, caps: list[tuple[str, str, int]]) -> Score:
+    """Hold `score` to the smallest configured cap the model says fired.
+
+    Only ever lowers: value becomes min(value, cap). The model's own number
+    moves to `raw_value`, and the enforcement is written into `reasons` so
+    the digest shows it. An id the config does not define is noted in
+    `reasons` and otherwise ignored — a typo in the reply is no reason to
+    lose its score. `false` means none fired; `true` names no cap, so it is
+    noted the same way. An errored score is returned untouched: it has no
+    value to cap, and its error must stay exactly as visible as it was.
+    """
+    if score.error:
+        return score
+    if fired is True:
+        score.reasons.append("caps_fired was true without naming a cap, not enforced")
+    known = {cap_id: cap for cap_id, _, cap in caps}
+    named = list(dict.fromkeys(_string_list(fired)))
+    unknown = [cap_id for cap_id in named if cap_id not in known]
+    if unknown:
+        score.reasons.append("caps_fired named unknown cap id(s), not enforced: "
+                             + ", ".join(unknown))
+    declared = [(cap_id, known[cap_id]) for cap_id in named if cap_id in known]
+    if declared:
+        cap_id, cap = min(declared, key=lambda item: item[1])
+        if score.value > cap:
+            score.raw_value = score.value
+            score.value = cap
+            score.caps_applied.append(cap_id)
+            score.reasons.append(f"cap {cap_id} enforced: {score.raw_value}→{cap}")
+    return score
 
 
 # --------------------------------------------------------------------------
@@ -443,13 +583,31 @@ def _resolve_client(config: Any, client: Any) -> Any:
 
 def score_job(job: Job, cv_markdown: str, config: Any, *, client: Any = None) -> Score:
     """Score one posting. Never raises — failures come back as `Score.error`."""
+    # Advisory only: records on job.raw what the posting guard saw, for the
+    # digest and auto-apply. It never changes the score, and a bug in it must
+    # not cost one.
+    try:
+        guard = guard_job(job)
+        if is_flagged(guard):
+            logger.warning("%s: %s", job.label, guard["verdict"])
+    except Exception as exc:
+        logger.warning("posting guard failed for %s: %s", job.label, exc)
     model = str(_cfg(config, "scoring.model", DEFAULT_MODEL) or DEFAULT_MODEL)
     max_tokens = _int(_cfg(config, "scoring.max_tokens", DEFAULT_MAX_TOKENS), DEFAULT_MAX_TOKENS)
     temperature = _float(
         _cfg(config, "scoring.temperature", DEFAULT_TEMPERATURE), DEFAULT_TEMPERATURE
     )
+    enforce_caps = _enforce_caps(config)
+    schema = _response_schema(enforce_caps)
+    accept = _accepting(schema)
 
     try:
+        # The model reads the cleaned description, and cleaning changes text
+        # (a soft hyphen inside a key, a defanged fence marker inside a
+        # value), so a copy of either form is a copy of the posting.
+        cleaned = clean_description(job.description)
+        untrusted = (job.description if cleaned == (job.description or "")
+                     else f"{job.description}\n{cleaned}")
         llm = _resolve_client(config, client)
         payload = llm.complete_json(
             model=model,
@@ -459,18 +617,22 @@ def score_job(job: Job, cv_markdown: str, config: Any, *, client: Any = None) ->
             # the verdict.
             require_keys=RESPONSE_KEYS,
             # The posting itself, so an object quoted out of it can never be
-            # mistaken for the model's verdict.
-            forbid_verbatim=job.description,
+            # mistaken for the model's verdict — raw and cleaned (above).
+            forbid_verbatim=untrusted,
             prompt=build_prompt(job, cv_markdown, _applicant(config),
-                                rules=_candidate_rules(config)),
+                                rules=_candidate_rules(config),
+                                caps_fired=enforce_caps and bool(_score_caps(config))),
             max_tokens=max_tokens,
             temperature=temperature,
             # Enforced by grammar where the provider supports it; a no-op
             # (the prompt path) everywhere else, injected fakes included.
-            schema=RESPONSE_SCHEMA,
+            schema=schema,
+            # What the reply is validated against instead: every score shape
+            # `parse_score` reads, so it stays the one place a score is decided.
+            accept_schema=accept,
             structured=structured_mode(config),
         )
-        validate_json_result(payload, require_keys=RESPONSE_KEYS, schema=RESPONSE_SCHEMA)
+        validate_json_result(payload, require_keys=RESPONSE_KEYS, schema=accept)
     except LLMError as exc:
         logger.warning("scoring %s failed: %s", job.label, exc)
         return Score(value=0, model=model, error=str(exc))
@@ -479,6 +641,8 @@ def score_job(job: Job, cv_markdown: str, config: Any, *, client: Any = None) ->
         return Score(value=0, model=model, error=str(exc))
 
     score = parse_score(payload)
+    if enforce_caps:
+        score = _apply_caps(score, payload.get("caps_fired"), _score_caps(config))
     # A chain may have answered from a fallback; attribute the score to the
     # model that actually produced it, not the one the config hoped for.
     score.model = getattr(llm, "last_model", None) or model

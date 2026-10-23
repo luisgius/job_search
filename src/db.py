@@ -6,9 +6,11 @@ The tracker separates sightings, application history and processing work:
   applications  the outcome per job (digest / dry-run / applied / failed)
   scoring_backlog  bounded pending evidence and durable retry/stop reasons
   submit_attempts  write-ahead protection against repeated submissions
+  application_events  what happened after the click (interview, rejection…)
 
 `has_applied()` is the hard gate in front of the auto-apply stage, and
-`should_surface()` is the softer gate in front of the digest.
+`should_surface()` is the softer gate in front of the digest. Both read
+`applications.status` only; the outcome log never moves either gate.
 
 Schema changes go through `MIGRATIONS`; `PRAGMA user_version` tracks where a
 database is, so an existing tracker upgrades in place instead of exploding.
@@ -17,15 +19,20 @@ database is, so an existing tracker upgrades in place instead of exploding.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterable, Iterator, Mapping
+from urllib.parse import urlsplit
 
 from .models import ApplyStatus, Job, ensure_utc, utcnow
+from .util import canonical_url, get_logger
 
-SCHEMA_VERSION = 4
+logger = get_logger(__name__)
+
+SCHEMA_VERSION = 6
 
 MIGRATIONS: list[str] = [
     # v1 — initial schema
@@ -114,6 +121,42 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX idx_scoring_backlog_due ON scoring_backlog(state, next_attempt_at);
     """,
+    # v5 — what happened after the click. `applications.status` stays the
+    # apply gate; this is an append-only log of the outcomes recorded by hand
+    # (`python -m src.track`) plus the `applied` event `record_status` writes
+    # when a row first becomes applied. Rows that were already applied get
+    # that event backfilled, dated from `updated_at` — the last time the
+    # submission was recorded — so their follow-up clock has a start.
+    #
+    # Idempotent (IF NOT EXISTS / NOT EXISTS) because the INSERT makes this
+    # the first migration that moves data, and `migrate` bumps user_version
+    # in a separate statement: a crash between the two must re-run cleanly.
+    # The JOIN keeps an orphaned application row from failing the foreign key.
+    """
+    CREATE TABLE IF NOT EXISTS application_events (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        key          TEXT NOT NULL REFERENCES jobs(key),
+        stage        TEXT NOT NULL,
+        note         TEXT NOT NULL DEFAULT '',
+        occurred_on  TEXT NOT NULL,
+        recorded_at  TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_application_events_key
+        ON application_events (key, occurred_on);
+    INSERT INTO application_events (key, stage, note, occurred_on, recorded_at)
+    SELECT a.key, 'applied', 'backfilled from status ' || a.status,
+           substr(a.updated_at, 1, 10), a.updated_at
+    FROM applications a JOIN jobs j ON j.key = a.key
+    WHERE a.status IN ('applied', 'submitted_unconfirmed')
+      AND NOT EXISTS (SELECT 1 FROM application_events e
+                      WHERE e.key = a.key AND e.stage = 'applied');
+    """,
+    # v6 — was the outcome judged on the full posting (1) or on a snippet
+    # (0)? NULL, unknown, for every row recorded before this column, and
+    # `handled_twin` reads unknown as "maybe only a snippet".
+    """
+    ALTER TABLE applications ADD COLUMN full_text INTEGER;
+    """,
 ]
 
 # Statuses that mean "this job has been sent somewhere on your behalf".
@@ -135,6 +178,129 @@ HANDLED_STATUSES: frozenset[str] = frozenset(
         ApplyStatus.FILTERED.value,
     }
 )
+
+# What a *twin* on another board must hold for `handled_twin` to call this
+# posting handled: `HANDLED_STATUSES` minus `filtered`. A filter verdict is
+# about one copy's data — its date, its location string, its body — and the
+# copy in hand passed the filters today, so another board's rejection is no
+# evidence anyone has looked at the job. Counting it would drop a passing
+# posting unscored; a dropped posting is invisible, a duplicate card costs a
+# glance. `scored_below` counts only under the richness rule in
+# `handled_twin`: a verdict on a snippet says nothing about the full ad.
+TWIN_HANDLED_STATUSES: frozenset[str] = HANDLED_STATUSES - {ApplyStatus.FILTERED.value}
+
+#: What happened after the click, recorded in `application_events`.
+#: Deliberately NOT `ApplyStatus` values: `applications.status` stays the one
+#: apply gate, and ten outcome words in that column would have every gate
+#: (`has_applied`, `should_surface`, the no-downgrade guard) to re-learn.
+OUTCOME_STAGES: tuple[str, ...] = (
+    "applied", "followed_up", "interview", "offer", "hired",
+    "rejected", "no_response", "offer_declined", "withdrawn", "dismissed",
+)
+
+#: Stages that close an application. Anything recorded after one needs
+#: `force=True`, so a key typed from memory cannot quietly reopen it.
+FINAL_STAGES: frozenset[str] = frozenset(
+    {"hired", "rejected", "no_response", "offer_declined", "withdrawn", "dismissed"}
+)
+
+#: Relevance labels for evaluating the ranking (docs/ROADMAP.md asks for
+#: pursue / stretch / dismiss). They judge the posting, not an application:
+#: they never imply one, never close one, and are accepted after a final stage.
+LABEL_STAGES: tuple[str, ...] = ("label_pursue", "label_stretch", "label_dismiss")
+
+#: Spellings accepted on input; only the right-hand side is ever stored.
+#: No bare "dismiss": it could mean the final stage or the label.
+STAGE_ALIASES: dict[str, str] = {
+    "ghosted": "no_response",
+    "no response": "no_response",
+    "declined": "offer_declined",
+    "followed up": "followed_up",
+    "follow up": "followed_up",
+    "followup": "followed_up",
+    "interviewing": "interview",
+    "pursue": "label_pursue",
+    "stretch": "label_stretch",
+}
+
+#: Stages that do not mean an application went out. Every other stage does —
+#: an interview, a rejection or a withdrawal (only a sent application can be
+#: withdrawn) is evidence of a submission — so recording one on a job the
+#: tracker never saw applied marks it applied, and on an unconfirmed
+#: submission confirms it.
+NON_SUBMITTING_STAGES: frozenset[str] = frozenset({"dismissed", *LABEL_STAGES})
+
+#: How `filters.collapse_variants` begins the reason recorded on a copy held
+#: back for another copy of the same posting, whose key's first eight
+#: characters follow in parentheses — a `filtered` row, or a `protected`
+#: scoring tombstone.
+VARIANT_HOLD = "same_posting_other_city:"
+_HOLDER_RE = re.compile(r"\(([0-9a-f]{8})\)")
+
+#: Shortest key prefix `jobs_matching` resolves. Keys are 16 hex characters;
+#: with six, a given prefix matching a second job among tens of thousands is
+#: already unlikely, and an ambiguous prefix is refused rather than guessed.
+MIN_KEY_PREFIX = 6
+
+
+class OutcomeClosedError(ValueError):
+    """An event was refused because the application already has a final stage."""
+
+
+def normalize_stage(value: Any) -> str:
+    """`" Ghosted "` -> `"no_response"`. ValueError for an unknown stage."""
+    text = " ".join(str(value or "").strip().lower().replace("-", " ").replace("_", " ").split())
+    stage = STAGE_ALIASES.get(text, text.replace(" ", "_"))
+    if stage not in OUTCOME_STAGES and stage not in LABEL_STAGES:
+        raise ValueError(
+            f"unknown stage {value!r} — one of: {', '.join(OUTCOME_STAGES + LABEL_STAGES)}"
+        )
+    return stage
+
+
+def _event_day(value: date | str) -> str:
+    """A calendar day as `YYYY-MM-DD`. ValueError for anything else."""
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    text = str(value or "").strip()
+    try:
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+            raise ValueError
+        return date.fromisoformat(text).isoformat()
+    except ValueError:
+        raise ValueError(f"expected a YYYY-MM-DD date, got {value!r}") from None
+
+
+def _summarise(events: list[Mapping[str, Any]], status: str | None,
+               updated_at: str | None) -> dict[str, Any]:
+    """Where one application stands, from its events in (occurred_on, id) order.
+
+    `followed_up` counts the follow-ups since the current stage began, so an
+    interview restarts the budget: a nudge after an interview is a different
+    email from the two already sent after applying. Labels are not activity.
+    """
+    lifecycle = [e for e in events if e["stage"] not in LABEL_STAGES]
+    labels = [e["stage"] for e in events if e["stage"] in LABEL_STAGES]
+    stage, followed_up = "", 0
+    for event in lifecycle:
+        if event["stage"] == "followed_up":
+            followed_up += 1
+        else:
+            stage, followed_up = event["stage"], 0
+    if not stage and status in TERMINAL_APPLY_STATUSES:
+        stage = ApplyStatus.APPLIED.value
+    return {
+        "stage": stage,
+        "followed_up": followed_up,
+        "last_activity": (lifecycle[-1]["occurred_on"] if lifecycle
+                          else str(updated_at or "")[:10]),
+        "closed": bool(lifecycle) and lifecycle[-1]["stage"] in FINAL_STAGES,
+        "applied_on": next((e["occurred_on"] for e in lifecycle
+                            if e["stage"] == "applied"), ""),
+        "label": labels[-1] if labels else "",
+    }
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -220,7 +386,14 @@ class Tracker:
         return True
 
     def observe_scoring(self, job: Job, *, now: datetime) -> Job:
-        """Refresh evidence, preserving the posting date at queue admission."""
+        """Refresh evidence, preserving the posting date at queue admission.
+
+        A full description already queued outlives a thinner sighting. When
+        today's copy is empty or snippet-only — the job fell out of its
+        source's detail-fetch budget this morning — and the stored copy is a
+        real body, the stored body and its `snippet_only=False` state are
+        kept, so the job is not scored on a teaser it was admitted without.
+        """
         row = self.get_scoring(job.key)
         if row is None or row["state"] != "pending":
             raise ValueError("job has no pending scoring work")
@@ -229,6 +402,15 @@ class Tracker:
         data.pop("key")
         data["posted_at"] = original["posted_at"]
         data["raw"] = job.raw
+        stored_raw = original.get("raw") if isinstance(original.get("raw"), dict) else {}
+        thin = bool(job.raw.get("snippet_only")) or not job.description.strip()
+        full = bool(str(original.get("description") or "").strip()) \
+            and not stored_raw.get("snippet_only")
+        if thin and full:
+            data["description"] = original["description"]
+            data["raw"] = {**job.raw, "snippet_only": False}
+            if "description_status" in stored_raw:
+                data["raw"]["description_status"] = stored_raw["description_status"]
         snapshot = json.dumps(data, ensure_ascii=False, default=str)
         if len(snapshot.encode("utf-8")) > 256 * 1024:
             raise ValueError("scoring evidence exceeds 256 KiB")
@@ -565,6 +747,7 @@ class Tracker:
         score_reasons: list[str] | None = None,
         method: str = "",
         artifacts_dir: str | None = None,
+        full_text: bool | None = None,
         now: datetime | None = None,
     ) -> None:
         """Write the outcome for a job.
@@ -573,12 +756,39 @@ class Tracker:
         submitted, a later run recording `digest` must not erase that fact.
         `score_reasons` is the calibration data — JSON-encoded, and like the
         score itself never erased by a later reason-less recording.
+        `full_text` says whether the copy judged had its full description;
+        None keeps what is stored.
+
+        A row that becomes applied (or unconfirmed) for the first time also
+        starts its outcome log with an `applied` event, so an auto-applied
+        job gets a follow-up clock without anyone typing a command.
         """
         status_value = status.value if isinstance(status, ApplyStatus) else str(status)
         stamp = (ensure_utc(now) or utcnow()).isoformat()
         existing = self.get_status(key)
         if existing in TERMINAL_APPLY_STATUSES and status_value not in TERMINAL_APPLY_STATUSES:
             return
+        self._write_status(key, status_value, detail=detail, score=score,
+                           score_reasons=score_reasons, method=method,
+                           artifacts_dir=artifacts_dir, full_text=full_text, stamp=stamp)
+        self.conn.commit()
+        if status_value in TERMINAL_APPLY_STATUSES and existing not in TERMINAL_APPLY_STATUSES:
+            # After the commit on purpose: the row above is the apply gate,
+            # and nothing about the outcome log may ever cost it.
+            try:
+                if not self._has_event(key, "applied"):
+                    note = f"{status_value} via {method}" if method else status_value
+                    self._insert_event(key, "applied", note, stamp[:10], stamp)
+                    self.conn.commit()
+            except sqlite3.Error as exc:
+                self.conn.rollback()
+                logger.warning("could not start the outcome log for %s: %s", key, exc)
+
+    def _write_status(self, key: str, status_value: str, *, detail: str = "",
+                      score: int | None = None, score_reasons: list[str] | None = None,
+                      method: str = "", artifacts_dir: str | None = None,
+                      full_text: bool | None = None, stamp: str) -> None:
+        """The `applications` upsert alone: no downgrade check, no commit."""
         reasons_json = (
             json.dumps([str(r) for r in score_reasons], ensure_ascii=False)
             if score_reasons else None
@@ -586,8 +796,9 @@ class Tracker:
         self.conn.execute(
             """
             INSERT INTO applications (key, status, detail, score, score_reasons,
-                                      method, artifacts_dir, created_at, updated_at)
-            VALUES (?,?,?,?,?,?,?,?,?)
+                                      method, artifacts_dir, full_text,
+                                      created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(key) DO UPDATE SET
                 status        = excluded.status,
                 detail        = excluded.detail,
@@ -598,12 +809,12 @@ class Tracker:
                                      THEN excluded.method ELSE applications.method END,
                 artifacts_dir = COALESCE(excluded.artifacts_dir,
                                          applications.artifacts_dir),
+                full_text     = COALESCE(excluded.full_text, applications.full_text),
                 updated_at    = excluded.updated_at
             """,
-            (key, status_value, detail, score, reasons_json, method,
-             artifacts_dir, stamp, stamp),
+            (key, status_value, detail, score, reasons_json, method, artifacts_dir,
+             None if full_text is None else int(bool(full_text)), stamp, stamp),
         )
-        self.conn.commit()
 
     def get_status(self, key: str) -> str | None:
         row = self.conn.execute(
@@ -647,6 +858,199 @@ class Tracker:
             (key, *sorted(TERMINAL_APPLY_STATUSES)),
         ).fetchone()
         return row is not None
+
+    def has_applied_url(self, url: str) -> bool:
+        """True when a posting at this URL was applied to, or had submit
+        clicked, under **any** key.
+
+        URLs compare as `canonical_url`, so `?gh_src=` and other tracking
+        clutter do not matter. This is what stops the board's copy of a job
+        recorded by hand (`python -m src.track add`) under a key the board
+        never produces — the company typed differently from the board slug,
+        "Warszawa" for "Warsaw".
+        """
+        target = canonical_url(url)
+        if not target:
+            return False
+        placeholders = ",".join("?" * len(TERMINAL_APPLY_STATUSES))
+        rows = self.conn.execute(
+            f"""
+            SELECT j.url FROM applications a JOIN jobs j ON j.key = a.key
+            WHERE a.status IN ({placeholders})
+            UNION ALL
+            SELECT j.url FROM submit_attempts s JOIN jobs j ON j.key = s.key
+            UNION ALL
+            SELECT url FROM submit_attempts
+            """,
+            tuple(sorted(TERMINAL_APPLY_STATUSES)),
+        ).fetchall()
+        return any(canonical_url(row[0]) == target for row in rows)
+
+    def handled_twin(
+        self,
+        dedupe_key: str,
+        *,
+        key: str,
+        source: str | None = None,
+        within_days: int = 30,
+        now: datetime | None = None,
+        full_text: bool | None = None,
+    ) -> dict[str, Any] | None:
+        """The same role, already handled through **another board**.
+
+        `should_surface` is keyed on `Job.key`, and in-run `filters.dedupe`
+        only sees one morning. So a role scored from Greenhouse on Monday came
+        back on Tuesday as the Arbeitnow copy — new key, longer description,
+        so it won the dedupe — and was scored and put in the digest again.
+
+        A row counts when it shares this non-empty `dedupe_key` under a
+        different `key` **and a different `source`**, and holds a
+        `TWIN_HANDLED_STATUSES` status inside the window — same window rule as
+        `should_surface`: a submission counts forever, anything else only
+        within `within_days`, and `within_days <= 0` leaves only submissions.
+        Same-source rows are deliberately ignored: a new id on the same board
+        is a re-listing, which `repost_gap_days` exists to flag, not to hide.
+
+        A `scored_below` twin counts only when the copy in hand is no richer:
+        it is itself a snippet (`full_text=False`), or the twin was scored on
+        its full description. A below-threshold verdict on an aggregator's
+        teaser must not keep the full ATS record from ever being read, and a
+        twin of unknown richness (recorded before that was stored) is
+        treated as a teaser. `full_text=None` means the copy in hand is
+        unknown, so it may be the richer one.
+
+        `source=` falls back to the stored row for `key`, as in
+        `repost_gap_days`. Returns the twin's `key`, `source`, `status` and
+        `updated_at` (a submission first, then the most recent), or None.
+        """
+        clean = str(dedupe_key or "").strip()
+        own = str(key or "")
+        if not clean:
+            return None
+        placeholders = ",".join("?" * len(TWIN_HANDLED_STATUSES))
+        rows = self.conn.execute(
+            f"""
+            SELECT j.key, j.source, a.status, a.updated_at, a.full_text
+            FROM jobs j JOIN applications a ON a.key = j.key
+            WHERE j.dedupe_key = ? AND j.key != ? AND a.status IN ({placeholders})
+            """,
+            (clean, own, *sorted(TWIN_HANDLED_STATUSES)),
+        ).fetchall()
+
+        own_source = _source_key(source)
+        if not own_source:
+            mine = self.get_job(own)
+            own_source = _source_key(mine["source"]) if mine is not None else ""
+        cutoff = (ensure_utc(now) or utcnow()) - timedelta(days=within_days)
+
+        best: tuple[bool, datetime] | None = None
+        found: dict[str, Any] | None = None
+        for row in rows:
+            if _source_key(row["source"]) == own_source:
+                continue
+            if row["status"] == ApplyStatus.SCORED_BELOW.value \
+                    and full_text is not False and row["full_text"] != 1:
+                continue  # judged on less than the copy in hand may hold
+            terminal = row["status"] in TERMINAL_APPLY_STATUSES
+            updated = _parse_iso(row["updated_at"])
+            # Unparseable or out-of-window rows do not block, exactly as
+            # `should_surface` treats its own row.
+            if not terminal and (within_days <= 0 or updated is None or updated < cutoff):
+                continue
+            # `max` in Python, not SQL: ISO strings with and without
+            # microseconds do not sort chronologically as text.
+            rank = (terminal, updated or datetime.min.replace(tzinfo=cutoff.tzinfo))
+            if best is None or rank > best:
+                best, found = rank, dict(row)
+        return found
+
+    def _spoken_for(self, key: str, dedupe_key: str) -> bool:
+        """Applied to, submit clicked, or the same role applied to."""
+        return (self.has_applied(key) or self.submit_attempted(key)
+                or self.has_applied_similar(dedupe_key))
+
+    def release_variant_copies(self, key: str) -> int:
+        """Let the copies held back as `key`'s city variants be judged again.
+
+        `filters.collapse_variants` keeps one copy of a posting listed per
+        city and holds the others back (`VARIANT_HOLD` naming `key`). That
+        is only right while `key` is going to be scored. When its scoring
+        work stops without a score (expired, exhausted, ineligible), those
+        holds are deleted, so each copy's next sighting is new work instead
+        of waiting out the reminder window.
+
+        Never when `key` was applied to, had submit clicked, or shares its
+        role with an application — then the copies stay held back for good
+        reason — and never for a copy with a submit attempt of its own.
+        Returns how many copies were released.
+        """
+        job = self.get_job(key)
+        if job is None or self._spoken_for(key, job["dedupe_key"]):
+            return 0
+        held = (f"FROM applications WHERE status = '{ApplyStatus.FILTERED.value}' "
+                "AND detail LIKE :pattern AND key != :key "
+                "AND key NOT IN (SELECT key FROM submit_attempts)")
+        stopped = ("FROM scoring_backlog WHERE state = 'protected' "
+                   "AND detail LIKE :pattern AND key != :key "
+                   "AND key NOT IN (SELECT key FROM submit_attempts)")
+        params = {"pattern": f"{VARIANT_HOLD}%({key[:8]})%", "key": key}
+        with self.transaction() as conn:
+            released = {row[0] for row in conn.execute(
+                f"SELECT key {held} UNION SELECT key {stopped}", params)}
+            conn.execute(f"DELETE {held}", params)
+            conn.execute(f"DELETE {stopped}", params)
+        return len(released)
+
+    def settle_variant_hold(self, key: str, *, within_days: int = 30,
+                            now: datetime | None = None) -> str | None:
+        """Re-judge `key`'s own `VARIANT_HOLD` now that it won a collapse.
+
+        The copy it was held back for was not seen today, or no longer
+        outranks it. Returns:
+
+        * None — `key` holds no such `filtered` row;
+        * "applied" — that copy was applied to (or clicked, or the role):
+          the hold must outlive the reminder window, so the caller renews
+          it rather than let the gate's window expire it;
+        * "held" — that copy was handled inside the window: the posting
+          was shown, and the hold stands for the gate to read;
+        * "released" — otherwise. The hold is deleted, so the gate judges
+          `key` as new, and that copy's pending scoring work becomes a
+          `protected` hold naming `key`: one copy of a posting in flight at
+          a time, and `release_variant_copies(key)` hands the work back if
+          `key` is never scored. Without this the posting waited out the
+          window while it aged past the freshness filter.
+        """
+        application = self.get_application(key)
+        if application is None or application["status"] != ApplyStatus.FILTERED.value \
+                or not str(application["detail"] or "").startswith(VARIANT_HOLD):
+            return None
+        prefixes = _HOLDER_RE.findall(application["detail"])
+        if not prefixes:
+            return None
+        holders = [dict(row) for row in self.conn.execute(
+            "SELECT key, dedupe_key FROM jobs WHERE substr(key, 1, 8) = ? AND key != ?",
+            (prefixes[-1], key),  # the key follows the place, which is free text
+        )]
+        if any(self._spoken_for(row["key"], row["dedupe_key"]) for row in holders):
+            return "applied"
+        for row in holders:
+            status = self.get_status(row["key"])
+            if status not in (None, ApplyStatus.FILTERED.value) and not self.should_surface(
+                    row["key"], within_days=within_days, now=now):
+                return "held"
+        place = str((self.get_job(key) or {}).get("location") or "").split(",")[0].strip()
+        detail = f"{VARIANT_HOLD} the copy listed for {place or 'no location'} " \
+                 f"({key[:8]}) stands in for it"
+        with self.transaction() as conn:
+            conn.execute("DELETE FROM applications WHERE key = ? AND status = ?",
+                         (key, ApplyStatus.FILTERED.value))
+            conn.executemany(
+                "UPDATE scoring_backlog SET state = 'protected', detail = ?, job_json = NULL "
+                "WHERE key = ? AND state = 'pending'",
+                [(detail, row["key"]) for row in holders],
+            )
+        return "released"
 
     # -- submit attempts --------------------------------------------------
 
@@ -737,6 +1141,166 @@ class Tracker:
             "SELECT status, COUNT(*) AS n FROM applications GROUP BY status"
         ).fetchall()
         return {r["status"]: r["n"] for r in rows}
+
+    # -- outcomes (what happened after the click) -------------------------
+
+    def record_event(self, key: str, stage: str, *, on: date | str,
+                     note: str = "", force: bool = False,
+                     now: datetime | None = None) -> str:
+        """Append one outcome event for `key`; returns the stage as stored.
+
+        A stage that means an application went out (anything outside
+        `NON_SUBMITTING_STAGES`) also tells the apply gate: a row not already
+        applied is upgraded through `record_status(APPLIED, method="manual")`,
+        so `has_applied`, `has_applied_similar` and `should_surface` block it
+        exactly as they block an auto-application. Its `applied` event is
+        dated `on` as well — the latest the submission can have happened.
+        Any such stage on an unconfirmed submission confirms it (status
+        `applied`, no second `applied` event): a recruiter's answer is proof
+        of receipt. `applied` on a row already carrying one writes nothing
+        new beyond that.
+
+        Events and status change in one transaction: a failed status write
+        leaves no event claiming an application the gate does not know.
+
+        After a final stage further events raise `OutcomeClosedError` unless
+        `force` (labels excepted). ValueError for an unknown key, stage or date.
+        """
+        stage_value = normalize_stage(stage)
+        day = _event_day(on)
+        if not self.has_job(key):
+            raise ValueError(f"no job with key {key!r} in the tracker")
+        events = self._events(key)
+        if stage_value not in LABEL_STAGES and not force:
+            summary = _summarise(events, None, None)
+            if summary["closed"]:
+                raise OutcomeClosedError(
+                    f"already closed as {summary['stage']} on "
+                    f"{summary['last_activity']}; recording {stage_value} needs force"
+                )
+        stamp = (ensure_utc(now) or utcnow()).isoformat()
+        with self.transaction():
+            if stage_value not in NON_SUBMITTING_STAGES:
+                implied = "" if stage_value == "applied" else f"implied by {stage_value}"
+                if not any(event["stage"] == "applied" for event in events):
+                    self._insert_event(key, "applied", implied or note, day, stamp)
+                status = self.get_status(key)
+                if status not in TERMINAL_APPLY_STATUSES:
+                    self._write_status(key, ApplyStatus.APPLIED.value, method="manual",
+                                       detail=implied or "recorded by hand", stamp=stamp)
+                elif status == ApplyStatus.SUBMITTED_UNCONFIRMED.value:
+                    confirmed = "receipt confirmed by hand" + (f" ({implied})" if implied else "")
+                    self._write_status(key, ApplyStatus.APPLIED.value, detail=confirmed,
+                                       stamp=stamp)
+                if stage_value == "applied":
+                    return stage_value
+            self._insert_event(key, stage_value, note, day, stamp)
+        return stage_value
+
+    def _events(self, key: str) -> list[dict[str, Any]]:
+        return [dict(row) for row in self.conn.execute(
+            "SELECT stage, note, occurred_on, recorded_at FROM application_events "
+            "WHERE key = ? ORDER BY occurred_on, id", (key,)
+        )]
+
+    def _has_event(self, key: str, stage: str) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM application_events WHERE key = ? AND stage = ? LIMIT 1",
+            (key, stage),
+        ).fetchone()
+        return row is not None
+
+    def _insert_event(self, key: str, stage: str, note: str, day: str, stamp: str) -> None:
+        self.conn.execute(
+            "INSERT INTO application_events (key, stage, note, occurred_on, recorded_at) "
+            "VALUES (?,?,?,?,?)",
+            (key, stage, str(note or "")[:2000], day, stamp),
+        )
+
+    def tracked_applications(self) -> list[dict[str, Any]]:
+        """Every job with an outcome on record, oldest activity first.
+
+        Applied-type rows plus any job with an event (a dismissal or a label
+        on a digest card). Each dict carries the job's company/title/location/
+        url/source, its application `status`, and the `_summarise` fields:
+        `stage`, `followed_up`, `last_activity`, `closed`, `applied_on`, `label`.
+        """
+        placeholders = ",".join("?" * len(TERMINAL_APPLY_STATUSES))
+        rows = self.conn.execute(
+            f"""
+            SELECT j.key, j.company, j.title, j.location, j.url, j.source,
+                   a.status, a.updated_at
+            FROM jobs j LEFT JOIN applications a ON a.key = j.key
+            WHERE a.status IN ({placeholders})
+               OR j.key IN (SELECT key FROM application_events)
+            """,
+            tuple(sorted(TERMINAL_APPLY_STATUSES)),
+        ).fetchall()
+        events: dict[str, list[dict[str, Any]]] = {}
+        for row in self.conn.execute(
+            "SELECT key, stage, note, occurred_on FROM application_events "
+            "ORDER BY key, occurred_on, id"
+        ):
+            events.setdefault(row["key"], []).append(dict(row))
+        tracked = []
+        for row in rows:
+            item = dict(row)
+            item.update(_summarise(events.get(row["key"], []), row["status"], row["updated_at"]))
+            tracked.append(item)
+        tracked.sort(key=lambda item: (item["last_activity"], item["key"]))
+        return tracked
+
+    def open_applications(self) -> list[dict[str, Any]]:
+        """Applied-type rows whose latest outcome is not final — the
+        follow-up list. Read-only; the digest calls it on every run."""
+        return [row for row in self.tracked_applications()
+                if row["status"] in TERMINAL_APPLY_STATUSES and not row["closed"]]
+
+    def outcome_events(self) -> list[dict[str, Any]]:
+        """Every event with its job, in (key, occurred_on) order — the
+        funnel's input and the export's rows."""
+        return [dict(row) for row in self.conn.execute(
+            """
+            SELECT e.key, e.stage, e.note, e.occurred_on, e.recorded_at,
+                   j.source, j.company, j.title, j.location, j.url, a.status
+            FROM application_events e JOIN jobs j ON j.key = e.key
+            LEFT JOIN applications a ON a.key = e.key
+            ORDER BY e.key, e.occurred_on, e.id
+            """
+        )]
+
+    def jobs_matching(self, handle: str) -> list[dict[str, Any]]:
+        """The jobs a hand-typed handle could mean: an exact key, a posting
+        URL, or a key prefix of at least `MIN_KEY_PREFIX` characters. URLs
+        compare as `canonical_url`, so a link copied from the browser with
+        `?gh_src=` still finds the board's record.
+        More than one row is an ambiguity the caller must refuse, not resolve."""
+        text = str(handle or "").strip()
+        if not text:
+            return []
+        columns = "key, company, title, location, url, source"
+        row = self.conn.execute(f"SELECT {columns} FROM jobs WHERE key = ?", (text,)).fetchone()
+        if row is not None:
+            return [dict(row)]
+        target = canonical_url(text) if "://" in text else ""
+        if target:
+            # The path survives canonicalisation byte for byte: a cheap prefilter.
+            path = urlsplit(target).path
+            rows = [r for r in self.conn.execute(
+                f"SELECT {columns} FROM jobs WHERE url = ? OR instr(url, ?) > 0 "
+                "ORDER BY first_seen_at, key", (text, path),
+            ) if r["url"] == text or canonical_url(r["url"]) == target]
+        else:
+            rows = self.conn.execute(
+                f"SELECT {columns} FROM jobs WHERE url = ? ORDER BY first_seen_at, key", (text,)
+            ).fetchall()
+        if rows or "://" in text or len(text) < MIN_KEY_PREFIX:
+            return [dict(r) for r in rows]
+        prefix = text.lower()
+        return [dict(r) for r in self.conn.execute(
+            f"SELECT {columns} FROM jobs WHERE substr(key, 1, ?) = ? ORDER BY key LIMIT 50",
+            (len(prefix), prefix),
+        )]
 
     # -- runs -------------------------------------------------------------
 

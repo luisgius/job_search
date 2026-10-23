@@ -23,6 +23,7 @@ from src.util import (
     http_get,
     http_get_json,
     parse_datetime,
+    retry_after_seconds,
     safe_call,
     setup_logging,
     slugify,
@@ -242,7 +243,8 @@ def test_http_get_does_not_retry_a_403(no_sleep):
 def test_http_get_backs_off_between_attempts(no_sleep):
     session = FakeSession([("x", FakeResponse(status_code=500))])
     with pytest.raises(HttpError):
-        http_get("https://x/", session=session, retries=3, backoff=2.0, sleep=no_sleep)
+        http_get("https://x/", session=session, retries=3, backoff=2.0, sleep=no_sleep,
+                 jitter=lambda: 0.0)
     # Increasing waits, and never a wait before the first attempt.
     assert no_sleep.calls == [2.0, 4.0]
 
@@ -258,6 +260,177 @@ def test_http_get_error_message_names_the_url(no_sleep):
     with pytest.raises(HttpError, match="boards-api"):
         http_get("https://boards-api.greenhouse.io/v1/boards/nope/jobs",
                  session=session, sleep=no_sleep)
+
+
+def test_http_get_sets_status_code_on_a_404_and_keeps_the_message(no_sleep):
+    session = FakeSession([("x", FakeResponse(status_code=404))])
+    with pytest.raises(HttpError) as raised:
+        http_get("https://x/", session=session, sleep=no_sleep)
+    assert raised.value.status_code == 404
+    # adzuna and ats_boards read the status out of this exact sentence.
+    assert str(raised.value) == "https://x/ -> HTTP 404"
+
+
+def test_http_get_exhausted_error_keeps_the_last_status_and_limit_headers(no_sleep):
+    session = FakeSession([("x", FakeResponse(
+        status_code=503, headers={"Retry-After": "1", "Set-Cookie": "secret"}))])
+    with pytest.raises(HttpError) as raised:
+        http_get("https://x/", session=session, retries=3, sleep=no_sleep,
+                 jitter=lambda: 0.0)
+    assert raised.value.status_code == 503
+    assert raised.value.headers == {"retry-after": "1"}
+    assert str(raised.value) == (
+        "GET https://x/ failed after 3 attempts: https://x/ -> HTTP 503")
+
+
+def test_http_get_transport_failure_has_no_status(no_sleep):
+    session = FakeSession([("x", OSError("connection reset"))])
+    with pytest.raises(HttpError) as raised:
+        http_get("https://x/", session=session, retries=2, sleep=no_sleep)
+    assert raised.value.status_code is None and raised.value.headers == {}
+    assert str(raised.value) == "GET https://x/ failed after 2 attempts: connection reset"
+
+
+def test_http_get_forwards_the_timeout_to_the_session(no_sleep):
+    session = FakeSession([("x", json_response({}))])
+    http_get("https://x/", session=session, timeout=7, sleep=no_sleep)
+    assert session.calls[0]["timeout"] == 7
+
+
+def test_http_get_adds_the_injected_jitter_to_its_backoff(no_sleep):
+    session = FakeSession([("x", FakeResponse(status_code=500))])
+    with pytest.raises(HttpError):
+        http_get("https://x/", session=session, retries=3, backoff=2.0,
+                 sleep=no_sleep, jitter=lambda: 0.25)
+    assert no_sleep.calls == [2.25, 4.25]
+
+
+def test_http_get_default_jitter_is_small(no_sleep):
+    session = FakeSession([("x", FakeResponse(status_code=500))])
+    with pytest.raises(HttpError):
+        http_get("https://x/", session=session, retries=3, backoff=2.0, sleep=no_sleep)
+    first, second = no_sleep.calls
+    assert 2.0 <= first <= 2.5 and 4.0 <= second <= 4.5
+
+
+# Retry-After and the total wait budget. Cases adapted from ai-job-search
+# (https://github.com/ai-job-search-dev/ai-job-search),
+# .agents/skills/freehire-search/cli/tests/retry-backoff.test.ts and
+# request-timeout.test.ts, MIT License, © 2026 Mads Lorentzen.
+
+
+def _limited(status, retry_after):
+    return FakeResponse(status_code=status, headers={"Retry-After": retry_after})
+
+
+def test_http_get_waits_as_long_as_a_numeric_retry_after_asks(no_sleep):
+    responses = [_limited(429, "20"), json_response({"ok": 1})]
+    session = FakeSession([("x", lambda url, params: responses.pop(0))])
+    assert http_get("https://x/", session=session, sleep=no_sleep,
+                    jitter=lambda: 0.0).json() == {"ok": 1}
+    assert len(session.calls) == 2
+    assert no_sleep.calls == [20.0]
+
+
+def test_http_get_honours_an_http_date_retry_after(no_sleep):
+    from email.utils import formatdate
+    import time
+
+    responses = [_limited(503, formatdate(time.time() + 20, usegmt=True)),
+                 json_response({"ok": 1})]
+    session = FakeSession([("x", lambda url, params: responses.pop(0))])
+    http_get("https://x/", session=session, sleep=no_sleep, jitter=lambda: 0.0)
+    # HTTP-dates have whole-second resolution; allow for a slow test host.
+    assert len(no_sleep.calls) == 1 and 15.0 <= no_sleep.calls[0] <= 20.0
+
+
+def test_http_get_fails_at_once_when_retry_after_exceeds_the_budget(no_sleep):
+    session = FakeSession([("x", _limited(429, "40"))])
+    with pytest.raises(HttpError, match="retry budget") as raised:
+        http_get("https://x/", session=session, sleep=no_sleep, jitter=lambda: 0.0)
+    assert len(session.calls) == 1
+    assert no_sleep.calls == []
+    assert raised.value.status_code == 429
+    assert raised.value.headers == {"retry-after": "40"}
+    # Still quotes the status line, so the far end reads as having answered.
+    assert "HTTP 429" in str(raised.value)
+
+
+def test_http_get_bounds_the_total_wait_across_retries(no_sleep):
+    session = FakeSession([("x", _limited(503, "12"))])
+    with pytest.raises(HttpError, match="retry budget"):
+        http_get("https://x/", session=session, retries=7, sleep=no_sleep,
+                 jitter=lambda: 0.0)
+    assert no_sleep.calls == [12.0, 12.0]
+    assert len(session.calls) == 3
+    assert sum(no_sleep.calls) <= 30
+
+
+def test_http_get_budget_is_configurable(no_sleep):
+    session = FakeSession([("x", _limited(503, "12"))])
+    with pytest.raises(HttpError, match="5s retry budget"):
+        http_get("https://x/", session=session, sleep=no_sleep, jitter=lambda: 0.0,
+                 max_wait=5)
+    assert no_sleep.calls == [] and len(session.calls) == 1
+
+
+def test_http_get_own_backoff_past_the_budget_keeps_the_transport_shape(no_sleep):
+    """ats_boards tells "never answered" from "answered badly" by this
+    sentence; running out of budget on transport errors must still read as
+    the former."""
+    session = FakeSession([("x", OSError("timed out"))])
+    with pytest.raises(HttpError) as raised:
+        http_get("https://x/", session=session, retries=5, backoff=10.0,
+                 sleep=no_sleep, jitter=lambda: 0.0)
+    assert no_sleep.calls == [10.0]
+    assert len(session.calls) == 2
+    assert raised.value.status_code is None
+    assert str(raised.value).startswith("GET https://x/ failed after 2 attempts: timed out")
+    assert "HTTP" not in str(raised.value)
+
+
+def test_http_get_keeps_its_own_backoff_when_retry_after_asks_for_less(no_sleep):
+    responses = [_limited(429, "0"), json_response({"ok": 1})]
+    session = FakeSession([("x", lambda url, params: responses.pop(0))])
+    http_get("https://x/", session=session, sleep=no_sleep, jitter=lambda: 0.0)
+    assert no_sleep.calls == [1.5]
+
+
+@pytest.mark.parametrize("junk", ["soon", "-5", "1.5e9", "", "Not, a date GMT"])
+def test_http_get_ignores_a_malformed_retry_after(no_sleep, junk):
+    responses = [_limited(503, junk), json_response({"ok": 1})]
+    session = FakeSession([("x", lambda url, params: responses.pop(0))])
+    assert http_get("https://x/", session=session, sleep=no_sleep,
+                    jitter=lambda: 0.0).json() == {"ok": 1}
+    assert no_sleep.calls == [1.5]
+
+
+def test_http_get_retry_after_from_an_earlier_response_is_not_reused(no_sleep):
+    calls = {"n": 0}
+
+    def flaky(url, params):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _limited(429, "20")
+        if calls["n"] == 2:
+            raise OSError("connection reset")
+        return json_response({"ok": 1})
+
+    session = FakeSession([("x", flaky)])
+    http_get("https://x/", session=session, sleep=no_sleep, jitter=lambda: 0.0)
+    assert no_sleep.calls == [20.0, 2.25]
+
+
+def test_retry_after_seconds_parses_delta_seconds_and_http_dates():
+    now = datetime(2026, 10, 18, 12, tzinfo=timezone.utc).timestamp()
+    assert retry_after_seconds("2", now=now) == 2.0
+    assert retry_after_seconds(" 3600 ", now=now) == 3600.0
+    assert retry_after_seconds("Sun, 18 Oct 2026 12:00:30 GMT", now=now) == 30.0
+    assert retry_after_seconds("Sun, 18 Oct 2026 11:59:00 GMT", now=now) == 0.0
+    assert retry_after_seconds(None, now=now) is None
+    assert retry_after_seconds("soon", now=now) is None
+    assert retry_after_seconds("-1", now=now) is None
+    assert retry_after_seconds("１０", now=now) is None  # non-ASCII digits
 
 
 # ==========================================================================

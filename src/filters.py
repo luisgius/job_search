@@ -19,14 +19,17 @@ from __future__ import annotations
 
 import re
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, NamedTuple
 
 from . import config as config_module
 from . import geo
-from .models import Job, collapse_initialisms, ensure_utc, normalize_text, utcnow
+from .models import (
+    Job, collapse_initialisms, ensure_utc, normalize_company, normalize_text,
+    normalize_title, utcnow,
+)
 from .util import canonical_url, get_logger
 
 logger = get_logger(__name__)
@@ -44,6 +47,7 @@ REASON_CATEGORIES: tuple[str, ...] = (
     "missing_keyword",
     "description_excluded",
     "description_too_short",
+    "same_posting_other_city",
     "filter_error",
 )
 
@@ -67,7 +71,14 @@ SOURCE_RANK: dict[str, int] = {
     "nofluffjobs": 2,
     "adzuna": 2,
     "linkedin_email": 1,
+    # An aggregator of other boards: the lowest rank, and `_richness` also
+    # lets any other source's full description beat its copy outright.
+    "freehire": 1,
 }
+
+#: Sources whose records are copies of postings other sources may carry
+#: directly. Their description length never outranks a direct full record.
+AGGREGATOR_COPY_SOURCES: frozenset[str] = frozenset({"freehire"})
 
 # A posting dated slightly in the future is a source clock/timezone quirk, not
 # a time machine. Anything inside this window is silently accepted as fresh.
@@ -720,11 +731,216 @@ def apply_filters(
 
 
 # --------------------------------------------------------------------------
+# multi-city copies
+# --------------------------------------------------------------------------
+
+#: Tier B's floor. Below it a shared body is likelier shared boilerplate or a
+#: synthesized teaser than one ad, and identity needs more than that.
+VARIANT_MIN_BODY_CHARS = 500
+
+#: What the tracker already holds for a copy, as `collapse_variants(known=)`
+#: reports it. The higher tier represents the posting ahead of every other
+#: preference, so the tracker gate that stops that copy stops the posting.
+TRACKED_NONE = 0        # nothing, or only a filter verdict
+TRACKED_QUEUED = 1      # queued for scoring by an earlier run, not yet shown
+TRACKED_HANDLED = 2     # handled (scored, shown, tried) inside the window
+TRACKED_UNVERIFIED = 3  # the tracker could not answer; ranks next to applied
+TRACKED_APPLIED = 4     # applied, submit clicked, or the same role applied to
+
+#: Exonyms boards really use for one city ("Cracow" on No Fluff Jobs, "Kraków"
+#: in the profile). Comparison only — never displayed, never part of any key.
+_CITY_SYNONYMS: dict[str, str] = {
+    "cracow": "krakow", "warszawa": "warsaw", "praha": "prague",
+    "wien": "vienna", "munchen": "munich", "muenchen": "munich",
+    "koln": "cologne", "koeln": "cologne", "nurnberg": "nuremberg",
+    "lisboa": "lisbon", "milano": "milan", "roma": "rome", "torino": "turin",
+    "bruxelles": "brussels", "brussel": "brussels", "kobenhavn": "copenhagen",
+    "koebenhavn": "copenhagen", "goteborg": "gothenburg", "zuerich": "zurich",
+    "geneve": "geneva", "genf": "geneva", "bucuresti": "bucharest",
+}
+
+_PLACE_SPLIT_RE = re.compile(r"[,;|/]")
+_WORK_MODE_RE = re.compile(r"\b(remote|hybrid|on[\s-]?site)\b", re.IGNORECASE)
+
+
+def _places(location: str | None) -> list[tuple[str, str]]:
+    """`(as displayed, as compared)` per non-empty place, in listed order.
+
+    Same cleanup as `Job.city` (work-mode words are not places), applied to
+    every segment rather than only the first.
+    """
+    out: list[tuple[str, str]] = []
+    for segment in _PLACE_SPLIT_RE.split(str(location or "")):
+        place = normalize_text(_WORK_MODE_RE.sub(" ", segment))
+        if place:
+            out.append((segment.strip(), _CITY_SYNONYMS.get(place, place)))
+    return out
+
+
+def _variant_identities(job: Job) -> list[tuple[Any, ...]]:
+    """What makes two copies one posting listed for different cities.
+
+    Tier A: same company, title and *set* of places, with at least two —
+    No Fluff Jobs publishes one posting per city and rotates the list, so
+    every copy names the same cities in a different order. Tier B: same
+    company and title and an identical full body of `VARIANT_MIN_BODY_CHARS`
+    or more; a snippet is synthesized from structured fields and identical
+    across unrelated jobs, so it never counts.
+    """
+    company, title = normalize_company(job.company), normalize_title(job.title)
+    if not company or not title:
+        return []
+    identities: list[tuple[Any, ...]] = []
+    places = frozenset(compared for _, compared in _places(job.location))
+    if len(places) >= 2:
+        identities.append(("places", company, title, places))
+    if not job.raw.get("snippet_only"):
+        body = normalize_text(job.description)
+        if len(body) >= VARIANT_MIN_BODY_CHARS:
+            identities.append(("body", company, title, body))
+    return identities
+
+
+def collapse_variants(jobs: list[Job], config: Any, *,
+                      known: Callable[[Job], int] | None = None,
+                      context: Iterable[Job] = ()) -> FilterResult:
+    """Keep one copy of a posting published once per city.
+
+    Runs after the hard filters, so every copy here is eligible and the one
+    kept is too. The representative is, first to last preference:
+
+      1. the copy the tracker holds most (`known(job)`, a `TRACKED_*` tier),
+         so the gate that stops it stops the posting — no sibling is scored
+         or applied to beside an application, shown twice, or scored beside
+         a copy already queued;
+      2. a direct record (`job.ats` set, not an `AGGREGATOR_COPY_SOURCES`
+         copy): the only kind auto-apply acts on, so an aggregator's
+         "Remote" copy cannot displace the ATS's own record;
+      3. the copy whose first city is the profile's (`applicant.location`).
+         Below "direct" on purpose: every copy here passed the location
+         filters, and a home-city aggregator copy winning would leave the
+         posting with nothing auto-apply may act on;
+      4. a remote copy, then the richest (`_richness`).
+
+    Ties keep the first sighting, and output follows the order each posting
+    was first seen. The kept copy gets `raw["also_in"]`, the other copies'
+    first cities. The rest are rejected as `same_posting_other_city` naming
+    the representative's key, so the tracker records them and the funnel
+    counts them.
+
+    `context` holds copies that are not candidates today — they failed the
+    filters, or a run before this one queued them — but may share a posting
+    with one that is. They never appear in the result. A context copy
+    represents its group only when the tracker holds it more than every
+    candidate; then every candidate is rejected and nothing of the posting
+    is kept. That is how a copy applied to last week, stale today, still
+    stops this week's sibling.
+
+    Only merges, never unblocks: a copy leaves `kept`, nothing joins it.
+    `filters.collapse_city_variants: false` turns it off.
+    """
+    result = FilterResult()
+    jobs = list(jobs or [])
+    if not bool(_cfg(config, "filters.collapse_city_variants", True)):
+        result.kept = jobs
+        return result
+
+    # Every identity names company and title, so other context is irrelevant.
+    names = {(normalize_company(job.company), normalize_title(job.title)) for job in jobs}
+    pool = jobs + [job for job in context or ()
+                   if (normalize_company(job.company), normalize_title(job.title)) in names]
+    candidates = len(jobs)
+
+    # Union-find whose root is always the earliest index, so groups come out
+    # in first-seen order and a chain of shared identities is one posting.
+    parent = list(range(len(pool)))
+
+    def root(index: int) -> int:
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = parent[index]
+        return index
+
+    first: dict[tuple[Any, ...], int] = {}
+    for index, job in enumerate(pool):
+        for identity in _variant_identities(job):
+            if identity not in first:
+                first[identity] = index
+                continue
+            a, b = root(first[identity]), root(index)
+            if a != b:
+                parent[max(a, b)] = min(a, b)
+
+    groups: dict[int, list[int]] = {}
+    for index in range(len(pool)):
+        groups.setdefault(root(index), []).append(index)
+
+    home_places = _places(str(_cfg(config, "applicant.location", "") or ""))
+    home = home_places[0][1] if home_places else ""
+    tiers: dict[int, int] = {}
+
+    def tier(index: int) -> int:
+        """Asked lazily: only copies that actually compete cost a lookup."""
+        if index not in tiers:
+            tiers[index] = int(known(pool[index])) if known is not None else TRACKED_NONE
+        return tiers[index]
+
+    def rank(index: int) -> tuple[Any, ...]:
+        job = pool[index]
+        places = _places(job.location)
+        source = (job.source or "").strip().lower()
+        return (tier(index), index < candidates,
+                bool(job.ats) and source not in AGGREGATOR_COPY_SOURCES,
+                bool(home and places and places[0][1] == home),
+                job.remote is True, _richness(job))
+
+    for members in groups.values():
+        entrants = [index for index in members if index < candidates]
+        if not entrants:
+            continue  # context alone: nothing here is today's to decide
+        if len(members) == 1:
+            result.kept.append(pool[members[0]])
+            continue
+        best = members[0]
+        for index in members[1:]:
+            if rank(index) > rank(best):
+                best = index  # strictly better; ties keep the first sighting
+        rep = pool[best]
+        if best < candidates:
+            result.kept.append(rep)
+        outcome = ("was already applied to" if tier(best) == TRACKED_APPLIED
+                   else "was kept" if best < candidates else "is already tracked")
+        kept_places = _places(rep.location)
+        kept_city = kept_places[0][1] if kept_places else ""
+        shown = kept_places[0][0] if kept_places else (rep.location or "no location")
+        also_in: list[str] = []
+        for index in entrants:
+            if index == best:
+                continue
+            job = pool[index]
+            result.rejected.append((
+                job, f"same_posting_other_city: the copy listed for {shown} "
+                     f"({rep.key[:8]}) {outcome}",
+            ))
+            places = _places(job.location)
+            if places and places[0][1] != kept_city and places[0][0] not in also_in:
+                also_in.append(places[0][0])
+        if also_in and best < candidates:
+            rep.raw["also_in"] = also_in
+
+    if result.rejected:
+        result.counts["same_posting_other_city"] = len(result.rejected)
+        logger.info("city variants: %d copies collapsed into %d postings",
+                    len(jobs), len(result.kept))
+    return result
+
+
+# --------------------------------------------------------------------------
 # dedupe
 # --------------------------------------------------------------------------
 
 
-def _richness(job: Job) -> tuple[int, int, int, float]:
+def _richness(job: Job) -> tuple[int, int, int, int, float]:
     """Sort key for "which copy of this posting do we keep?".
 
     A real date first (freshness filtering depends on it), then the longest
@@ -733,6 +949,14 @@ def _richness(job: Job) -> tuple[int, int, int, float]:
     richness: extra metadata boilerplate must not let a stale listing hide a
     fresh one. Snippets therefore compare by source rank and recency, never
     by teaser length, using the same transitive tuple as every other record.
+
+    One step sits between date and length: a full description from any
+    source that is not an aggregator copy (`AGGREGATOR_COPY_SOURCES`). For
+    every other source it is exactly "description length > 0", so their
+    order is unchanged; its only effect is that freehire's longer copy of a
+    Greenhouse posting cannot displace the Greenhouse record — the one
+    auto-apply may act on. A snippet-only direct record still loses to a
+    full copy, and an undated one to a dated copy, as it would to any board.
 
     Recency is *last* on purpose. Boards accumulate — the same role sits there
     as a two-day-old req and as today's repost — and when the two copies tie
@@ -749,7 +973,9 @@ def _richness(job: Job) -> tuple[int, int, int, float]:
         rank = 3  # an unknown source that still carries an ATS id is an ATS
     posted = job.posted_at.timestamp() if job.posted_at else 0.0
     description_chars = 0 if job.raw.get("snippet_only") else len(job.description or "")
-    return (1 if job.posted_at else 0, description_chars, rank, posted)
+    aggregated = (job.source or "").strip().lower() in AGGREGATOR_COPY_SOURCES
+    direct = 1 if description_chars and not aggregated else 0
+    return (1 if job.posted_at else 0, direct, description_chars, rank, posted)
 
 
 def dedupe(jobs: list[Job]) -> list[Job]:

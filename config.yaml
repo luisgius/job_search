@@ -111,6 +111,10 @@ sources:
   justjoin_it: true        # justjoin.it — salary on every ad
   nofluffjobs: true        # nofluffjobs.com — PL/CEE, salary on every ad
   allegro: true            # bounded public careers collector; limits in watchlist.yaml
+  # freehire.me — keyless aggregator of ATS boards (Workday, Oracle, SAP …
+  # employers no adapter here reaches). Its copies lose dedupe to the direct
+  # record and never auto-apply. Queries in watchlist.yaml; docs/FREEHIRE_SOURCE.md.
+  freehire: false
   adzuna: false            # needs free keys from developer.adzuna.com
   linkedin_email: false    # needs gmail_credentials.json (see README)
 
@@ -465,6 +469,7 @@ apply:
   headless: true
   timeout_seconds: 60
   require_pdf: true        # no tailored PDF -> digest instead of auto-apply
+  block_on_posting_guard: true  # posting talks to the AI -> digest, never a live submit
 
 output:
   dir: output

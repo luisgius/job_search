@@ -19,6 +19,9 @@ from src.models import Job, Score
 
 DATASET = Path(__file__).with_name("cases.json")
 MAX_CASES = 10
+#: One more than `--max-cases` allows: `cap_declared_but_exceeded` is an
+#: enforcement fixture, never live-eligible, so the live bound stays ten.
+DATASET_CASES = 11
 PRIMARY = "fake/primary"
 FALLBACK = "fake/fallback"
 
@@ -31,8 +34,8 @@ def load_dataset() -> dict[str, Any]:
     data = json.loads(DATASET.read_text(encoding="utf-8"))
     cases = data["cases"]
     ids = [case["id"] for case in cases]
-    if len(cases) != MAX_CASES or len(set(ids)) != len(ids):
-        raise ValueError("dataset must contain exactly ten uniquely named synthetic cases")
+    if len(cases) != DATASET_CASES or len(set(ids)) != len(ids):
+        raise ValueError("dataset must contain exactly eleven uniquely named synthetic cases")
     for case in cases:
         if case["labels"]["pursue"] not in (True, False, None):
             raise ValueError("pursue must be true, false, or null")
@@ -113,6 +116,9 @@ def check_contract(score: Score, case: dict[str, Any]) -> list[str]:
     for fragment in expected.get("gaps_contain", []):
         if fragment.lower() not in " ".join(score.gaps).lower():
             issues.append(f"fixture gap was lost: {fragment}")
+    for fragment in expected.get("reasons_contain", []):
+        if fragment.lower() not in " ".join(score.reasons).lower():
+            issues.append(f"expected reason is missing: {fragment}")
     return issues
 
 
@@ -135,9 +141,12 @@ def evaluate_case(
         delegate = live_client
         requested_model = model
     client = RecordingClient(delegate)
+    # A case may switch on a scoring option for itself (`enforce_caps`);
+    # every other case runs on the shared rules alone.
+    rules = {**dataset["candidate_rules"], **case.get("scoring", {})}
     config = {
         "applicant": dataset["applicant"],
-        "scoring": {**dataset["candidate_rules"], "model": requested_model,
+        "scoring": {**rules, "model": requested_model,
                     "max_tokens": 700, "temperature": 0, "fallback_models": []},
         # Prompt path prevents the native-format compatibility retry in live mode.
         "llm": {"structured_output": "prompt"},
@@ -163,7 +172,7 @@ def evaluate_case(
         "fingerprints": {"request_sha256": fingerprint(client.request),
                          "cv_sha256": fingerprint(dataset["cv_markdown"]),
                          "job_sha256": fingerprint({**job.to_dict(), "raw": job.raw}),
-                         "rules_sha256": fingerprint(dataset["candidate_rules"])},
+                         "rules_sha256": fingerprint(rules)},
     }
 
 
@@ -265,7 +274,7 @@ def run_suite(*, mode: str = "offline", case_ids: list[str] | None = None,
                    "contract_failed": contract_failed, "fallback_successes": sum(row["fallback_used"] for row in rows),
                    "simulated_provider_errors": sum(row["simulated_provider_errors"] for row in rows),
                    "simulated_completion_attempts": sum(row["simulated_completion_attempts"] for row in rows)},
-        "bounds": {"max_cases": max_cases or MAX_CASES, "max_live_requests": len(rows) if mode == "live" else 0,
+        "bounds": {"max_cases": max_cases or len(rows), "max_live_requests": len(rows) if mode == "live" else 0,
                    "max_output_tokens_per_request": 700, "live_retries": 0, "live_fallbacks": 0},
         "usage": {"status": "simulated_no_spend", "live_requests": 0} if mode == "offline" else
                  live_usage_report(meter),

@@ -15,14 +15,21 @@ strict. It returns a path *only* when a non-empty file actually exists on
 disk afterwards; a hook that returns cleanly without writing anything, or
 writes a zero-byte file, is a failure. Anything less would let auto-apply
 upload an empty "CV".
+
+`verify` goes one step further, when `pdf.verify` asks it to: it reads the
+PDF back as text — what an ATS parser will see — and lists what is wrong.
 """
 
 from __future__ import annotations
 
 import importlib
 import importlib.util
+import re
+import shutil
+import subprocess
+import unicodedata
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Iterable
 
 from .util import get_logger
 
@@ -192,3 +199,189 @@ def _looks_like_pdf(path: Path) -> bool:
     except OSError as exc:
         logger.warning("could not read %s back after rendering: %s", path, exc)
         return False
+
+
+# --------------------------------------------------------------------------
+# reading a rendered PDF back
+# --------------------------------------------------------------------------
+
+#: Searched after PATH. launchd starts scripts/run_daily.sh with a bare PATH,
+#: so a Homebrew pdftotext is invisible to `shutil.which` in a scheduled run.
+PDFTOTEXT_DIRS: tuple[str, ...] = ("/opt/homebrew/bin", "/usr/local/bin")
+
+#: Text that means a glyph did not survive rendering. ReportLab draws ■ for a
+#: character its font lacks; U+FFFD and "(cid:N)" are what extractors emit
+#: for a glyph they cannot map back to a character.
+BAD_GLYPHS: dict[str, str] = {
+    "\u25a0": "■ boxes (characters the font could not draw)",
+    "\ufffd": "U+FFFD replacement characters",
+    "(cid:": "(cid:N) glyphs with no text mapping",
+}
+
+#: Page texts for a PDF, or None when this machine has no way to extract them.
+Extractor = Callable[[Path], "list[str] | None"]
+
+_HEADING_LINE_RE = re.compile(r"^[ \t]{0,3}#{1,6}[ \t]+(.*?)[ \t]*#*[ \t]*$")
+_LINK_TEXT_RE = re.compile(r"\[([^\]]+)\]\([^)]*\)")
+# A dictionary with no dictionary nested inside it, for `page_count`.
+_FLAT_DICT_RE = re.compile(rb"<<((?:(?!<<|>>).)*)>>", re.DOTALL)
+_PAGES_TYPE_RE = re.compile(rb"/Type\s*/Pages\b")
+_COUNT_RE = re.compile(rb"/Count\s+(\d+)")
+
+_logged_once: set[str] = set()
+
+
+def _log_once(message: str) -> None:
+    """Warn about a machine-level gap once per process, not once per job."""
+    if message not in _logged_once:
+        _logged_once.add(message)
+        logger.warning("%s", message)
+
+
+def find_pdftotext(override: str = "") -> str | None:
+    """Path of a usable `pdftotext`: `override` (pdf.pdftotext), PATH, then
+    `PDFTOTEXT_DIRS`. None when there is none."""
+    if override:
+        found = shutil.which(override)
+        if found:
+            return found
+        _log_once(f"pdf.pdftotext is {override!r}, which is not an executable "
+                  "— looking for pdftotext elsewhere")
+    found = shutil.which("pdftotext")
+    if found:
+        return found
+    for directory in PDFTOTEXT_DIRS:
+        found = shutil.which("pdftotext", path=directory)
+        if found:
+            return found
+    return None
+
+
+def extract_pages(path: str | Path, *, pdftotext: str = "") -> list[str] | None:
+    """Text of each page via pdftotext, else pypdf if importable.
+
+    None means this machine has no extractor. An extractor that exists but
+    cannot read the file raises RuntimeError: that is news about the PDF.
+    """
+    binary = find_pdftotext(pdftotext)
+    if binary:
+        try:
+            result = subprocess.run(
+                [binary, "-enc", "UTF-8", str(path), "-"],
+                capture_output=True, timeout=60,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise RuntimeError(f"pdftotext failed: {exc}") from exc
+        if result.returncode != 0:
+            detail = result.stderr.decode("utf-8", "ignore").strip().splitlines()
+            raise RuntimeError(
+                f"pdftotext exited {result.returncode}"
+                + (f": {detail[0]}" if detail else "")
+            )
+        # Every page, the last included, ends with a form feed.
+        text = result.stdout.decode("utf-8", "ignore")
+        return text.removesuffix("\f").split("\f")
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return None
+    try:
+        return [page.extract_text() or "" for page in PdfReader(str(path)).pages]
+    except Exception as exc:
+        raise RuntimeError(f"pypdf could not read it: {exc}") from exc
+
+
+def page_count(path: str | Path) -> int | None:
+    """Pages in the root of the page tree, read with a regex, no PDF library.
+
+    Enough for ReportLab output, whose page tree is uncompressed; None (not a
+    guess) when the tree sits inside a compressed object stream.
+    """
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        return None
+    counts = []
+    for match in _FLAT_DICT_RE.finditer(data):
+        body = match.group(1)
+        count = _COUNT_RE.search(body) if _PAGES_TYPE_RE.search(body) else None
+        if count:
+            counts.append(int(count.group(1)))
+    return max(counts) if counts else None
+
+
+def headings_of(markdown: str) -> list[str]:
+    """Plain text of each markdown heading, for `verify(headings=...)`."""
+    headings = []
+    for line in str(markdown or "").splitlines():
+        match = _HEADING_LINE_RE.match(line)
+        if match:
+            text = _LINK_TEXT_RE.sub(r"\1", match.group(1))
+            text = re.sub(r"[*`]", "", text).strip()
+            if text:
+                headings.append(text)
+    return headings
+
+
+def _flat(text: str) -> str:
+    """Comparable form: NFKC, single spaces, casefolded."""
+    return " ".join(unicodedata.normalize("NFKC", str(text)).split()).casefold()
+
+
+def verify(
+    path: str | Path,
+    *,
+    require: Iterable[str] = (),
+    max_pages: int | None = None,
+    headings: Iterable[str] = (),
+    pdftotext: str = "",
+    extractor: Extractor | None = None,
+) -> list[str]:
+    """Read a rendered PDF back and list what is wrong with it; [] is clean.
+
+    Flags `BAD_GLYPHS`, a `require` string (name, email) missing from the
+    text, more than `max_pages` pages, and a non-final page whose last line
+    is one of `headings` (its content starts on the next page).
+
+    With no extractor on this machine only the page count is checked (via
+    `page_count`) and the rest is skipped with one warning per run: the check
+    is an extra, so a missing tool must never cost a PDF. `extractor`
+    replaces the pdftotext/pypdf lookup; `pdftotext` overrides the binary.
+    """
+    target = Path(path)
+    try:
+        if extractor is None:
+            pages = extract_pages(target, pdftotext=pdftotext)
+        else:
+            pages = extractor(target)
+    except Exception as exc:
+        return [f"its text could not be read back ({exc})"]
+
+    problems: list[str] = []
+    count = len(pages) if pages is not None else page_count(target)
+    if max_pages is not None and count is not None and count > max_pages:
+        problems.append(f"{count} pages, over the limit of {max_pages}")
+    if pages is None:
+        _log_once("no pdftotext (poppler) or pypdf found — PDF text checks are "
+                  "skipped; install poppler or set pdf.pdftotext")
+        return problems
+
+    text = "\n".join(pages)
+    for marker, meaning in BAD_GLYPHS.items():
+        if marker in text:
+            problems.append(f"{text.count(marker)} {meaning}")
+    flat = _flat(text)
+    for needle in require:
+        if _flat(needle) and _flat(needle) not in flat:
+            problems.append(f"{str(needle).strip()!r} is missing from its text")
+    wanted = {_flat(h): str(h).strip() for h in headings if _flat(h)}
+    for number, page in enumerate(pages[:-1], start=1):
+        lines = [line for line in page.splitlines() if line.strip()]
+        # Two lines too, for a heading long enough to wrap.
+        for tail in (lines[-1:], lines[-2:]):
+            heading = wanted.get(_flat(" ".join(tail))) if tail else None
+            if heading:
+                problems.append(f"page {number} ends with the heading "
+                                f"{heading!r}, its content on the next page")
+                break
+    return problems

@@ -396,7 +396,8 @@ def test_tailoring_runs_through_openrouter(tmp_path: Path):
         "tailoring": {"model": "openai/gpt-5"},
         "output": {"dir": str(tmp_path / "output")},
     })
-    session = PostSession([FakeResponse(_json=completion("# Ada Lovelace\n\nSummary."))])
+    session = PostSession([FakeResponse(
+        _json=completion("# Ada Lovelace\n\n## Summary\nSummary."))])
     llm = LLMClient("or-key", provider="openrouter", session=session,
                     sleep=lambda _s: None)
 

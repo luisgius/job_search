@@ -22,6 +22,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import requests
 
+from ..jobposting import extract_job_posting
 from ..models import Job
 from ..util import html_to_text, parse_datetime
 
@@ -104,7 +105,7 @@ def _settle_dates(job: Job) -> None:
 
 
 class _Page(HTMLParser):
-    """Read observed SAP microdata, plus standard JobPosting JSON-LD."""
+    """Read observed SAP microdata; JobPosting JSON-LD is read by `jobposting`."""
     def __init__(self, body: str):
         super().__init__(convert_charrefs=True)
         self.stack: list[tuple[str, list[str]]] = []
@@ -133,8 +134,6 @@ class _Page(HTMLParser):
         prop = a.get("data-careersite-propertyid", "")
         if prop in {"dept", "shift", "location"}:
             keys.append(prop)
-        if tag == "script" and a.get("type") == "application/ld+json":
-            keys.append("jsonld")
         if tag == "a" and a.get("href"):
             self.links.append(a["href"])
         if tag not in _VOID:
@@ -159,25 +158,11 @@ class _Page(HTMLParser):
             self.visible.append(data)
         for _, keys in self.stack:
             for key in keys:
-                if not hidden or key == "jsonld":
+                if not hidden:
                     self.fields.setdefault(key, []).append(data)
 
     def value(self, key):
         return " ".join(" ".join(self.fields.get(key, [])).split())
-
-
-def _json_job(page: _Page) -> Mapping:
-    try:
-        value = json.loads("".join(page.fields.get("jsonld", [])))
-    except (ValueError, TypeError):
-        return {}
-    nodes = value if isinstance(value, list) else [value]
-    if isinstance(value, Mapping) and isinstance(value.get("@graph"), list):
-        nodes = value["@graph"]
-    for node in nodes:
-        if isinstance(node, Mapping) and node.get("@type") == "JobPosting":
-            return node
-    return {}
 
 
 def parse_detail(body: str, url: str, *, listing: Job | None = None,
@@ -185,7 +170,7 @@ def parse_detail(body: str, url: str, *, listing: Job | None = None,
     """Return full/partial job, None for explicit closure; reject non-job pages."""
     page = _Page(body)
     visible = " ".join(" ".join(page.visible).split())
-    data = _json_job(page)
+    data = extract_job_posting(body) or {}
     if _CLOSED.search(visible):
         return None
     if page.refresh:

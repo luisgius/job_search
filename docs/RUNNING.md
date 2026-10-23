@@ -114,3 +114,60 @@ The digest, top to bottom: the health table first (a red row = a source
 died, a 404'd slug, a Tier 2 endpoint gone dark), then "Needs your click".
 The LLM line under the health table is your running bill. Everything else is
 optional reading.
+
+## Recording outcomes
+
+The tracker knows what the pipeline submitted. Everything after that, and
+anything you applied to yourself, it learns from you — one command each,
+from the repo root:
+
+```bash
+python -m src.track mark 3f9c2a1b applied        # applied by hand; the digest card prints this line
+python -m src.track mark 3f9c2a1b interview --on 2026-10-20 --note "call with Ana"
+python -m src.track mark 3f9c2a1b followed_up
+python -m src.track mark 3f9c2a1b rejected       # or no_response (ghosted), offer, hired,
+                                                 # offer_declined (declined), withdrawn, dismissed
+python -m src.track mark 3f9c2a1b label_pursue --note "why"   # also label_stretch, label_dismiss
+python -m src.track add --company "Acme" --title "Data Scientist" \
+    --location "Kraków, Poland" --url https://acme.example/jobs/1   # applied outside the pipeline
+python -m src.track list --open                  # still waiting on an answer
+python -m src.track report                       # applied -> interview -> offer -> hired
+python -m src.track export                       # output/applications.csv, one row per event
+```
+
+The handle is a full key, a unique key prefix of six or more characters
+(the digest prints eight) or the posting URL (tracking parameters such as
+`?gh_src=` and `?utm_source=` are ignored). Before writing, it echoes
+the company and title. A handle that matches several jobs, or none, exits 2,
+lists the candidates and writes nothing. `--on` defaults to today and refuses
+future dates.
+
+Every stage except `dismissed` and the labels means an application went out
+(`withdrawn` included: only a sent application can be withdrawn), so it also
+marks the job applied, and confirms one the pipeline recorded as submitted
+but unconfirmed. The pipeline then never resurfaces it, never re-scores it and
+never auto-applies to it or to a repost of the same company, title and city.
+That makes `apply.dry_run: true` no longer the only guard against a second
+application to a role you applied to yourself.
+
+`add` is for applications made outside the pipeline. A Greenhouse, Lever,
+Ashby, Workable, SmartRecruiters, Personio or Teamtailor URL is recorded under
+the id the board's own copy carries, so that copy is blocked however you typed
+the company or city. Any other URL blocks auto-apply to a posting at that URL;
+a copy elsewhere is recognised only when its company, title and city read as
+you typed them. The command prints which of the two it did.
+
+`hired`, `rejected`, `no_response`, `offer_declined`, `withdrawn` and
+`dismissed` close an application. Recording anything later needs `--force`
+(exit 1 without it). Events are append-only, so a correction is a new event,
+not an edit. A job wrongly marked applied stays blocked, which is why the
+echo line is there.
+
+On the digest, **Follow-ups due** appears below "Needs your click" only when
+an open application has gone quiet for `tracking.followup_days` (10) with
+fewer than `tracking.max_followups` (2) follow-ups at its current stage. At
+`tracking.stale_days` (60) it suggests `no_response` instead. 0 turns a check
+off. The page only prints the command to run; it never records anything.
+**Applications to date**, in the run stats, counts each application at the
+furthest stage it reached and shows rejections as a fraction of final
+outcomes (`2/5`), never a bare percentage.

@@ -227,6 +227,22 @@ allegro:
   detail_urls:
     - https://careers.allegro.eu/job/Warszawa-Data-Scientist-Allegro-AI-Hub-00-841/1365885255/
 
+freehire:
+  # freehire.me's public search API; read only when sources.freehire is on.
+  # Each query's facets are sent as written (a list is a repeated param);
+  # `limit`, `offset`, `description_format` and `posted_within_days` are the
+  # adapter's and are refused here — freehire re-dates `posted_at`, so
+  # freshness comes from `created_at`. See docs/FREEHIRE_SOURCE.md.
+  queries:
+    - countries: [pl]
+      category: [data_engineering, ai_engineering, data_analytics, data_science, ml_ai]
+    - work_mode: remote
+      regions: [eu, global]
+      category: [data_engineering, ai_engineering, data_analytics, data_science, ml_ai]
+  limit: 50          # hits per request; hard maximum 100
+  max_requests: 6    # per run, shared by the queries; hard maximum 20
+  exclude_upstream: [whatjobs-pl, energyjobline]   # aggregators, not employers
+
 adzuna:
   # Adzuna's European coverage, lowercase: at be ch de es fr gb it nl pl.
   # It does NOT cover Portugal, Ireland or the Nordics — those come from the

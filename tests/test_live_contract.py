@@ -1735,3 +1735,67 @@ def test_nofluff_postings_still_have_the_fields_we_parse():
             f"'artificial-intelligence' (saw e.g. {sorted(categories)[:8]}) — "
             "the category vocabulary moved and DATA_CATEGORIES needs updating"
         )
+
+
+# ==========================================================================
+# freehire.me (fixture reduced from a 2026-10-22 capture: these re-check it)
+# ==========================================================================
+
+FREEHIRE_REQUIRED = ("public_slug", "source", "url", "title", "company",
+                     "created_at")
+FREEHIRE_EXPECTED = ("external_id", "location", "description", "countries",
+                     "posted_at", "enrichment")
+
+
+class _FreehireOnePage:
+    """The first shipped query, one small page: two requests for the file."""
+
+    def __init__(self):
+        from src.config import WATCHLIST_DEFAULTS
+
+        defaults = WATCHLIST_DEFAULTS["freehire"]
+        self.watchlist = {"freehire": {**defaults, "queries": defaults["queries"][:1],
+                                       "limit": 5, "max_requests": 1}}
+
+
+def test_freehire_search_still_answers_and_parses():
+    from src.sources.freehire import fetch
+
+    errors: list[str] = []
+    jobs = fetch(_FreehireOnePage(), errors=errors)
+    if errors:
+        # `fetch` never raises, so the skip-or-fail rule is applied to its
+        # report: a status code or a reshaped body is an answer, and fails.
+        if _STATUS_RE.search(errors[0]) or "shape" in errors[0]:
+            pytest.fail(f"freehire answered but not as parsed: {errors[0]}")
+        pytest.skip(f"network unreachable: {errors[0]}")
+    if not jobs:
+        pytest.skip("no usable hits on the first page right now")
+    assert all(j.company and j.url and j.ats is None for j in jobs)
+    assert any(j.posted_at for j in jobs), (
+        "no hit carries a usable created_at — freshness would drop everything"
+    )
+
+
+def test_freehire_hits_still_have_the_fields_we_parse():
+    from src.sources.freehire import API_URL
+
+    payload = _raw_payload(API_URL, {"countries": "pl", "limit": 5, "offset": 0,
+                                     "description_format": "text"})
+    data = payload.get("data") if isinstance(payload, dict) else None
+    assert isinstance(data, list) and data, (
+        "the payload no longer carries a 'data' list — fetch() reports this "
+        "as shape drift and the source degrades"
+    )
+    seen = _union_of_keys(data)
+    missing = [f for f in FREEHIRE_REQUIRED if f not in seen]
+    assert not missing, f"freehire dropped required field(s): {missing}"
+    absent = [f for f in FREEHIRE_EXPECTED if f not in seen]
+    assert not absent, (
+        f"freehire no longer sends {absent} — re-record freehire_search.json "
+        "from this live payload"
+    )
+    meta = payload.get("meta")
+    assert isinstance(meta, dict) and isinstance(meta.get("total"), int), (
+        "meta.total is gone — fetch() then pages until a short page or its cap"
+    )

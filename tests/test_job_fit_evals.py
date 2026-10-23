@@ -31,11 +31,11 @@ def test_offline_suite_exercises_ten_cases_without_network(no_live_transport):
     report = harness.run_suite()
     assert report["passed"]
     assert report["counts"] == {
-        "cases": 10, "score_errors": 4, "invalid_outputs": 0,
-        "contract_passed": 10, "contract_failed": 0, "fallback_successes": 1,
-        "simulated_provider_errors": 2, "simulated_completion_attempts": 11,
+        "cases": 11, "score_errors": 4, "invalid_outputs": 0,
+        "contract_passed": 11, "contract_failed": 0, "fallback_successes": 1,
+        "simulated_provider_errors": 2, "simulated_completion_attempts": 12,
     }
-    assert report["model_counts"] == {"fake/primary": 5, "fake/fallback": 1}
+    assert report["model_counts"] == {"fake/primary": 6, "fake/fallback": 1}
     assert report["error_model_counts"] == {"fake/primary": 4}
     assert report["semantic_metrics"]["status"] == "not_evaluated"
     assert "precision_at_10" not in report["semantic_metrics"]
@@ -73,6 +73,9 @@ def test_parser_injection_and_fallback_outcomes(no_live_transport):
     assert rows["provider_fallback"]["score"]["model"] == "fake/fallback"
     assert rows["provider_error"]["score"]["error"]
     assert rows["snippet_only"]["labels"]["pursue"] is None
+    capped = rows["cap_declared_but_exceeded"]["score"]
+    assert (capped["value"], capped["raw_value"], capped["caps_applied"]) == (40, 75, ["cap-1"])
+    assert rows["required_german"]["score"]["caps_applied"] == []  # flag off: prompt only
 
 
 def test_changed_fixture_expectation_is_a_failure(no_live_transport):
@@ -248,7 +251,7 @@ def test_cli_offline_report_and_failure_exit(tmp_path):
     result = subprocess.run([sys.executable, "-m", "evals.job_fit", "--output", str(path)],
                             capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
-    assert json.loads(path.read_text())["counts"]["contract_passed"] == 10
+    assert json.loads(path.read_text())["counts"]["contract_passed"] == 11
     invalid = subprocess.run([sys.executable, "-m", "evals.job_fit", "--mode", "live"],
                              capture_output=True, text=True, check=False)
     assert invalid.returncode == 2

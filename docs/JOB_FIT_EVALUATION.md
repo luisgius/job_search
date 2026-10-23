@@ -1,6 +1,6 @@
 # Job-fit evaluation harness
 
-This harness calls the production `src.scoring.score_job` with ten wholly synthetic
+This harness calls the production `src.scoring.score_job` with eleven wholly synthetic
 cases. Its default mode validates the scoring plumbing using scripted model replies.
 **Passing fake responses are not evidence of model quality, truthful reasoning, or
 usefulness to the real applicant.** No private CV, mailbox, project configuration,
@@ -55,13 +55,17 @@ snippet gaps and fallback model identity.
 | `copied_verdict_only` | Reject a verdict lifted entirely from the posting | Unlabeled parser/security fixture |
 | `provider_error` | Return an error, not an assessed zero | Unlabeled transport fixture |
 | `provider_fallback` | Recover through real chain and attribute `fake/fallback` | Unlabeled transport fixture |
+| `cap_declared_but_exceeded` | With `enforce_caps` on, hold a declared cap: 75 becomes 40 | Unlabeled enforcement fixture |
 
 `cases.json` separates `offline.expected` from `labels.pursue`, label rationale,
 posting evidence and human review criteria. Only three scenarios carry binary
 pursue labels; none has a real hiring outcome or a human applicant's judgment.
 The rules include a German-required ceiling of 40 as a synthetic candidate rule.
 That ceiling is a production prompt instruction, not a parser-enforced invariant.
-The fake score matching it proves only response handling.
+The fake score matching it proves only response handling. The one exception is
+`cap_declared_but_exceeded`, which turns on `scoring.enforce_caps` for itself
+only. It shows that code holds a reply to the cap the reply declares in
+`caps_fired`. It does not show that a model declares the caps that apply.
 
 ## Report interpretation
 

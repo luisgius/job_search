@@ -462,6 +462,34 @@ def test_validate_rejects_bad_freshness(tmp_path: Path, hours):
     assert any("max_age_hours" in p for p in cfg.validate())
 
 
+def test_enforce_caps_defaults_off(tmp_path: Path):
+    assert write_config(tmp_path).get("scoring.enforce_caps") is False
+
+
+@pytest.mark.parametrize("value", ["true", "yes", 1])
+def test_validate_rejects_a_non_boolean_enforce_caps(tmp_path: Path, value):
+    cfg = write_config(tmp_path, {"scoring": {"enforce_caps": value}})
+    assert any("scoring.enforce_caps" in p for p in cfg.validate())
+
+
+@pytest.mark.parametrize("caps,problem", [
+    ([{"when": "a", "cap": 60, "id": "x"}, {"when": "b", "cap": 40, "id": "x"}], "'x'"),
+    # An explicit id that collides with another entry's default id.
+    ([{"when": "a", "cap": 60}, {"when": "b", "cap": 40, "id": "cap-1"}], "'cap-1'"),
+    ([{"when": "a", "cap": 60, "id": ""}], "score_caps[1].id"),
+    ([{"when": "a", "cap": 60, "id": 7}], "score_caps[1].id"),
+])
+def test_validate_rejects_ambiguous_cap_ids(tmp_path: Path, caps, problem):
+    cfg = write_config(tmp_path, {"scoring": {"score_caps": caps, "enforce_caps": True}})
+    assert any(problem in p for p in cfg.validate())
+
+
+def test_named_and_default_cap_ids_are_valid(tmp_path: Path):
+    caps = [{"when": "a", "cap": 60, "id": "german"}, {"when": "b", "cap": 40}]
+    cfg = write_config(tmp_path, {"scoring": {"score_caps": caps, "enforce_caps": True}})
+    assert cfg.validate() == []
+
+
 @pytest.mark.parametrize("value", [-1, "soon", True])
 def test_validate_rejects_a_bad_repost_gap(tmp_path: Path, value):
     """It only ever colours a card, so a bad value costs a wrong flag rather
@@ -469,6 +497,13 @@ def test_validate_rejects_a_bad_repost_gap(tmp_path: Path, value):
     one that is rejected, because the user believes it took effect."""
     cfg = write_config(tmp_path, {"freshness": {"repost_min_gap_days": value}})
     assert any("repost_min_gap_days" in p for p in cfg.validate())
+
+
+@pytest.mark.parametrize("value", ["yes", 1])
+def test_validate_rejects_a_non_boolean_collapse_city_variants(tmp_path: Path, value):
+    cfg = write_config(tmp_path, {"filters": {"collapse_city_variants": value}})
+    assert any("collapse_city_variants" in p for p in cfg.validate())
+    assert DEFAULTS["filters"]["collapse_city_variants"] is True
 
 
 def test_zero_is_a_legal_repost_gap_and_means_off(tmp_path: Path):
@@ -480,6 +515,20 @@ def test_zero_is_a_legal_repost_gap_and_means_off(tmp_path: Path):
     that made it loudest. `test_digest` pins the behaviour; this pins that
     validate still accepts it."""
     cfg = write_config(tmp_path, {"freshness": {"repost_min_gap_days": 0}})
+    assert cfg.validate() == []
+
+
+@pytest.mark.parametrize("name", ["followup_days", "stale_days", "max_followups"])
+@pytest.mark.parametrize("value", [-1, True, "soon", 2.5])
+def test_validate_rejects_a_bad_tracking_setting(tmp_path: Path, name, value):
+    cfg = write_config(tmp_path, {"tracking": {name: value}})
+    assert any(f"tracking.{name}" in p for p in cfg.validate())
+
+
+def test_tracking_defaults_validate_and_zero_means_off(tmp_path: Path):
+    assert DEFAULTS["tracking"] == {"followup_days": 10, "stale_days": 60, "max_followups": 2}
+    cfg = write_config(tmp_path, {"tracking": {"followup_days": 0, "stale_days": 0,
+                                               "max_followups": 0}})
     assert cfg.validate() == []
 
 
@@ -628,6 +677,17 @@ def test_validate_flags_missing_phone_only_when_live_applying(tmp_path: Path):
     assert any("phone" in p for p in live.validate())
 
 
+def test_the_posting_guard_gate_defaults_on_and_must_be_a_bool(tmp_path: Path):
+    """A quoted "false" is a truthy string: the gate would stay on while the
+    user believes it is off. Rejected rather than guessed at."""
+    from src.config import DEFAULTS
+
+    assert DEFAULTS["apply"]["block_on_posting_guard"] is True
+    assert not any("block_on_posting_guard" in p for p in write_config(tmp_path).validate())
+    quoted = write_config(tmp_path, {"apply": {"block_on_posting_guard": "false"}})
+    assert any("block_on_posting_guard" in p for p in quoted.validate())
+
+
 def test_validate_flags_linkedin_without_credentials(tmp_path: Path):
     cfg = write_config(tmp_path, {"sources": {"linkedin_email": True}})
     assert any("gmail_credentials.json" in p for p in cfg.validate())
@@ -741,3 +801,30 @@ def test_a_fallback_entry_timeout_and_retries_are_validated(tmp_path: Path):
         "tailoring.fallback_models[5].max_retries",
         "tailoring.fallback_models[6].max_retries",
     ]
+
+
+def test_the_tailoring_checks_validate_their_types(tmp_path: Path):
+    """A quoted "false" is a truthy string: the check the user switched off
+    would silently stay on. Same for a style mode nobody implements."""
+    cfg = write_config(tmp_path, {
+        "tailoring": {"pin_header": "false", "entity_check": 1,
+                      "style": {"mode": "loud", "max_em_dashes": -1,
+                                "banned_phrases": "synergies"}},
+        "cv": {"verbatim_sections": [""]},
+    })
+    problems = " ".join(cfg.validate())
+    for key in ("tailoring.pin_header", "tailoring.entity_check",
+                "tailoring.style.mode", "tailoring.style.max_em_dashes",
+                "tailoring.style.banned_phrases", "cv.verbatim_sections"):
+        assert key in problems, key
+
+
+def test_a_bare_yaml_off_is_a_valid_style_mode(tmp_path: Path):
+    """`mode: off` reaches Python as False — which is what the user meant."""
+    (tmp_path / "config.yaml").write_text(
+        "tailoring:\n  style:\n    mode: off\n", encoding="utf-8")
+    cfg = Config.load(tmp_path / "config.yaml", tmp_path / "w.yaml",
+                      root=tmp_path, env={})
+    assert cfg.get("tailoring.style.mode") is False
+    assert not any("style" in p for p in cfg.validate())
+    assert write_config(tmp_path).validate() == []

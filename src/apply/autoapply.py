@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from .. import posting_guard
 from ..models import ApplyStatus, ScoredJob, ensure_utc, normalize_text, utcnow
 from ..util import ensure_dir, get_logger, slugify
 
@@ -43,6 +44,12 @@ logger = get_logger(__name__)
 
 #: The only two application forms this bot is allowed to touch.
 SUPPORTED_ATS: tuple[str, ...] = ("greenhouse", "lever")
+
+#: Sources whose records are an aggregator's copy of a posting. Their URL can
+#: be a genuine Greenhouse/Lever form (freehire links to the upstream ATS),
+#: but title, description and date are a third party's restatement, so the
+#: form is never filled from them: a human applies.
+NEVER_AUTO_APPLY_SOURCES: frozenset[str] = frozenset({"freehire"})
 
 #: More inputs than this and the form is a screener, not an application.
 MAX_FORM_FIELDS = 12
@@ -352,6 +359,13 @@ def eligible(
     if not bool(_cfg(config, "apply.enabled", True)):
         return False, "auto-apply is off (apply.enabled: false)"
 
+    source = (job.source or "").strip().lower()
+    if source in NEVER_AUTO_APPLY_SOURCES:
+        return False, (
+            f"an aggregator's copy ({source}), not the employer's own record — "
+            f"apply by hand: {job.url}"
+        )
+
     ats = detect_ats(job.url)
     if ats not in SUPPORTED_ATS:
         return False, (
@@ -391,6 +405,20 @@ def eligible(
             + "; ".join(flags)
             + ") — read it yourself before anything is submitted"
         )
+
+    # Same rule for a posting that talks to the model ("ignore previous
+    # instructions", hidden tag characters): the documents were generated from
+    # it, so a human reads it before anything goes out under the user's name.
+    # Dry runs still fill the form. Re-assessed here, not read off job.raw —
+    # a gate does not trust a stored "clean".
+    if (not bool(_cfg(config, "apply.dry_run", True))
+            and bool(_cfg(config, "apply.block_on_posting_guard", True))):
+        guard = posting_guard.assess(job)
+        if posting_guard.is_flagged(guard):
+            return False, (
+                "posting contains instruction-shaped text — read it first ("
+                + guard["verdict"] + ")"
+            )
 
     if bool(_cfg(config, "apply.require_pdf", True)):
         pdf = str(getattr(scored.artifacts, "cv_pdf", "") or "")
@@ -433,6 +461,18 @@ def eligible(
             return False, (
                 "already applied to this role at this company (re-posted under "
                 "a new id)"
+            )
+
+        # The same posting URL under another key: an application recorded by
+        # hand (`python -m src.track add`) whose company or city was typed
+        # differently from the board's, so neither check above can see it.
+        same_url = _tracker_flag(tracker, "has_applied_url", job.url)
+        if same_url is None:
+            return False, "could not verify apply history — not applying"
+        if same_url:
+            return False, (
+                "already applied through this posting's URL (recorded under "
+                f"another key) — check it by hand: {job.url}"
             )
 
     return True, ""

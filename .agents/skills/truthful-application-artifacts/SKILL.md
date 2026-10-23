@@ -21,4 +21,4 @@ For PDF output, use the existing rendering path or an available document/PDF wor
 
 Return actual artifact paths, unsupported-claim findings, validation/repair/fallback results, and the scope of visual checks. Drafting or review does not authorize delivery; preserve any existing explicit delivery authorization without adding a redundant confirmation. For implementation work, use synthetic facts, an injected client, and a temporary output directory.
 
-Evidence: [tailoring](../../../src/tailor.py), `tailor_job:721–850`; [application gate](../../../src/apply/autoapply.py), `eligible:340–438`; [PDF wrapper](../../../src/pdf.py); [architecture contract](../../../docs/ARCHITECTURE.md). Re-resolve source spans through Graft after code moves.
+Evidence: [tailoring](../../../src/tailor.py), `tailor_job:1287–1455`; [application gate](../../../src/apply/autoapply.py), `eligible:347–478`; [PDF wrapper](../../../src/pdf.py); [architecture contract](../../../docs/ARCHITECTURE.md). Re-resolve source spans through Graft after code moves.

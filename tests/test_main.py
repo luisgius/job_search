@@ -407,6 +407,413 @@ def test_filtered_jobs_are_recorded_so_they_are_not_re_evaluated(
     assert memory_tracker.get_status(stale.key) == ApplyStatus.FILTERED.value
 
 
+class CountingScorer:
+    """Answers every scoring call with a match and counts them. The runs that
+    use it switch tailoring off, so every call it sees is a scoring call."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def complete_json(self, **kwargs):
+        self.calls += 1
+        return {"score": 85, "reasons": ["Python matches"], "strengths": [],
+                "gaps": [], "verdict": "good fit"}
+
+
+def test_a_cross_source_copy_of_yesterdays_digest_is_not_scored_again(
+        tmp_path: Path, stub_sources, memory_tracker, monkeypatch):
+    """Day one the Greenhouse record is scored and lands in the digest. Day
+    two the Arbeitnow copy of the same job carries a longer description, so it
+    wins in-run dedupe — under a key the tracker has never seen. That copy was
+    scored and shown a second time; now its handled twin stops it."""
+    aggregator: list = []
+    monkeypatch.setattr(main_module.arbeitnow, "fetch",
+                        lambda config, **kwargs: list(aggregator))
+    cfg = pipeline_config(tmp_path, sources={"arbeitnow": True},
+                          tailoring={"enabled": False})
+    ats = make_job(company="Celonis", title="Data Engineer", location="Munich, Germany",
+                   hours_old=2, ats_job_id="4711")
+    stub_sources.results["ats_boards"] = [ats]
+    first = CountingScorer()
+    day_one, _ = run_pipeline(cfg, tracker=memory_tracker, now=NOW, llm_client=first)
+    assert [item.key for item in day_one] == [ats.key] and first.calls == 1
+    assert memory_tracker.get_status(ats.key) == ApplyStatus.DIGEST.value
+
+    copy = make_job(source="arbeitnow", company="Celonis", title="Data Engineer",
+                    location="Munich, Germany", hours_old=2, ats=None, ats_job_id=None,
+                    url="https://www.arbeitnow.com/jobs/celonis/data-engineer-munich",
+                    description=ats.description + " Benefits, team and interview steps.")
+    assert copy.dedupe_key == ats.dedupe_key and copy.key != ats.key
+    aggregator.append(copy)
+    second = CountingScorer()
+    day_two, stats = run_pipeline(cfg, tracker=memory_tracker,
+                                  now=NOW + timedelta(hours=20), llm_client=second)
+
+    assert second.calls == 0 and day_two == []
+    assert stats.after_dedupe == 1 and stats.after_filters == 1
+    assert stats.already_seen == 1 and stats.filter_counts == {}
+    row = memory_tracker.get_application(copy.key)
+    assert row["status"] == ApplyStatus.FILTERED.value
+    assert row["detail"] == (f"cross-source duplicate of {ats.key[:8]} "
+                             f"(greenhouse, digest {NOW.date().isoformat()})")
+    assert memory_tracker.get_status(ats.key) == ApplyStatus.DIGEST.value
+
+
+def test_a_queued_copy_whose_twin_was_handled_stops_without_a_model_call(
+        tmp_path: Path, stub_sources, memory_tracker, monkeypatch):
+    """The backlog path: the aggregator copy was queued behind the cap while
+    its Greenhouse twin was scored. When it is next observed it stops on the
+    existing protected path, not with a second evaluation."""
+    aggregator: list = []
+    monkeypatch.setattr(main_module.arbeitnow, "fetch",
+                        lambda config, **kwargs: list(aggregator))
+    cfg = pipeline_config(tmp_path, sources={"arbeitnow": True},
+                          tailoring={"enabled": False})
+    ats = make_job(company="Celonis", title="Data Engineer", location="Munich, Germany",
+                   hours_old=2, ats_job_id="4711")
+    copy = make_job(source="arbeitnow", company="Celonis", title="Data Engineer",
+                    location="Munich, Germany", hours_old=2, ats=None, ats_job_id=None,
+                    url="https://www.arbeitnow.com/jobs/celonis/data-engineer-munich")
+    memory_tracker.enqueue_scoring(copy, now=NOW - timedelta(hours=1))
+    memory_tracker.record_job(ats, now=NOW - timedelta(hours=1))
+    memory_tracker.record_status(ats.key, ApplyStatus.DIGEST, now=NOW - timedelta(hours=1))
+    aggregator.append(copy)
+    client = CountingScorer()
+    scored, stats = run_pipeline(cfg, tracker=memory_tracker, now=NOW, llm_client=client)
+
+    assert client.calls == 0 and scored == []
+    row = memory_tracker.get_scoring(copy.key)
+    assert row["state"] == "protected"
+    assert row["detail"].startswith(f"cross-source duplicate of {ats.key[:8]} (greenhouse")
+    assert stats.already_seen == 1
+
+
+def test_a_same_board_repost_is_still_scored_and_flagged(
+        tmp_path: Path, stub_sources, memory_tracker):
+    """The twin check ignores same-board rows on purpose: a new id on the
+    same board is a re-listing, and the digest's repost flag is the place
+    that says so — on a card that therefore has to exist."""
+    earlier = make_job(company="Company0", title="Backend Engineer",
+                       location="Berlin, Germany", ats_job_id="old-req",
+                       posted_at=NOW - timedelta(days=20))
+    memory_tracker.record_job(earlier, now=NOW - timedelta(days=20))
+    memory_tracker.record_status(earlier.key, ApplyStatus.DIGEST,
+                                 now=NOW - timedelta(days=20))
+    repost = make_job(company="Company0", title="Backend Engineer",
+                      location="Berlin, Germany", ats_job_id="new-req", hours_old=2)
+    stub_sources.results["ats_boards"] = [repost]
+    client = CountingScorer()
+    scored, stats = run_pipeline(pipeline_config(tmp_path, tailoring={"enabled": False}),
+                                 tracker=memory_tracker, now=NOW, llm_client=client)
+
+    assert client.calls == 1 and [item.key for item in scored] == [repost.key]
+    assert stats.already_seen == 0
+    assert "On the market 20 days or more" in Path(stats.digest_path).read_text(encoding="utf-8")
+
+
+def nofluff_copy(location, n):
+    """A No Fluff Jobs-shaped copy of one posting, listed for one city."""
+    return make_job(source="nofluffjobs", company="Northwind", title="Data Engineer",
+                    location=location, hours_old=2, ats=None, ats_job_id=f"nfj-{n}",
+                    url=f"https://nofluffjobs.com/job/northwind-data-engineer-{n}",
+                    description="Main technology: Python. Seniority: Mid.",
+                    raw={"snippet_only": True})
+
+
+def test_one_posting_listed_per_city_is_scored_once_as_the_home_copy(
+        tmp_path: Path, stub_sources, memory_tracker, monkeypatch):
+    copies = [nofluff_copy("Warsaw, Cracow, Gdańsk", 1),
+              nofluff_copy("Cracow, Gdańsk, Warsaw", 2),
+              nofluff_copy("Gdańsk, Warsaw, Cracow", 3)]
+    monkeypatch.setattr(main_module.nofluffjobs, "fetch",
+                        lambda config, **kwargs: list(copies))
+    cfg = pipeline_config(tmp_path, sources={"greenhouse": False, "nofluffjobs": True},
+                          applicant={"location": "Kraków, Poland"},
+                          tailoring={"enabled": False})
+    client = CountingScorer()
+    scored, stats = run_pipeline(cfg, tracker=memory_tracker, now=NOW, llm_client=client)
+
+    assert client.calls == 1 and [item.key for item in scored] == [copies[1].key]
+    assert scored[0].job.raw["also_in"] == ["Warsaw", "Gdańsk"]
+    assert stats.after_dedupe == 3 and stats.after_filters == 1
+    assert stats.filter_counts == {"same_posting_other_city": 2}
+    assert stats.to_dict()["filter_counts"] == stats.filter_counts
+    for loser in (copies[0], copies[2]):
+        row = memory_tracker.get_application(loser.key)
+        assert row["status"] == ApplyStatus.FILTERED.value
+        assert row["detail"].startswith("same_posting_other_city:")
+
+
+def test_collapsing_city_copies_leaves_never_apply_twice_alone(
+        tmp_path: Path, stub_sources, memory_tracker, monkeypatch):
+    """Only merging, never unblocking: an applied home copy stays blocked, and
+    an applied copy recorded as a city variant keeps its `applied` row."""
+    home, other = nofluff_copy("Cracow, Warsaw", 1), nofluff_copy("Warsaw, Cracow", 2)
+    for job in (home, other):
+        memory_tracker.record_job(job, now=NOW - timedelta(days=60))
+        memory_tracker.record_status(job.key, ApplyStatus.APPLIED,
+                                     now=NOW - timedelta(days=60))
+    monkeypatch.setattr(main_module.nofluffjobs, "fetch",
+                        lambda config, **kwargs: [other, home])
+    cfg = pipeline_config(tmp_path, sources={"greenhouse": False, "nofluffjobs": True},
+                          applicant={"location": "Kraków, Poland"},
+                          tailoring={"enabled": False})
+    client = CountingScorer()
+    scored, stats = run_pipeline(cfg, tracker=memory_tracker, now=NOW, llm_client=client)
+
+    assert client.calls == 0 and scored == []
+    assert stats.filter_counts == {"same_posting_other_city": 1}
+    assert memory_tracker.has_applied(home.key) and memory_tracker.has_applied(other.key)
+
+
+# --------------------------------------------------------------------------
+# city copies against what the tracker already holds
+# --------------------------------------------------------------------------
+
+#: One ad, word for word, published as a separate Greenhouse req per city.
+VARIANT_AD = "We are hiring a data engineer to build pipelines in Python and SQL. " * 15
+
+
+def city_req(req, location, **overrides):
+    fields = dict(company="Acme", title="Data Engineer", location=location,
+                  description=VARIANT_AD, ats_job_id=str(req), hours_old=3,
+                  url=f"https://boards.greenhouse.io/acme/jobs/{req}")
+    fields.update(overrides)
+    return make_job(**fields)
+
+
+def warsaw_config(tmp_path: Path):
+    return pipeline_config(tmp_path, applicant={"location": "Warsaw, Poland"},
+                           tailoring={"enabled": False})
+
+
+def test_a_new_city_copy_of_an_ad_already_applied_to_is_never_scored(
+        tmp_path: Path, stub_sources, memory_tracker):
+    """Berlin req applied to six days ago — stale today, so the filters drop
+    it — and today the same ad as a Warsaw req, the profile's city. Collapse
+    kept the Warsaw copy and every gate keys on it, so it was scored and
+    could be auto-applied: a second application to one posting. Neither on
+    the day, nor after the reminder window while Berlin is no longer listed."""
+    applied = city_req(111, "Berlin, Germany", hours_old=24 * 6)
+    memory_tracker.record_job(applied, now=NOW - timedelta(days=5))
+    memory_tracker.record_status(applied.key, ApplyStatus.APPLIED, method="greenhouse",
+                                 now=NOW - timedelta(days=5))
+    home = city_req(222, "Warsaw, Poland")
+    stub_sources.results["ats_boards"] = [applied, home]
+    client = CountingScorer()
+    scored, stats = run_pipeline(warsaw_config(tmp_path), tracker=memory_tracker, now=NOW,
+                                 llm_client=client)
+
+    assert client.calls == 0 and scored == []
+    assert stats.after_filters == 0 and stats.filter_counts["same_posting_other_city"] == 1
+    row = memory_tracker.get_application(home.key)
+    assert (row["status"], row["detail"]) == (
+        "filtered", f"same_posting_other_city: the copy listed for Berlin "
+                    f"({applied.key[:8]}) was already applied to")
+    assert memory_tracker.get_scoring(home.key) is None
+
+    later = NOW + timedelta(days=31)
+    stub_sources.results["ats_boards"] = [city_req(222, "Warsaw, Poland", posted_at=later)]
+    scored, stats = run_pipeline(warsaw_config(tmp_path), tracker=memory_tracker, now=later,
+                                 llm_client=client)
+    assert client.calls == 0 and scored == [] and stats.already_seen == 1
+    assert memory_tracker.get_application(home.key)["updated_at"] == later.isoformat()
+
+
+def test_a_city_copy_of_queued_work_is_held_back_not_scored_beside_it(
+        tmp_path: Path, stub_sources, memory_tracker):
+    """Queued work skips the filters and the collapse, so yesterday's queued
+    Warsaw copy and today's Berlin copy were both scored."""
+    queued = city_req(1, "Warsaw, Poland", hours_old=26)
+    memory_tracker.enqueue_scoring(queued, now=NOW - timedelta(days=1))
+    sibling = city_req(2, "Berlin, Germany")
+    stub_sources.results["ats_boards"] = [queued, sibling]
+    client = CountingScorer()
+    scored, stats = run_pipeline(warsaw_config(tmp_path), tracker=memory_tracker, now=NOW,
+                                 llm_client=client)
+
+    assert client.calls == 1 and [item.key for item in scored] == [queued.key]
+    row = memory_tracker.get_application(sibling.key)
+    assert (row["status"], row["detail"]) == (
+        "filtered", f"same_posting_other_city: the copy listed for Warsaw "
+                    f"({queued.key[:8]}) is already tracked")
+    assert stats.filter_counts == {"same_posting_other_city": 1}
+
+
+def test_two_queued_copies_of_one_ad_are_scored_once(
+        tmp_path: Path, stub_sources, memory_tracker):
+    """Both copies were admitted on days the other was not listed; today both
+    are ready. The combined list is collapsed once more, the loser stops on
+    the protected path, and the counts say where it went."""
+    berlin, warsaw = city_req(1, "Berlin, Germany", hours_old=50), city_req(2, "Warsaw, Poland")
+    memory_tracker.enqueue_scoring(berlin, now=NOW - timedelta(days=2))
+    memory_tracker.enqueue_scoring(warsaw, now=NOW - timedelta(days=1))
+    stub_sources.results["ats_boards"] = [berlin, warsaw]
+    client = CountingScorer()
+    scored, stats = run_pipeline(warsaw_config(tmp_path), tracker=memory_tracker, now=NOW,
+                                 llm_client=client)
+
+    assert client.calls == 1 and [item.key for item in scored] == [warsaw.key]
+    row = memory_tracker.get_scoring(berlin.key)
+    assert (row["state"], row["detail"]) == (
+        "protected", f"same_posting_other_city: the copy listed for Warsaw "
+                     f"({warsaw.key[:8]}) was kept")
+    assert stats.after_filters == 1 and stats.source_after_filters["greenhouse"] == 1
+    assert stats.filter_counts == {"same_posting_other_city": 1}
+    assert stats.scoring_pending == 0
+
+
+def test_queued_work_stops_when_a_city_copy_was_applied_to(
+        tmp_path: Path, stub_sources, memory_tracker):
+    applied = city_req(1, "Berlin, Germany", hours_old=24 * 6)
+    memory_tracker.record_job(applied, now=NOW - timedelta(days=5))
+    memory_tracker.record_status(applied.key, ApplyStatus.APPLIED, now=NOW - timedelta(days=5))
+    queued = city_req(2, "Warsaw, Poland", hours_old=26)
+    memory_tracker.enqueue_scoring(queued, now=NOW - timedelta(days=1))
+    stub_sources.results["ats_boards"] = [applied, queued]
+    client = CountingScorer()
+    scored, _ = run_pipeline(warsaw_config(tmp_path), tracker=memory_tracker, now=NOW,
+                             llm_client=client)
+
+    assert client.calls == 0 and scored == []
+    row = memory_tracker.get_scoring(queued.key)
+    assert row["state"] == "protected"
+    assert row["detail"].endswith(f"({applied.key[:8]}) was already applied to")
+
+
+def test_a_held_copy_stands_in_when_its_representative_is_no_longer_listed(
+        tmp_path: Path, stub_sources, memory_tracker):
+    """Day one the Warsaw copy is queued and Berlin held back. Day two only
+    Berlin is listed: it used to stay hidden for the whole reminder window
+    while Warsaw waited to be seen again — long enough to go stale. Now it
+    is scored, and Warsaw's queued work is held back for it instead."""
+    warsaw, berlin = city_req(1, "Warsaw, Poland"), city_req(2, "Berlin, Germany")
+    stub_sources.results["ats_boards"] = [warsaw, berlin]
+    cfg = warsaw_config(tmp_path)
+    run_pipeline(cfg, tracker=memory_tracker, now=NOW, skip_llm=True)
+    assert memory_tracker.get_scoring(warsaw.key)["state"] == "pending"
+    assert memory_tracker.get_status(berlin.key) == ApplyStatus.FILTERED.value
+
+    stub_sources.results["ats_boards"] = [berlin]
+    client = CountingScorer()
+    scored, _ = run_pipeline(cfg, tracker=memory_tracker, now=NOW + timedelta(hours=18),
+                             llm_client=client)
+    assert client.calls == 1 and [item.key for item in scored] == [berlin.key]
+    row = memory_tracker.get_scoring(warsaw.key)
+    assert (row["state"], row["detail"]) == (
+        "protected", f"same_posting_other_city: the copy listed for Berlin "
+                     f"({berlin.key[:8]}) stands in for it")
+
+    stub_sources.results["ats_boards"] = [warsaw, berlin]
+    scored, _ = run_pipeline(cfg, tracker=memory_tracker, now=NOW + timedelta(hours=20),
+                             llm_client=client)
+    assert client.calls == 1 and scored == []
+
+
+def test_copies_held_back_for_work_that_expires_unscored_are_released(
+        tmp_path: Path, stub_sources, memory_tracker):
+    warsaw, berlin = city_req(1, "Warsaw, Poland"), city_req(2, "Berlin, Germany")
+    stub_sources.results["ats_boards"] = [warsaw, berlin]
+    cfg = warsaw_config(tmp_path)
+    run_pipeline(cfg, tracker=memory_tracker, now=NOW, skip_llm=True)
+    assert memory_tracker.get_status(berlin.key) == ApplyStatus.FILTERED.value
+
+    stub_sources.results["ats_boards"] = []
+    _, stats = run_pipeline(cfg, tracker=memory_tracker, now=NOW + timedelta(days=8),
+                            skip_llm=True)
+    assert memory_tracker.get_scoring(warsaw.key)["state"] == "expired"
+    assert memory_tracker.get_application(berlin.key) is None
+    assert any(warsaw.key in error and "1 copy/copies of the same posting" in error
+               for error in stats.errors)
+
+
+class BelowScorer(CountingScorer):
+    def complete_json(self, **kwargs):
+        self.calls += 1
+        return {"score": 40, "reasons": ["thin match"], "strengths": [],
+                "gaps": [], "verdict": "weak"}
+
+
+def test_a_teaser_scored_below_does_not_hide_the_full_ad_from_another_board(
+        tmp_path: Path, stub_sources, memory_tracker, monkeypatch):
+    """Yesterday a snippet-only board copy scored below the threshold; today
+    the Greenhouse record of the same role arrives with the full ad. It was
+    filtered as a cross-source duplicate and never read."""
+    board: list = []
+    monkeypatch.setattr(main_module.arbeitnow, "fetch", lambda config, **kwargs: list(board))
+    cfg = pipeline_config(tmp_path, sources={"arbeitnow": True}, tailoring={"enabled": False})
+    teaser = make_job(source="arbeitnow", company="Acme", title="Data Engineer",
+                      location="Warsaw, Poland", hours_old=2, ats=None, ats_job_id=None,
+                      url="https://www.arbeitnow.com/jobs/acme/data-engineer",
+                      description="Data Engineer at Acme. Python, SQL.",
+                      raw={"snippet_only": True})
+    board.append(teaser)
+    first = BelowScorer()
+    run_pipeline(cfg, tracker=memory_tracker, now=NOW, llm_client=first)
+    assert first.calls == 1
+    assert memory_tracker.get_status(teaser.key) == ApplyStatus.SCORED_BELOW.value
+
+    full = make_job(company="Acme", title="Data Engineer", location="Warsaw, Poland",
+                    hours_old=2, ats_job_id="42", description="The full ad. " * 200)
+    assert full.dedupe_key == teaser.dedupe_key
+    board.clear()
+    stub_sources.results["ats_boards"] = [full]
+    second = CountingScorer()
+    scored, _ = run_pipeline(cfg, tracker=memory_tracker, now=NOW + timedelta(hours=20),
+                             llm_client=second)
+    assert second.calls == 1 and [item.key for item in scored] == [full.key]
+
+
+def test_a_full_ad_scored_below_still_hides_its_copy_on_another_board(
+        tmp_path: Path, stub_sources, memory_tracker, monkeypatch):
+    board: list = []
+    monkeypatch.setattr(main_module.arbeitnow, "fetch", lambda config, **kwargs: list(board))
+    cfg = pipeline_config(tmp_path, sources={"arbeitnow": True}, tailoring={"enabled": False})
+    full = make_job(company="Acme", title="Data Engineer", location="Warsaw, Poland",
+                    hours_old=2, ats_job_id="42", description="The full ad. " * 200)
+    stub_sources.results["ats_boards"] = [full]
+    first = BelowScorer()
+    run_pipeline(cfg, tracker=memory_tracker, now=NOW, llm_client=first)
+    assert memory_tracker.get_application(full.key)["full_text"] == 1
+
+    stub_sources.results["ats_boards"] = []
+    board.append(make_job(source="arbeitnow", company="Acme", title="Data Engineer",
+                          location="Warsaw, Poland", hours_old=2, ats=None, ats_job_id=None,
+                          url="https://www.arbeitnow.com/jobs/acme/data-engineer",
+                          description="The full ad. " * 210))
+    second = CountingScorer()
+    scored, stats = run_pipeline(cfg, tracker=memory_tracker, now=NOW + timedelta(hours=20),
+                                 llm_client=second)
+    assert second.calls == 0 and scored == [] and stats.already_seen == 1
+
+
+def test_a_manual_application_stops_its_scoring_backlog(tmp_path: Path, stub_sources,
+                                                        memory_tracker):
+    """Applied by hand (`python -m src.track mark K applied`) while the job sat
+    in the scoring queue: the next run must neither score it nor apply to it."""
+    job = fresh_jobs(1)[0]
+    stub_sources.results["ats_boards"] = [job]
+    cfg = pipeline_config(tmp_path)
+    run_pipeline(cfg, tracker=memory_tracker, now=NOW, skip_llm=True)
+    assert memory_tracker.get_scoring(job.key)["state"] == "pending"
+
+    memory_tracker.record_event(job.key, "applied", on=NOW.date(), now=NOW)
+
+    class Exploding:
+        def complete(self, **kw):
+            raise AssertionError("a manually applied job was scored")
+
+        complete_json = complete
+
+    scored, _ = run_pipeline(cfg, tracker=memory_tracker, now=NOW + timedelta(hours=2),
+                             llm_client=Exploding())
+    assert scored == []
+    row = memory_tracker.get_scoring(job.key)
+    assert (row["state"], row["detail"]) == (
+        "protected", "application or submit attempt already recorded")
+    assert memory_tracker.get_status(job.key) == ApplyStatus.APPLIED.value
+
+
 def test_final_statuses_are_persisted(tmp_path: Path, stub_sources, memory_tracker):
     stub_sources.results["ats_boards"] = fresh_jobs(1)
     scored, _ = run_pipeline(pipeline_config(tmp_path), tracker=memory_tracker,

@@ -781,6 +781,7 @@ footer code {
       {{ judgment(item) }}
       {{ links(item, 'Open application →') }}
       {% if item.status_detail %}<p class="note">{{ item.status_detail }}</p>{% endif %}
+      {% if item.mark_applied %}<p class="note">Applied by hand? Record it: <code>{{ item.mark_applied }}</code></p>{% endif %}
       {{ previews(item) }}
     </article>
     {% endfor %}
@@ -792,6 +793,28 @@ footer code {
     {% endif %}
   {% endif %}
 </section>
+
+{# ---------------- 1b. follow-ups (only when something is due) ---------- #}
+{% if followups %}
+<section id="followups">
+  <div class="sec-head">
+    <h2>Follow-ups due</h2>
+    <span class="n">{{ followups | length }}</span>
+    <span class="hint">applications gone quiet — this page records nothing; run the command once you have acted</span>
+  </div>
+  {% for row in followups %}
+  <article class="card{% if row.state == 'stale' %} warn{% endif %}">
+    <h3 class="role">{{ row.company }} — {{ row.title }}</h3>
+    <div class="meta"><span>{{ row.summary }}</span>{% if row.source %}<span class="tag src">{{ row.source }}</span>{% endif %}</div>
+    <p class="note">{{ row.advice }}</p>
+    {% for command in row.commands %}<p class="note"><code>{{ command }}</code></p>{% endfor %}
+    {% if row.url %}
+    <div class="links"><a href="{{ row.url }}" target="_blank" rel="noopener">Open the posting →</a><span class="host">{{ row.url_host }}</span></div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</section>
+{% endif %}
 
 {# ---------------- 2. auto-applied ---------------- #}
 <section class="sec">
@@ -858,6 +881,7 @@ footer code {
       <p class="note">No screenshot was saved for this one — treat the fill as unverified.</p>
       {% endif %}
       {{ links(item, 'Open application →') }}
+      {% if item.mark_applied %}<p class="note">Submitted it yourself? Record it: <code>{{ item.mark_applied }}</code></p>{% endif %}
       {{ previews(item) }}
     </article>
     {% endfor %}
@@ -1001,6 +1025,32 @@ footer code {
     <p class="note">Use saved posting evidence where available for retry or review. Older paused entries may lack saved posting data; availability remains unknown.</p>
     {% if backlog.missing_paused_evidence is defined %}<p>{{ backlog.missing_paused_evidence }} historical paused entry has no retained posting data.</p>{% endif %}
   </section>
+
+  {% if applications_funnel %}
+  <section id="applications">
+    <h3>Applications to date</h3>
+    <div class="funnel">
+      {% for step in applications_funnel.steps %}
+      <div class="step"><div class="v">{{ step.value }}</div><div class="k">{{ step.label }}</div></div>
+      {% if not loop.last %}<div class="arrow">→</div>{% endif %}
+      {% endfor %}
+    </div>
+    <p>Rejected or no response: {{ applications_funnel.rejection_rate }}{% if applications_funnel.final %} final outcomes{% endif %}.</p>
+    {% if applications_funnel.by_source %}
+    <div class="scroll">
+      <table>
+        <thead><tr><th>source</th><th class="num">applied</th><th class="num">interview</th><th class="num">offer</th><th class="num">hired</th></tr></thead>
+        <tbody>
+          {% for row in applications_funnel.by_source %}
+          <tr><td>{{ row.source }}</td><td class="num">{{ row.applied }}</td><td class="num">{{ row.interview }}</td><td class="num">{{ row.offer }}</td><td class="num">{{ row.hired }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+    {% for stage in applications_funnel.unrecognised %}<p class="note">unrecognised: {{ stage }}</p>{% endfor %}
+  </section>
+  {% endif %}
 
   <div class="grid2">
     <div>

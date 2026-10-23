@@ -27,7 +27,7 @@ import html as html_module
 import math
 import os
 from collections.abc import Iterable, Mapping
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -40,6 +40,8 @@ from . import config as config_module
 from urllib.parse import urlsplit
 
 from . import health as health_module
+from . import posting_guard
+from .db import FINAL_STAGES, LABEL_STAGES, NON_SUBMITTING_STAGES, OUTCOME_STAGES
 from .models import ApplyStatus, ScoredJob, ensure_utc, utcnow
 from .util import ensure_dir, get_logger, html_to_text, truncate
 
@@ -60,6 +62,8 @@ SOURCE_NAMES: tuple[str, ...] = config_module.SOURCE_NAMES
 #: literal here would let the page report a number the filter is not using.
 DEFAULT_MAX_AGE_HOURS: int = config_module.DEFAULT_MAX_AGE_HOURS
 DEFAULT_REPOST_MIN_GAP_DAYS: int = config_module.DEFAULT_REPOST_MIN_GAP_DAYS
+#: followup_days / stale_days / max_followups, imported for the same reason.
+TRACKING_DEFAULTS: Mapping[str, int] = config_module.DEFAULTS["tracking"]
 
 #: Past this age `relative_time` prints a calendar date instead of a day
 #: count, because "2026-04-02" is easier to place than "124d ago". The card
@@ -409,6 +413,16 @@ def _safe_url(url: Any) -> tuple[str, str]:
     return text, parts.netloc
 
 
+def track_command(key: Any, stage: str) -> str:
+    """The exact `python -m src.track` line that records `stage` for `key`.
+
+    Eight characters of the key: `src.track` resolves a unique prefix, and on
+    the rare collision it lists the candidates and writes nothing. Printed as
+    escaped text — the page suggests, it never records.
+    """
+    return f"python -m src.track mark {str(key or '')[:8]} {stage}"
+
+
 def _item(
     scored: ScoredJob,
     *,
@@ -448,7 +462,11 @@ def _item(
 
     # Descriptions arrive as HTML from Greenhouse and as plain text elsewhere;
     # flatten first so the excerpt is prose rather than escaped markup.
-    excerpt = truncate(html_to_text(job.description), DESCRIPTION_EXCERPT_CHARS, suffix=" …")
+    # Invisible characters out of everything the card prints from the posting:
+    # a bidi override in a title shows the reader a different string than the
+    # one the scorer saw.
+    excerpt = truncate(posting_guard.clean_text(html_to_text(job.description))[0],
+                       DESCRIPTION_EXCERPT_CHARS, suffix=" …")
     # The FULL letter, deliberately: it goes out under the user's real name,
     # and a 250-char teaser is how a servile or absurd sentence in paragraph
     # three ships unread. The details block collapses, so length is free.
@@ -466,6 +484,17 @@ def _item(
         tracker=tracker,
         repost_min_gap_days=repost_min_gap_days,
     )
+    # Re-assessed rather than read off job.raw: an unscored card (`--no-llm`,
+    # a scorer outage) never went through `scoring.score_job`. Advisory, like
+    # the ghost flag — a problem here costs the line, never the card.
+    try:
+        guard = posting_guard.assess(job)
+    except Exception as exc:
+        logger.debug("posting guard failed for %s: %s", getattr(job, "url", "?"), exc)
+        guard = None
+    if posting_guard.is_flagged(guard):
+        quote = guard["instruction_like"][0] if guard["instruction_like"] else ""
+        flags.append(guard["verdict"] + (f": “{quote}”" if quote else ""))
 
     if job.posted_at is None:
         # Undated postings are common (LinkedIn alerts carry no per-job date);
@@ -492,8 +521,10 @@ def _item(
     safe_url, url_host = _safe_url(job.url)
     return {
         "key": job.key,
-        "company": job.company or "Unknown company",
-        "title": job.title or "Untitled role",
+        # Shown on needs-click and dry-run cards: applied by hand, say so.
+        "mark_applied": track_command(job.key, "applied"),
+        "company": posting_guard.clean_text(job.company)[0] or "Unknown company",
+        "title": posting_guard.clean_text(job.title)[0] or "Untitled role",
         "location": job.location,
         "country": job.country or "",
         "remote": job.remote,
@@ -755,6 +786,159 @@ def _llm_usage(stats_data: Mapping[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _tracker_rows(tracker: Any, method: str) -> list[Any]:
+    """Outcome rows from a read-only tracker method; [] when absent or broken.
+
+    The same tolerance as `_run_rows`: these sections advise, and a tracker
+    stub or a locked database costs them and nothing else on the page.
+    """
+    reader = getattr(tracker, method, None)
+    if not callable(reader):
+        return []
+    try:
+        return list(reader() or [])
+    except Exception as exc:
+        logger.debug("tracker.%s failed: %s", method, exc)
+        return []
+
+
+def followups(
+    rows: Iterable[Mapping[str, Any]] | None,
+    now: datetime | None,
+    followup_days: int,
+    stale_days: int,
+    max_followups: int,
+) -> list[dict[str, Any]]:
+    """Which open applications deserve a nudge today. Pure; never writes.
+
+    `rows` are `Tracker.open_applications()`. Quiet days count from the last
+    recorded activity (the application, a follow-up, an interview):
+
+    * **due** — quiet for `followup_days` or more, with fewer than
+      `max_followups` follow-ups recorded since the current stage began;
+    * **stale** — quiet for `stale_days` or more. Wins over due: after two
+      months the useful command is `no_response`, not a third email.
+
+    0 turns either day check off, and `max_followups: 0` means never suggest
+    a follow-up. A `submitted_unconfirmed` row says "confirm receipt first":
+    chasing an application the employer may never have received starts the
+    wrong conversation.
+    """
+    today = (ensure_utc(now) or utcnow()).date()
+    found: list[dict[str, Any]] = []
+    for row in rows or []:
+        try:
+            last = date.fromisoformat(str(row.get("last_activity") or "")[:10])
+        except (AttributeError, ValueError):
+            continue  # no usable date, no clock: nothing honest to say
+        quiet = (today - last).days
+        followed = _int(row.get("followed_up"), 0)
+        stale = stale_days > 0 and quiet >= stale_days
+        due = (not stale and followup_days > 0 and quiet >= followup_days
+               and followed < max_followups)
+        if not (due or stale):
+            continue
+        key = str(row.get("key") or "")
+        unconfirmed = row.get("status") == ApplyStatus.SUBMITTED_UNCONFIRMED.value
+        commands = [track_command(key, "applied")] if unconfirmed else []
+        commands.append(track_command(key, "followed_up" if due else "no_response"))
+        if due:
+            commands.append(track_command(key, "no_response"))
+        if unconfirmed:
+            advice = ("Submitted but unconfirmed — confirm receipt first, then "
+                      "record it as applied.")
+        elif stale:
+            advice = f"Quiet for {quiet} days — most likely closed. Record it."
+        else:
+            advice = "Due a follow-up. Send it, then record it."
+        url, host = _safe_url(row.get("url"))
+        found.append({
+            "key": key,
+            "company": str(row.get("company") or "Unknown company"),
+            "title": str(row.get("title") or "Untitled role"),
+            "source": str(row.get("source") or ""),
+            "url": url,
+            "url_host": host,
+            "state": "stale" if stale else "due",
+            "quiet_days": quiet,
+            "summary": (
+                f"{row.get('stage') or 'applied'} · last activity {last.isoformat()} "
+                f"({quiet} days ago) · follow-ups at this stage: {followed}"
+            ),
+            "advice": advice,
+            "commands": commands,
+        })
+    found.sort(key=lambda item: (-item["quiet_days"], item["key"]))
+    return found
+
+
+#: How far up the ladder a stage proves an application got. `offer_declined`
+#: is an offer that arrived; final stages prove only that it was sent.
+_FUNNEL_RANK: dict[str, int] = {
+    "applied": 1, "interview": 2, "offer": 3, "offer_declined": 3, "hired": 4,
+}
+
+
+def application_funnel(events: Iterable[Mapping[str, Any]] | None) -> dict[str, Any] | None:
+    """"Applications to date", counted from `Tracker.outcome_events()`. Pure.
+
+    Each application counts at the furthest stage it ever reached, so a
+    rejection after an interview still counts at interview. The rejection
+    rate is (rejected + no_response) over applications with a final outcome,
+    printed as "2/5" and never as a bare percentage: at these sample sizes
+    the denominator is the part worth reading.
+
+    None — the section is hidden — while nothing has been applied to and
+    no event carries a stage this code does not know.
+    """
+    known = set(OUTCOME_STAGES) | set(LABEL_STAGES)
+    reached: dict[str, int] = {}
+    latest: dict[str, str] = {}
+    source_of: dict[str, str] = {}
+    unrecognised: set[str] = set()
+    for event in events or []:
+        if not isinstance(event, Mapping):
+            continue
+        key, stage = str(event.get("key") or ""), str(event.get("stage") or "")
+        if stage not in known:
+            unrecognised.add(stage)
+            continue
+        if stage in LABEL_STAGES:
+            continue
+        rank = _FUNNEL_RANK.get(stage, 0 if stage in NON_SUBMITTING_STAGES else 1)
+        reached[key] = max(reached.get(key, 0), rank)
+        latest[key] = stage  # events arrive in (key, occurred_on) order
+        source_of[key] = str(event.get("source") or "unknown")
+
+    applications = [key for key, rank in reached.items() if rank >= 1]
+    if not applications and not unrecognised:
+        return None
+
+    def ladder(keys: list[str]) -> list[int]:
+        return [sum(1 for k in keys if reached[k] >= rank) for rank in (1, 2, 3, 4)]
+
+    final = [k for k in applications if latest[k] in FINAL_STAGES]
+    rejected = sum(1 for k in final if latest[k] in ("rejected", "no_response"))
+    by_source = []
+    for source in sorted({source_of[k] for k in applications}):
+        counts = ladder([k for k in applications if source_of[k] == source])
+        by_source.append({"source": source, "applied": counts[0],
+                          "interview": counts[1], "offer": counts[2], "hired": counts[3]})
+    by_source.sort(key=lambda row: (-row["applied"], row["source"]))
+    counts = ladder(applications)
+    return {
+        "steps": [
+            {"label": label, "value": value} for label, value in zip(
+                ("applied", "reached interview", "reached offer", "hired"), counts)
+        ],
+        "final": len(final),
+        "rejected": rejected,
+        "rejection_rate": f"{rejected}/{len(final)}" if final else "no final outcomes yet",
+        "by_source": by_source,
+        "unrecognised": sorted(unrecognised),
+    }
+
+
 def build_context(
     scored_jobs: Iterable[ScoredJob] | None = None,
     stats: Any = None,
@@ -772,8 +956,9 @@ def build_context(
     distinguishable from a broken pipeline.
 
     `tracker=` is optional and read-only: it supplies the sighting history the
-    repost flag needs (`db.Tracker.repost_gap_days`). Omitting it costs that
-    one flag and changes nothing else — no job appears, disappears or moves
+    repost flag needs (`db.Tracker.repost_gap_days`), and the outcome log
+    behind "Follow-ups due" and "Applications to date". Omitting it costs
+    those and changes nothing else — no job appears, disappears or moves
     because a tracker was or was not passed.
     """
     moment = ensure_utc(now) or utcnow()
@@ -828,6 +1013,10 @@ def build_context(
 
     totals = {name: len(items) for name, items in buckets.items()}
     totals["all"] = sum(totals.values())
+    tracking = {
+        name: max(0, _int(_cfg(config, f"tracking.{name}", default), default))
+        for name, default in TRACKING_DEFAULTS.items()
+    }
 
     context: dict[str, Any] = {
         "generated_at": moment,
@@ -856,6 +1045,9 @@ def build_context(
             stats, stats_data, errors, new_by_source, tracker, moment
         ),
         "llm_usage": _llm_usage(stats_data),
+        "followups": followups(_tracker_rows(tracker, "open_applications"),
+                               moment, **tracking),
+        "applications_funnel": application_funnel(_tracker_rows(tracker, "outcome_events")),
         "filter_counts": filter_counts,
         "errors": errors,
         "totals": totals,
@@ -922,6 +1114,8 @@ def _skeleton() -> dict[str, Any]:
         "source_counts": {},
         "source_health": [],
         "llm_usage": None,
+        "followups": [],
+        "applications_funnel": None,
         "filter_counts": {},
         "errors": [],
         "totals": {name: 0 for name in list(sections) + ["all"]},

@@ -19,4 +19,4 @@ Preserve these contracts:
 
 Verify the changed parser/fetcher on relevant malformed, missing-date/location, duplicate, and request-failure fixtures. Exercise the affected dedupe/filter path to show which jobs survive and why; parser success alone does not establish useful source coverage. Report the exact fixture, changed funnel counts/reasons, focused test command, and any unverified live behavior. Live checks stay within the user's authorized source and request budget.
 
-Evidence: [Job identity](../../../src/models.py), `Job:173–258`; [dedupe and filters](../../../src/filters.py), `_check_location:334–440`, `is_fresh:562–596`, `dedupe:735–807`; [Adzuna](../../../src/sources/adzuna.py), `parse_result:221–292`. Re-resolve spans through Graft after code moves.
+Evidence: [Job identity](../../../src/models.py), `Job:173–292`; [dedupe and filters](../../../src/filters.py), `_check_location:352–467`, `is_fresh:565–599`, `dedupe:981–1010`; [Adzuna](../../../src/sources/adzuna.py), `parse_result:221–292`. Re-resolve spans through Graft after code moves.

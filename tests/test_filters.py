@@ -19,7 +19,13 @@ from src.filters import (
     FUTURE_TOLERANCE_HOURS,
     REASON_CATEGORIES,
     SOURCE_RANK,
+    TRACKED_APPLIED,
+    TRACKED_HANDLED,
+    TRACKED_NONE,
+    TRACKED_QUEUED,
+    VARIANT_MIN_BODY_CHARS,
     apply_filters,
+    collapse_variants,
     dedupe,
     is_fresh,
     passes_keywords,
@@ -328,6 +334,191 @@ def test_min_description_chars(tmp_path):
 def test_result_summary_reads_like_a_log_line(tmp_path, jobs):
     summary = apply_filters(jobs, cfg(tmp_path), now=NOW).summary()
     assert "kept" in summary and "dropped" in summary
+
+
+# ==========================================================================
+# collapse_variants — one posting listed once per city
+# ==========================================================================
+#
+# No Fluff Jobs publishes one posting per city and rotates the city list, so
+# every copy has a different first city, a different `dedupe_key` and — with
+# no ATS id — a different `Job.key`. A burst of fourteen copies of one ad
+# used to take fourteen of the run's scoring slots.
+
+HOME = {"applicant": {"location": "Kraków, Poland"}}
+
+#: A full ad body comfortably over the tier B floor.
+BODY = " ".join(f"Responsibility {i}: build and run batch data pipelines." for i in range(20))
+
+
+def city_copy(location, n, **overrides):
+    """One No Fluff Jobs-shaped copy: no ATS, a synthesized snippet body."""
+    fields = dict(source="nofluffjobs", company="Northwind", title="Data Engineer",
+                  ats=None, ats_job_id=f"nfj-{n}", location=location,
+                  url=f"https://nofluffjobs.com/job/northwind-data-engineer-{n}",
+                  description="Main technology: Python. Seniority: Mid.",
+                  raw={"snippet_only": True})
+    fields.update(overrides)
+    return make_job(**fields)
+
+
+def test_rotated_city_lists_are_one_posting():
+    copies = [city_copy("Warsaw, Cracow, Gdańsk", 1),
+              city_copy("Gdańsk, Warsaw, Cracow", 2),
+              city_copy("Cracow, Gdańsk, Warsaw", 3)]
+    assert len({job.dedupe_key for job in copies}) == 3      # dedupe cannot see it
+
+    result = collapse_variants(copies, HOME)
+
+    assert result.kept == [copies[2]]
+    assert [job for job, _ in result.rejected] == copies[:2]
+    assert all(reason.startswith("same_posting_other_city:") and copies[2].key[:8] in reason
+               for _, reason in result.rejected)
+    assert result.counts == {"same_posting_other_city": 2}
+    assert copies[2].raw["also_in"] == ["Warsaw", "Gdańsk"]
+
+
+def test_the_profile_city_copy_is_kept_over_a_richer_earlier_one():
+    """"Cracow" on the board, "Kraków" in the profile: one city."""
+    richer = city_copy("Warsaw, Cracow", 1, description=BODY, raw={})
+    home = city_copy("Cracow, Warsaw", 2)
+    assert collapse_variants([richer, home], HOME).kept == [home]
+    assert home.raw["also_in"] == ["Warsaw"]
+
+
+def test_without_a_home_copy_remote_then_richness_decides():
+    office = city_copy("Berlin, Paris", 1, description=BODY, raw={})
+    remote = city_copy("Paris, Berlin", 2, remote=True)
+    assert collapse_variants([office, remote], HOME).kept == [remote]
+
+    teaser = city_copy("Berlin, Paris", 3)
+    richer = city_copy("Paris, Berlin", 4, description=BODY, raw={})
+    assert collapse_variants([teaser, richer], HOME).kept == [richer]
+
+
+def test_one_full_body_listed_for_two_cities_is_one_posting():
+    """Tier B: separate requisitions per city, the same ad word for word."""
+    berlin = city_copy("Berlin, Germany", 1, source="greenhouse", ats="greenhouse",
+                       description=BODY, raw={})
+    barcelona = city_copy("Barcelona, Spain", 2, source="greenhouse", ats="greenhouse",
+                          description=BODY, raw={})
+    result = collapse_variants([berlin, barcelona], HOME)
+    assert result.kept == [berlin]                # a full tie keeps the first sighting
+    assert berlin.raw["also_in"] == ["Barcelona"]
+
+
+def test_different_city_sets_with_different_bodies_stay_apart():
+    a = city_copy("Warsaw, Cracow", 1, description=BODY, raw={})
+    b = city_copy("Berlin, Munich", 2, description=BODY.replace("batch", "streaming"),
+                  raw={})
+    other_title = city_copy("Cracow, Warsaw", 3, title="Data Analyst")
+    result = collapse_variants([a, b, other_title], HOME)
+    assert result.kept == [a, b, other_title]
+    assert result.rejected == [] and result.counts == {}
+    assert "also_in" not in a.raw
+
+
+@pytest.mark.parametrize("snippet", [True, False])
+def test_a_shared_teaser_is_never_identity(snippet):
+    """Snippets are synthesized from structured fields, so unrelated jobs share
+    them; a long one still never merges. A *full* body that long does."""
+    assert len(BODY) >= VARIANT_MIN_BODY_CHARS
+    raw = {"snippet_only": True} if snippet else {}
+    a = city_copy("Warsaw", 1, description=BODY, raw=dict(raw))
+    b = city_copy("Gdańsk", 2, description=BODY, raw=dict(raw))
+    assert len(collapse_variants([a, b], HOME).kept) == (2 if snippet else 1)
+
+
+def test_a_short_shared_full_body_is_not_identity():
+    a = city_copy("Warsaw", 1, description="We use Python and SQL.", raw={})
+    b = city_copy("Gdańsk", 2, description="We use Python and SQL.", raw={})
+    assert collapse_variants([a, b], HOME).kept == [a, b]
+
+
+def test_groups_come_out_in_first_seen_order():
+    first = city_copy("Warsaw, Cracow", 1)
+    other = city_copy("Berlin, Munich", 2, company="Contoso")
+    home = city_copy("Cracow, Warsaw", 3)
+    assert collapse_variants([first, other, home], HOME).kept == [home, other]
+
+
+def ats_copy(location, n, **overrides):
+    """One Greenhouse requisition per city, the same full ad (tier B)."""
+    return city_copy(location, n, source="greenhouse", ats="greenhouse", ats_job_id=str(n),
+                     url=f"https://boards.greenhouse.io/northwind/jobs/{n}",
+                     description=BODY, raw={}, **overrides)
+
+
+def standing(**tiers):
+    """`known=` as the pipeline passes it: a tier per key, NONE otherwise."""
+    return lambda job: tiers.get(job.key, TRACKED_NONE)
+
+
+def test_a_copy_already_applied_to_stands_for_its_posting():
+    """The home-city copy would win on rank, but its Berlin sibling was
+    applied to: keeping the new copy is a second application to one ad."""
+    applied, home = ats_copy("Berlin, Germany", 1), ats_copy("Kraków, Poland", 2)
+    result = collapse_variants([applied, home], HOME,
+                               known=standing(**{applied.key: TRACKED_APPLIED}))
+    assert result.kept == [applied]
+    assert result.rejected == [(home, "same_posting_other_city: the copy listed for "
+                                      f"Berlin ({applied.key[:8]}) was already applied to")]
+
+
+def test_a_context_copy_the_tracker_holds_rejects_every_candidate():
+    """Stale today, so the filters dropped it — but applied (or queued) all
+    the same. Nothing of the posting may be kept beside it."""
+    for tier, outcome in ((TRACKED_APPLIED, "was already applied to"),
+                          (TRACKED_QUEUED, "is already tracked")):
+        held, home = ats_copy("Berlin, Germany", 1), ats_copy("Kraków, Poland", 2)
+        result = collapse_variants([home], HOME, known=standing(**{held.key: tier}),
+                                   context=[held])
+        assert result.kept == [] and [job for job, _ in result.rejected] == [home]
+        assert result.rejected[0][1].endswith(f"({held.key[:8]}) {outcome}")
+        assert result.counts == {"same_posting_other_city": 1}
+
+
+def test_context_the_tracker_does_not_hold_never_displaces_a_candidate():
+    held, home = ats_copy("Kraków, Poland", 1), ats_copy("Berlin, Germany", 2)
+    stranger = ats_copy("Gdańsk, Poland", 3, company="Contoso")
+    result = collapse_variants([home], HOME, known=standing(), context=[held, stranger])
+    assert result.kept == [home] and result.rejected == []
+
+
+def test_among_held_copies_the_stronger_hold_wins():
+    """Handled beats queued: a copy already shown stops one still waiting."""
+    queued, shown = ats_copy("Kraków, Poland", 1), ats_copy("Berlin, Germany", 2)
+    result = collapse_variants([queued], HOME, context=[shown], known=standing(
+        **{queued.key: TRACKED_QUEUED, shown.key: TRACKED_HANDLED}))
+    assert result.kept == [] and result.rejected[0][0] is queued
+
+
+def test_the_ats_record_beats_an_aggregators_remote_copy():
+    """Only the ATS's own record can be auto-applied to; a "Remote" freehire
+    copy of the same ad used to win on remote-ness and leave nothing to act on."""
+    ats = ats_copy("Warsaw, Poland", 77)
+    agg = city_copy("Remote", 78, source="freehire", ats=None, remote=True,
+                    url="https://freehire.me/jobs/acme-ml", description=BODY, raw={})
+    assert collapse_variants([agg, ats], HOME).kept == [ats]
+
+
+def test_a_direct_record_outranks_the_home_city_of_an_indirect_copy():
+    """Every copy passed the location filters; home city decides among
+    direct records, and among indirect ones, but not across the two."""
+    ats = ats_copy("Warsaw, Poland", 1)
+    home = city_copy("Kraków, Poland", 2, source="freehire", ats=None,
+                     description=BODY, raw={})
+    assert collapse_variants([home, ats], HOME).kept == [ats]
+    other_ats = ats_copy("Kraków, Poland", 3)
+    assert collapse_variants([ats, home, other_ats], HOME).kept == [other_ats]
+
+
+def test_collapse_city_variants_false_keeps_every_copy():
+    copies = [city_copy("Warsaw, Cracow", 1), city_copy("Cracow, Warsaw", 2)]
+    off = {**HOME, "filters": {"collapse_city_variants": False}}
+    result = collapse_variants(copies, off)
+    assert result.kept == copies and result.rejected == []
+    assert "same_posting_other_city" in REASON_CATEGORIES
 
 
 # ==========================================================================

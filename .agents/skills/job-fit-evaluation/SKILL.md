@@ -15,11 +15,11 @@ Current invariants:
 
 - `parse_score` clamps numeric scores to 0–100; a missing/unparseable score sets `Score.error`, not a valid low score.
 - Scoring errors remain visible in `DIGEST` and must not become eligible applications, even with a zero application threshold.
-- Candidate context, positive signals, and score caps are prompt instructions; numeric clamping does not enforce individual caps. Measure rule violations separately. Do not claim a deterministic cap unless implemented and tested.
+- Candidate context, positive signals, and score caps are prompt instructions; numeric clamping does not enforce individual caps. With `scoring.enforce_caps: true` (default false) code lowers a score to any cap the model declares in `caps_fired`, but detecting the condition is still the model's call. Measure rule violations separately (raw vs enforced). Do not claim a deterministic cap beyond that.
 - Attribute successful results to the producing model, including a fallback. Respect `scoring.max_jobs`; batch truncation and later freshness/reminder gates are pipeline behavior to evaluate when in scope, not evidence of ranking quality.
 
 Record dataset/split version, prompt and candidate-rule fingerprints, CV fingerprint, effective model/provider, relevant parameters, code revision plus local-change identification, errors, latency, tokens, and available cost. Keep raw applicant text out of ordinary reports; a fingerprint does not make its underlying private snapshot public.
 
 Compare baseline and candidate on the same held-out jobs. Report precision at ten (with the actual denominator for smaller sets), false negatives, rule violations, failure cases, latency, and spend. Mark unavailable costs as unknown. Bound paid requests and stop at the authorized budget; reuse existing authorization without asking again. Use existing evaluation tooling without installing dependencies or promoting defaults as a side effect. Model-backed evidence and human labels remain prerequisites for claims of ranking improvement.
 
-Evidence: [scoring](../../../src/scoring.py), `_candidate_rules:185–236`, `parse_score:397–424`, `score_job:438–480`, batch/status handling `483–534`; [evaluation guidance](../../../docs/EVALUATION.md); [dated research](../../../docs/RESEARCH_2026-09-09.md). Re-resolve source spans through Graft after code moves.
+Evidence: [scoring](../../../src/scoring.py), `_candidate_rules:209–267`, `parse_score:463–502`, `score_job:584–651`, batch/status handling `483–534`; [evaluation guidance](../../../docs/EVALUATION.md); [dated research](../../../docs/RESEARCH_2026-09-09.md). Re-resolve source spans through Graft after code moves.

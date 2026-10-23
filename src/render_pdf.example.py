@@ -36,6 +36,10 @@ BODY_FONT = "Helvetica"
 BOLD_FONT = "Helvetica-Bold"
 BODY_SIZE = 9.6
 LINE_SPACING = 1.32
+# Space (pt) a sub-heading needs below it for itself plus its first lines of
+# content; with less left on the page it starts the next page instead. A run
+# of headings ("## PROJECTS" then "### …") reserves it once per heading.
+HEADING_KEEP_PT = 60.0
 
 _HEADING_RE = re.compile(r"^\s{0,3}(#{1,6})\s+(.*?)\s*#*\s*$")
 # A rule is three or more of the same marker, optionally spaced: --- *** ___
@@ -151,6 +155,7 @@ def render(cv_markdown: str, out_path: str) -> None:
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.units import mm
     from reportlab.platypus import (
+        CondPageBreak,
         HRFlowable,
         ListFlowable,
         ListItem,
@@ -184,8 +189,9 @@ def render(cv_markdown: str, out_path: str) -> None:
     for level in ("h4", "h5", "h6"):
         styles[level] = styles["h3"]
 
+    sub_headings = ("h2", "h3", "h4", "h5", "h6")
     flowables: list[object] = []
-    for kind, payload in blocks:
+    for index, (kind, payload) in enumerate(blocks):
         if kind == "rule":
             flowables.append(Spacer(1, 3))
             flowables.append(HRFlowable(width="100%", thickness=0.6,
@@ -211,6 +217,17 @@ def render(cv_markdown: str, out_path: str) -> None:
                     spaceAfter=5,
                 ))
         elif kind in styles:
+            if kind in sub_headings and (index == 0 or blocks[index - 1][0] not in sub_headings):
+                # Not keepWithNext: ReportLab never keeps a ListFlowable with
+                # its heading, so a project title would still be stranded at
+                # the foot of page 1 with its bullets on page 2. A run of
+                # headings ("## PROJECTS" over "### RAG System") gets one
+                # break, tall enough for the whole run: a break of the "###"
+                # alone would leave the "##" at the foot of the page.
+                run = 1
+                while index + run < len(blocks) and blocks[index + run][0] in sub_headings:
+                    run += 1
+                flowables.append(CondPageBreak(HEADING_KEEP_PT * run))
             flowables.append(Paragraph(inline_markup(str(payload)), styles[kind]))
         else:
             flowables.append(Paragraph(inline_markup(str(payload)), body))

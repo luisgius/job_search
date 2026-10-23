@@ -9,7 +9,10 @@ exactly the signatures below so the stages compose without surprises.
 sources.*      -> list[Job]          (never raises; logs + skips on failure)
 dedupe                               -> collapse canonical apply URL, then Job.dedupe_key
 filters.apply_filters                -> (kept: list[Job], rejected: list[tuple[Job, str]])
-db.Tracker                           -> drop already-handled keys
+filters.collapse_variants            -> one copy per posting listed in several cities
+                                        (filters.collapse_city_variants; tracker-known copy wins)
+db.Tracker                           -> drop already-handled keys, and cross-source twins of
+                                        a handled job (Tracker.handled_twin)
 scoring.score_jobs   -> list[ScoredJob]  (LLM; Score.error set on failure)
 tailor.tailor        -> writes tailored CV + cover letter markdown
 apply.autoapply.run  -> fills Greenhouse/Lever form OR bails to digest
@@ -100,6 +103,15 @@ artifacts_dir=, now=)`, `get_status(key)`, `has_applied(key)`,
 `counts_by_status()`, `backup(keep=, now=)` — a dated daily sqlite-backup-API
 copy under `output/backups/` (schema v3 added `applications.score_reasons`,
 JSON, the threshold-calibration data).
+
+Schema v5 added `application_events` (outcomes and relevance labels recorded
+with `python -m src.track`; `applications.status` stays the one apply gate)
+and v6 `applications.full_text` (whether a `scored_below` verdict was reached
+on the full ad, so `handled_twin` lets a richer copy be scored).
+`handled_twin(dedupe_key, key=, source=, within_days=, now=)` finds the same
+role already handled under another source's key; `record_event`,
+`open_applications`, `jobs_matching` and `has_applied_url` back the CLI and
+the digest's follow-up and funnel sections.
 
 `has_applied` is True only for `applied`. A dry run must leave the job
 eligible for a real application later.
@@ -529,10 +541,14 @@ def build_cover_prompt(job, cv_markdown, applicant) -> str
 def tailor_job(scored, cv_markdown, config, *, client=None, out_dir=None) -> ScoredJob
 def tailor_jobs(scored_jobs, cv_markdown, config, *, client=None, errors=None) -> list[ScoredJob]
 def artifact_dir(job, base_dir) -> Path      # <base>/applications/<slug>-<key>
-def validate_tailored_cv(base_md, tailored_md, applicant=None) -> tuple[bool, str]
+def validate_tailored_cv(base_md, tailored_md, applicant=None, *,
+                         entity_check=False, verbatim_sections=()) -> tuple[bool, str]
 def validate_cover_letter(cover_md, *, base_md, job=None, applicant=None)
                                        -> tuple[bool, str, list[str]]  # ok, reason, flags
 def unanchored_numbers(base_md, candidate_md, extra_md="") -> list[str]
+def unanchored_links(base_md, candidate_md, applicant=None) -> list[str]
+def ungrounded_headings(base_md, tailored_md) -> list[str]
+def letter_style_issues(text, *, banned_phrases=None, max_em_dashes=1) -> list[str]
 ```
 The prompts must forbid inventing employers, dates, degrees, or metrics not
 present in the base CV — reordering/rephrasing/emphasis only. Prompt rules are
@@ -541,12 +557,24 @@ a request, not a guarantee, so the output is validated afterwards:
 unfilled placeholder, a document past twice the base CV's length, and —
 hard-number grounding — any percent or year the base CV never stated
 (formatting is normalised first, so "10,000" and "10k" are one fact, and a
-duration derivable from anchored year pairs is arithmetic, not invention); a
-rejected CV falls back to the base. `validate_cover_letter` gates on the same
+duration derivable from anchored year pairs is arithmetic, not invention), a
+lost applicant email, and any URL or email found neither in the base CV nor in
+`applicant`; with `tailoring.entity_check` (default on) also a `###` heading
+whose `|`-separated parts are not a subset of one base-CV heading's (invented
+employer, "Junior" dropped) and a `cv.verbatim_sections` item the base lacks.
+A rejected CV gets one repair, then falls back to the base. Before any check,
+every model output loses the glyphs Helvetica cannot draw (U+2011, U+202F…),
+the CV gets the base CV's header back plus the `applicant` contact fields it
+lacks (`tailoring.pin_header`, default on), and the letter gets its greeting,
+paragraphs and signature split for the renderer; `tailoring.ascii_date_ranges`
+(opt-in) turns "Mar 2026 – Present" into an ASCII range.
+`validate_cover_letter` gates on the same
 mechanically-certain failures — the posting is allowed as an extra number
 anchor there, since a letter may quote the ad — and everything judgement-y
-(overlength, never naming the company) is a flag in `status_detail`, never a
-block. Writes `cv.md` + `cover_letter.md` into the artifact dir and fills
+(overlength, never naming the company, an unanchored link, and under
+`tailoring.style.mode: flag|repair` the style lint) is a flag in
+`status_detail`, never a block — but a flagged letter is kept out of live
+forms. Writes `cv.md` + `cover_letter.md` into the artifact dir and fills
 `ScoredJob.artifacts`. Respects `tailoring.max_per_run`.
 
 ### `src/render_pdf.py` — **user-supplied hook, do not implement**

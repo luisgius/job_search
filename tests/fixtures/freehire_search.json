@@ -1,0 +1,479 @@
+{
+  "data": [
+    {
+      "public_slug": "mid-data-analyst-capco-hlwgfdts",
+      "source": "greenhouse",
+      "manually_added": false,
+      "external_id": "capco:8111831",
+      "url": "https://job-boards.greenhouse.io/capco/jobs/8111831?utm_source=freehire.me",
+      "title": "Mid Data Analyst",
+      "company": "Capco",
+      "company_slug": "capco",
+      "location": "Poland - Cracow",
+      "description": "*********************************\nData Analyst (Financial Services)\n*********************************\n\n-----------\nAbout Capco\n-----------\n\nAt Capco Poland, we're not just another consultancy—we're the dynamic force driving digital transformation in the financial world. As a global leader in technology and management consulting, we help clients tackle complex challenges across banking, payments, capital markets, …",
+      "countries": [
+        "pl"
+      ],
+      "regions": [
+        "eu"
+      ],
+      "work_mode": "hybrid",
+      "skills": [
+        "accessibility",
+        "agile",
+        "analytics",
+        "data-ingestion",
+        "data-quality",
+        "etl"
+      ],
+      "cities": [
+        "Kraków"
+      ],
+      "metros": [
+        "Kraków (PL)"
+      ],
+      "collections": [],
+      "is_tech": "tech",
+      "auto_apply_available": true,
+      "posted_at": "2026-10-22T14:42:15Z",
+      "created_at": "2026-08-13T10:08:09Z",
+      "updated_at": "2026-10-22T15:10:15Z",
+      "last_seen_at": "2026-10-22T15:10:15Z",
+      "closed_at": null,
+      "enrichment": {
+        "summary": "Data Analyst builds and maintains ETL pipelines and cleans financial datasets to support ML models in banking and capital markets.",
+        "employment_type": "contract",
+        "seniority": "middle",
+        "experience_years_min": 5,
+        "english_level": "c1",
+        "category": "data_analytics",
+        "domains": [
+          "fintech"
+        ],
+        "posting_language": "en",
+        "company_type": "agency"
+      },
+      "enriched_at": "2026-08-14T22:15:33Z",
+      "enrichment_version": 2,
+      "reality": {
+        "class": "stale",
+        "age_days": 70,
+        "repost_count": 1,
+        "mass_posting_count": 1,
+        "fake_freshness": false
+      }
+    },
+    {
+      "public_slug": "snowflake-data-engineer-qatar-location-capco-svvacacz",
+      "source": "greenhouse",
+      "manually_added": false,
+      "external_id": "capco:8273875",
+      "url": "https://job-boards.greenhouse.io/capco/jobs/8273875?utm_source=freehire.me",
+      "title": "Snowflake Data Engineer (Qatar location)  ",
+      "company": "Capco",
+      "company_slug": "capco",
+      "location": "Poland - Warsaw",
+      "description": "*CAPCO POLAND*\n\n**We are looking for candidates willing to relocate to the Middle East - Qatar for the duration of the project.*\n\nAt *Capco Poland,* we’re not just another consultancy - we’re the spark behind digital transformation in the financial world. As a global leader in technology and management consulting, we thrive on helping clients tackle the toughest challenges across banking, payments, capital markets, …",
+      "countries": [
+        "pl"
+      ],
+      "regions": [
+        "eu"
+      ],
+      "skills": [
+        "agile",
+        "airflow",
+        "analytics",
+        "aws",
+        "azure",
+        "ci-cd"
+      ],
+      "cities": [
+        "Warsaw"
+      ],
+      "metros": [
+        "Warsaw (PL)"
+      ],
+      "collections": [],
+      "is_tech": "tech",
+      "auto_apply_available": true,
+      "posted_at": "2026-10-22T14:42:15Z",
+      "created_at": "2026-10-12T13:52:32Z",
+      "updated_at": "2026-10-22T15:11:13Z",
+      "last_seen_at": "2026-10-22T15:11:13Z",
+      "closed_at": null,
+      "enrichment": {
+        "seniority": "senior",
+        "experience_years_min": 5,
+        "category": "data_engineering",
+        "posting_language": "en",
+        "requirements": [
+          {
+            "text": "Proven experience delivering enterprise-scale data engineering solutions with strong hands-on expertise in Snowflake.",
+            "priority": "required"
+          },
+          {
+            "text": "Minimum of 5 years Snowflake experience.",
+            "priority": "required"
+          }
+        ]
+      },
+      "enriched_at": null,
+      "enrichment_version": 0,
+      "reality": {
+        "class": "fresh",
+        "age_days": 10,
+        "repost_count": 1,
+        "mass_posting_count": 1,
+        "fake_freshness": false
+      }
+    },
+    {
+      "public_slug": "specjalista-ds-data-governance-emagine-l4makrqu",
+      "source": "emagine",
+      "manually_added": false,
+      "external_id": ":181490",
+      "url": "https://portal.emagine.org/jobs/181490/specjalista-ds-data-governance?utm_source=freehire.me",
+      "title": "Specjalista ds. Data Governance",
+      "company": "emagine",
+      "company_slug": "emagine",
+      "location": "Warsaw, Poland",
+      "description": "*Informacje o projekcie:*\n\n* \n\nBranża: bankowość\n\n* \n\nStawka: do ok. 130 zł/h netto + VAT, B2B\n\n* \n\nLokalizacja: hybryda - 2 x tygodniu Warszawa\n\n*Podsumowanie:*\n\nPoszukujemy doświadczonego Specjalisty ds. Data Governance, który wesprze transformację organizacyjną w obszarze zarządzania danymi w dużej organizacji z sektora finansowego. Głównym celem roli jest projektowanie i wdrażanie federacyjnego modelu Data …",
+      "countries": [
+        "pl"
+      ],
+      "regions": [
+        "eu"
+      ],
+      "work_mode": "hybrid",
+      "skills": [
+        "data-governance",
+        "data-quality",
+        "gcp",
+        "jest"
+      ],
+      "cities": [
+        "Warsaw"
+      ],
+      "metros": [
+        "Warsaw (PL)"
+      ],
+      "collections": [],
+      "is_tech": "tech",
+      "posted_at": "2026-10-22T13:56:11Z",
+      "created_at": "2026-10-22T13:56:11Z",
+      "updated_at": "2026-10-22T14:05:57Z",
+      "last_seen_at": "2026-10-22T13:56:11Z",
+      "closed_at": null,
+      "enrichment": {
+        "summary": "Data Governance Specialist placed via Emagine at a large banking-sector organization in Warsaw to design and implement a federated Data Governance model, define data policies and roles, and drive organizational change and data culture. Hybrid role (2 days/week on-site in Warsaw) on a B2B contract paying up to ~130 PLN/hour net.",
+        "employment_type": "contract",
+        "salary_max": 130,
+        "salary_currency": "PLN",
+        "salary_period": "hour",
+        "seniority": "senior",
+        "category": "data_engineering",
+        "domains": [
+          "fintech"
+        ],
+        "company_type": "outstaff",
+        "requirements": [
+          {
+            "text": "Minimum 5 years of experience in Data Governance or Data Management in a large, complex organization",
+            "priority": "required"
+          },
+          {
+            "text": "Experience in the banking sector",
+            "priority": "required"
+          }
+        ]
+      },
+      "enriched_at": "2026-10-22T14:05:57Z",
+      "enrichment_version": 2,
+      "reality": {
+        "class": "fresh",
+        "age_days": 0,
+        "repost_count": 1,
+        "mass_posting_count": 1,
+        "fake_freshness": false
+      }
+    },
+    {
+      "public_slug": "senior-machine-learning-engineer-speech-synthesis-telnyx-urxxwr4u",
+      "source": "greenhouse",
+      "manually_added": false,
+      "external_id": "telnyx54:7498103003",
+      "url": "https://job-boards.greenhouse.io/telnyx54/jobs/7498103003?utm_source=freehire.me",
+      "title": "Senior Machine Learning Engineer (Voice & Video AI)",
+      "company": "Telnyx",
+      "company_slug": "telnyx",
+      "location": "Dublin; Amsterdam; Krakow",
+      "description": "*About Telnyx*\n\nTelnyx is an industry leader that's not just imagining the future of global connectivity—we're building it. From architecting and amplifying the reach of a private, global, multi-cloud IP network , to bringing hyperlocal edge technology right to your fingertips through intuitive APIs, we're shaping a new era of seamless interconnection between people, devices, and applications.\n\nWe're driven by a …",
+      "countries": [
+        "ie",
+        "nl",
+        "pl"
+      ],
+      "regions": [
+        "eu"
+      ],
+      "skills": [
+        "ai",
+        "api",
+        "cloud",
+        "distributed-training",
+        "docker",
+        "fine-tuning"
+      ],
+      "cities": [
+        "Amsterdam",
+        "Dublin",
+        "Kraków"
+      ],
+      "metros": [],
+      "collections": [
+        "ie-permit-employer",
+        "nl-recognised-sponsor",
+        "techstars",
+        "uk-skilled-worker-sponsor",
+        "us-h1b-sponsor"
+      ],
+      "is_tech": "tech",
+      "auto_apply_available": true,
+      "posted_at": "2026-10-22T13:22:14Z",
+      "created_at": "2026-06-12T02:49:09Z",
+      "updated_at": "2026-10-22T15:10:51Z",
+      "last_seen_at": "2026-10-22T15:10:51Z",
+      "closed_at": null,
+      "enrichment": {
+        "summary": "Build real-time conversational voice and video AI at Telnyx: evaluate, fine-tune, and deploy speech-to-speech and full-duplex audiovisual models on global GPU infrastructure, owning features end-to-end from inference services to backend APIs and customer portal UIs. Core stack: Python, PyTorch, Docker, Kubernetes.",
+        "seniority": "senior",
+        "experience_years_min": 6,
+        "category": "ml_ai",
+        "domains": [
+          "devtools"
+        ],
+        "posting_language": "en",
+        "company_type": "product",
+        "requirements": [
+          {
+            "text": "6+ years in machine learning or related engineering with production experience",
+            "priority": "required"
+          },
+          {
+            "text": "Depth in speech generation, speech-to-speech systems, video generation, or multimodal models",
+            "priority": "required"
+          }
+        ]
+      },
+      "enriched_at": "2026-10-22T01:29:48Z",
+      "enrichment_version": 2,
+      "reality": {
+        "class": "stale",
+        "age_days": 132,
+        "repost_count": 1,
+        "mass_posting_count": 1,
+        "fake_freshness": true
+      }
+    },
+    {
+      "manually_added": false,
+      "location": "Remote",
+      "description": "<p>Build <b>AI</b> features &amp; ship them.</p>",
+      "countries": [],
+      "regions": [
+        "global"
+      ],
+      "skills": [],
+      "cities": [],
+      "metros": [],
+      "collections": [],
+      "is_tech": "tech",
+      "updated_at": "2026-10-22T12:00:00Z",
+      "last_seen_at": "2026-10-22T12:00:00Z",
+      "closed_at": null,
+      "enrichment": {
+        "seniority": "intern",
+        "category": "ai_engineering",
+        "employment_type": "internship"
+      },
+      "reality": {
+        "class": "fresh",
+        "age_days": 1,
+        "repost_count": 1,
+        "mass_posting_count": 1,
+        "fake_freshness": false
+      },
+      "public_slug": "intern-fullstack-ai-innovation-example-labs-synth01",
+      "source": "lever",
+      "external_id": "examplelabs:synth01",
+      "url": "https://jobs.lever.co/examplelabs/5f0c3a1e-synth-0001?utm_source=freehire.me",
+      "title": "Intern - Fullstack &amp; AI Innovation ",
+      "company": "Example Labs",
+      "company_slug": "example-labs",
+      "work_mode": "remote",
+      "posted_at": "2026-10-22T09:00:00Z",
+      "created_at": "2026-10-21T08:00:00Z"
+    },
+    {
+      "manually_added": false,
+      "location": "Kraków, Poland",
+      "description": "",
+      "countries": [
+        "pl"
+      ],
+      "regions": [
+        "eu"
+      ],
+      "skills": [],
+      "cities": [],
+      "metros": [],
+      "collections": [],
+      "is_tech": "tech",
+      "updated_at": "2026-10-22T12:00:00Z",
+      "last_seen_at": "2026-10-22T12:00:00Z",
+      "closed_at": null,
+      "enrichment": {},
+      "reality": {
+        "class": "fresh",
+        "age_days": 1,
+        "repost_count": 1,
+        "mass_posting_count": 1,
+        "fake_freshness": false
+      },
+      "public_slug": "data-scientist-no-company-synth02",
+      "source": "workday",
+      "external_id": "nocompany:synth02",
+      "url": "https://example.wd3.myworkdayjobs.com/en-US/careers/job/Krakow/Data-Scientist_R-0002?utm_source=freehire.me",
+      "title": "Data Scientist",
+      "company": "",
+      "company_slug": "",
+      "posted_at": "2026-10-22T10:00:00Z",
+      "created_at": "2026-10-22T10:00:00Z"
+    },
+    {
+      "manually_added": false,
+      "location": "Kraków",
+      "description": "",
+      "countries": [
+        "pl"
+      ],
+      "regions": [
+        "eu"
+      ],
+      "skills": [],
+      "cities": [],
+      "metros": [],
+      "collections": [],
+      "is_tech": "tech",
+      "updated_at": "2026-10-22T12:00:00Z",
+      "last_seen_at": "2026-10-22T12:00:00Z",
+      "closed_at": null,
+      "enrichment": {},
+      "reality": {
+        "class": "fresh",
+        "age_days": 1,
+        "repost_count": 1,
+        "mass_posting_count": 1,
+        "fake_freshness": false
+      },
+      "public_slug": "data-analyst-whatjobs-synth03",
+      "source": "whatjobs-pl",
+      "external_id": "whatjobs:synth03",
+      "url": "https://pl.whatjobs.com/jobs/data-analyst/krakow/synth03?utm_source=freehire.me",
+      "title": "Data Analyst",
+      "company": "Reposted Employer",
+      "company_slug": "reposted-employer",
+      "posted_at": "2026-10-22T10:00:00Z",
+      "created_at": "2026-10-22T10:00:00Z"
+    },
+    {
+      "manually_added": false,
+      "location": "Kraków, Poland",
+      "description": "Onsite in Kraków. Python, SQL, model monitoring.",
+      "countries": [
+        "pl"
+      ],
+      "regions": [
+        "eu"
+      ],
+      "skills": [],
+      "cities": [
+        "Kraków"
+      ],
+      "metros": [],
+      "collections": [],
+      "is_tech": "tech",
+      "updated_at": "2026-10-22T12:00:00Z",
+      "last_seen_at": "2026-10-22T12:00:00Z",
+      "closed_at": null,
+      "enrichment": {
+        "employment_type": "contract",
+        "seniority": "middle",
+        "category": "ml_ai",
+        "salary_min": 20000,
+        "salary_max": 26000,
+        "salary_currency": "PLN",
+        "salary_period": "month"
+      },
+      "reality": {
+        "class": "fresh",
+        "age_days": 1,
+        "repost_count": 1,
+        "mass_posting_count": 1,
+        "fake_freshness": false
+      },
+      "public_slug": "ml-engineer-example-bank-synth04",
+      "source": "oracle",
+      "external_id": "examplebank:synth04",
+      "url": "https://example.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX/job/40004?utm_source=freehire.me",
+      "title": "Machine Learning Engineer",
+      "company": "Example Bank",
+      "company_slug": "example-bank",
+      "work_mode": "onsite",
+      "posted_at": "2026-10-22T07:00:00Z",
+      "created_at": "2026-10-20T07:00:00Z"
+    },
+    {
+      "manually_added": false,
+      "location": "Warsaw, Poland",
+      "description": "Spark and dbt pipelines.",
+      "countries": [
+        "pl"
+      ],
+      "regions": [
+        "eu"
+      ],
+      "skills": [],
+      "cities": [],
+      "metros": [],
+      "collections": [],
+      "is_tech": "tech",
+      "updated_at": "2026-10-22T12:00:00Z",
+      "last_seen_at": "2026-10-22T12:00:00Z",
+      "closed_at": null,
+      "enrichment": {},
+      "reality": {
+        "class": "fresh",
+        "age_days": 1,
+        "repost_count": 1,
+        "mass_posting_count": 1,
+        "fake_freshness": false
+      },
+      "public_slug": "data-engineer-undated-synth05",
+      "source": "workday",
+      "external_id": "undated:synth05",
+      "url": "https://example.wd3.myworkdayjobs.com/en-US/careers/job/Warsaw/Data-Engineer_R-0005?utm_source=freehire.me",
+      "title": "Data Engineer",
+      "company": "Example Retail",
+      "company_slug": "example-retail",
+      "posted_at": "2026-10-22T11:00:00Z",
+      "created_at": null
+    }
+  ],
+  "meta": {
+    "limit": 50,
+    "offset": 0,
+    "total": 9
+  }
+}

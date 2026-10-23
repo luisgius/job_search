@@ -22,4 +22,4 @@ Select offline scenarios proportionate to the change: dry-run click count, unkno
 
 Report scenario → evidence → stored state → retry consequence, with exact test commands and source spans. An audit finding is not permission to clear an attempt or repair production history. If reconciliation is requested, use evidence about the actual submission and existing authorization; never test uncertainty by submitting again.
 
-Evidence: [application flow](../../../src/apply/autoapply.py), `eligible:340–438`, `inspect_form:665–747`, `apply_one:1122–1310`; [tracker](../../../src/db.py), `record_status:435–483`, identity/attempt/reminder gates `497–598`; [status schema](../../../src/models.py), `ApplyStatus:329–348`. Re-resolve spans through Graft after code moves.
+Evidence: [application flow](../../../src/apply/autoapply.py), `eligible:347–478`, `inspect_form:705–787`, `apply_one:1162–1350`; [tracker](../../../src/db.py), `record_status:740–785`, identity/attempt/reminder gates `497–598`; [status schema](../../../src/models.py), `ApplyStatus:333–353`. Re-resolve spans through Graft after code moves.

@@ -320,7 +320,7 @@ def test_v3_migration_preserves_application_and_submission_history(tmp_path):
         conn.execute("INSERT INTO submit_attempts VALUES ('known', 'url', 'greenhouse', ?)",
                      (NOW.isoformat(),))
     with Tracker(path) as tracker:
-        assert tracker.migrate() == 4
+        assert tracker.migrate() == len(MIGRATIONS)
         assert tracker.pending_scoring() == []
         assert tracker.submit_attempted("known")
         assert tracker.submit_attempt("known")["attempted_at"] == NOW.isoformat()
@@ -462,7 +462,7 @@ def test_attempt_write_failure_skips_only_unconfirmed_job_and_recovers_after_res
 @pytest.mark.parametrize("method", [
     "get_scoring", "pending_scoring", "has_applied", "submit_attempted",
     "get_application", "observe_scoring", "scoring_detail", "stop_scoring",
-    "has_applied_similar",
+    "has_applied_similar", "handled_twin",
 ])
 def test_queue_admission_and_preparation_storage_errors_preserve_work_and_digest(
         scenario, monkeypatch, method):

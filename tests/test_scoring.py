@@ -183,7 +183,7 @@ def test_parse_score_happy_path():
 
 @pytest.mark.parametrize(
     "raw,expected",
-    [(82, 82), (82.4, 82), (82.6, 83), ("82", 82), ("82.5", 82),
+    [(82, 82), (82.4, 82), (82.6, 83), ("82", 82), ("82.5", 83),
      ("82/100", 82), (" 82 ", 82), ("score: 82", 82)],
 )
 def test_parse_score_coerces_the_shapes_models_emit(raw, expected):
@@ -442,7 +442,7 @@ def test_the_rules_reach_the_model(tmp_path):
     class Client:
         def complete_json(self, *, model, system, require_keys, forbid_verbatim,
                           prompt, max_tokens, temperature, schema=None,
-                          structured="auto"):
+                          structured="auto", accept_schema=None):
             captured["prompt"] = prompt
             return {"score": 70, "reasons": ["ok"], "strengths": [],
                     "gaps": [], "verdict": "fine"}
@@ -468,3 +468,256 @@ def test_the_shipped_config_carries_the_samba_tv_cap():
     assert any(int(c["cap"]) == 60 and "fine-tuning" in c["when"] for c in caps)
     assert shipped["scoring"]["threshold"] == 65   # untouched by design
     assert shipped["scoring"]["max_jobs"] == 40    # untouched by design
+
+
+# ==========================================================================
+# Every score shape parse_score reads survives validation
+# ==========================================================================
+
+
+def _reply(score=82, **extra):
+    body = {"score": score, "verdict": "Fit", "reasons": ["8y Python vs 5+ asked"],
+            "strengths": [], "gaps": []}
+    body.update(extra)
+    return json.dumps(body)
+
+
+def _structured(mode, scoring=None):
+    return {"scoring": dict(scoring or {}), "llm": {"structured_output": mode}}
+
+
+@pytest.mark.parametrize("mode", ["native", "prompt"])
+@pytest.mark.parametrize("raw,expected", [(72.0, 72), ("72", 72), ("82/100", 82), (64.5, 65),
+                                          ("85%", 85), (0, 0), (5, 5)])
+def test_score_job_reads_every_shape_parse_score_documents(mode, raw, expected):
+    """These shapes used to be validated against "integer" before
+    `parse_score` saw them, and came back as "response.score has wrong type"
+    — a burned fallback attempt, or a job stuck in SCORING_PENDING."""
+    score = score_job(make_job(), BASE_CV, _structured(mode),
+                      client=llm_client([_reply(raw)]))
+    assert score.ok is True, score.error
+    assert score.value == expected
+
+
+@pytest.mark.parametrize("mode", ["native", "prompt"])
+def test_score_job_turns_a_score_with_no_number_into_an_error(mode):
+    score = score_job(make_job(), BASE_CV, _structured(mode),
+                      client=llm_client([_reply("excellent")]))
+    assert score.ok is False
+    assert score.value == 0
+    assert "response.score" in score.error
+
+
+@pytest.mark.parametrize("mode", ["native", "prompt"])
+@pytest.mark.parametrize("raw", ["8/10", "4/5", "N/A (0 of 3 requirements)", 0.85, 8.5,
+                                 "-20", "850", "0.85", 0.5])
+def test_a_score_on_another_scale_is_an_error_not_a_low_score(mode, raw):
+    """Each of these was an error before the accept schema loosened, and then
+    a valid score: "8/10" became 8, 0.85 became 1, "850" became 100. A score
+    the model wrote on some other scale is unparseable, not low — the job
+    stays pending, and a fallback model gets to answer."""
+    score = score_job(make_job(), BASE_CV, _structured(mode),
+                      client=llm_client([_reply(raw)]))
+    assert score.ok is False
+    assert score.value == 0
+
+
+def test_a_score_on_another_scale_lets_the_fallback_answer():
+    from src.llm import chain_from_config
+
+    cfg = {"scoring": {"model": "first", "fallback_models": ["second"]},
+           "llm": {"structured_output": "prompt"}}
+    chain = chain_from_config(cfg, "scoring", clients=[llm_client([_reply("8/10")]),
+                                                       llm_client([_reply(72)])])
+    score = score_job(make_job(), BASE_CV, cfg, client=chain)
+    assert score.ok is True and score.value == 72
+    assert score.model == "second"
+
+
+def test_a_half_point_reply_at_the_threshold_is_a_match():
+    """64.5 rounds half-up to 65 — not to 64, under the default threshold."""
+    cfg = _structured("prompt", {"threshold": 65})
+    scored = score_jobs([make_job()], BASE_CV, cfg, client=llm_client([_reply(64.5)]))
+    assert scored[0].score_value == 65
+    assert scored[0].status is ApplyStatus.DIGEST
+
+
+@pytest.mark.parametrize("raw,expected", [(64.5, 65), (12.5, 13), (99.5, 100),
+                                          (64.49, 64), ("64,5", 65), (72.5, 73)])
+def test_parse_score_rounds_half_up(raw, expected):
+    assert parse_score({"score": raw}).value == expected
+
+
+def test_native_structured_output_still_asks_the_provider_for_an_integer():
+    from src.llm import LLMClient
+    from src.scoring import RESPONSE_SCHEMA
+
+    fake = FakeAnthropic([_reply(72.0)])
+    score = score_job(make_job(), BASE_CV, _structured("native"),
+                      client=LLMClient("k", provider="anthropic", client=fake))
+    sent = fake.calls[0]["output_config"]["format"]["schema"]
+    assert sent == RESPONSE_SCHEMA
+    assert sent["properties"]["score"] == {"type": "integer", "minimum": 0, "maximum": 100}
+    assert score.ok is True and score.value == 72
+
+
+# ==========================================================================
+# scoring.enforce_caps — caps held in code, off by default
+# ==========================================================================
+
+from src.scoring import RESPONSE_SCHEMA, _apply_caps, _score_caps  # noqa: E402
+
+_CAPS = [{"when": "requires German", "cap": 60, "id": "german"},
+         {"when": "requires a PhD", "cap": 40}]
+
+#: Today's rendering, written out: with the flag off, ids must not leak into
+#: the prompt and nothing else may move.
+_CAPS_RULES_TODAY = (
+    "HARD CAPS — non-negotiable ceilings:\n"
+    "- If the posting requires German: the score MUST NOT exceed 60. "
+    "Say which cap fired in `reasons`.\n"
+    "- If the posting requires a PhD: the score MUST NOT exceed 40. "
+    "Say which cap fired in `reasons`."
+)
+
+#: Today's schema, written out, for the same reason.
+_SCHEMA_TODAY = {
+    "type": "object",
+    "properties": {
+        "score": {"type": "integer", "minimum": 0, "maximum": 100},
+        "verdict": {"type": "string"},
+        "reasons": {"type": "array", "items": {"type": "string"}},
+        "strengths": {"type": "array", "items": {"type": "string"}},
+        "gaps": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["score", "verdict", "reasons", "strengths", "gaps"],
+    "additionalProperties": False,
+}
+
+
+def _enforcing(on=True, caps=_CAPS):
+    return _structured("native", {"score_caps": caps, "enforce_caps": on})
+
+
+def _capped(score, cfg=None, **extra):
+    return score_job(make_job(), BASE_CV, cfg or _enforcing(),
+                     client=llm_client([_reply(score, **extra)]))
+
+
+@pytest.mark.parametrize("flag", [{}, {"enforce_caps": False}])
+def test_flag_off_leaves_prompt_and_schema_byte_identical(flag):
+    cfg = _structured("native", {"score_caps": _CAPS, **flag})
+    assert _candidate_rules(cfg) == _CAPS_RULES_TODAY
+    fake = FakeAnthropic([_reply(70)])
+    from src.llm import LLMClient
+
+    job = make_job()
+    score_job(job, BASE_CV, cfg, client=LLMClient("k", provider="anthropic", client=fake))
+    request = fake.calls[0]
+    assert request["output_config"]["format"]["schema"] == _SCHEMA_TODAY == RESPONSE_SCHEMA
+    assert request["messages"][0]["content"] == build_prompt(
+        job, BASE_CV, {}, rules=_CAPS_RULES_TODAY)
+    assert "caps_fired" not in request["messages"][0]["content"]
+
+
+def test_flag_on_names_each_cap_and_offers_caps_fired():
+    rules = _candidate_rules(_enforcing())
+    assert "- [german] If the posting requires German" in rules
+    assert "- [cap-2] If the posting requires a PhD" in rules  # default id
+    assert "`caps_fired`" in rules
+
+    fake = FakeAnthropic([_reply(70)])
+    from src.llm import LLMClient
+
+    score_job(make_job(), BASE_CV, _enforcing(),
+              client=LLMClient("k", provider="anthropic", client=fake))
+    sent = fake.calls[0]["output_config"]["format"]["schema"]
+    # Strict structured output (OpenAI's `strict: true`) rejects an optional
+    # property and an array without `items`; "none fired" is null or [].
+    assert sent["properties"]["caps_fired"] == {"type": ["array", "null"],
+                                                "items": {"type": "string"}}
+    assert sent["required"] == [*RESPONSE_KEYS, "caps_fired"]
+    assert sent["properties"]["score"]["type"] == "integer"
+    assert RESPONSE_SCHEMA == _SCHEMA_TODAY      # the flag-off schema is untouched
+
+
+def test_flag_on_output_section_offers_caps_fired_too():
+    """The caps block calls `caps_fired` a sixth key; the OUTPUT section
+    must not then demand "exactly these five keys"."""
+    from src.llm import LLMClient
+
+    fake = FakeAnthropic([_reply(70)])
+    score_job(make_job(), BASE_CV, _enforcing(),
+              client=LLMClient("k", provider="anthropic", client=fake))
+    output = fake.calls[0]["messages"][0]["content"].split("\nOUTPUT\n")[-1]
+    assert "exactly these five keys" not in output
+    assert "`caps_fired`" in output
+    # Without caps to declare, nothing mentions it.
+    plain = build_prompt(make_job(), BASE_CV, {}, rules=_candidate_rules(_enforcing(caps=[])))
+    assert "caps_fired" not in plain
+
+
+def test_a_declared_cap_holds_the_score_to_it():
+    score = _capped(75, caps_fired=["german"])
+    assert score.ok is True
+    assert (score.value, score.raw_value, score.caps_applied) == (60, 75, ["german"])
+    assert "cap german enforced: 75→60" in score.reasons
+
+
+def test_two_declared_caps_hold_the_score_to_the_smaller():
+    score = _capped(75, caps_fired=["german", "cap-2"])
+    assert (score.value, score.raw_value, score.caps_applied) == (40, 75, ["cap-2"])
+
+
+def test_a_cap_only_ever_lowers_a_score():
+    score = _capped(50, caps_fired=["german"])
+    assert (score.value, score.raw_value, score.caps_applied) == (50, None, [])
+    assert not any("enforced" in reason for reason in score.reasons)
+
+
+def test_an_unknown_cap_id_is_noted_not_fatal():
+    score = _capped(75, caps_fired=["no-such-cap"])
+    assert score.ok is True and score.value == 75
+    assert any("unknown cap id" in r and "no-such-cap" in r for r in score.reasons)
+
+
+def test_a_bare_string_caps_fired_is_one_cap():
+    assert _capped(75, caps_fired="german").value == 60
+
+
+@pytest.mark.parametrize("extra", [{}, {"caps_fired": None}, {"caps_fired": []},
+                                   {"caps_fired": False}, {"caps_fired": ""}])
+def test_an_omitted_or_empty_caps_fired_validates_and_enforces_nothing(extra):
+    score = _capped(75, **extra)
+    assert score.ok is True
+    assert (score.value, score.caps_applied) == (75, [])
+
+
+def test_a_true_caps_fired_names_no_cap_and_is_noted():
+    score = _capped(75, caps_fired=True)
+    assert score.ok is True
+    assert (score.value, score.caps_applied) == (75, [])
+    assert any("caps_fired was true" in reason for reason in score.reasons)
+
+
+def test_an_error_score_is_never_capped():
+    errored = Score(value=0, error="no numeric 'score'", reasons=["r"])
+    assert _apply_caps(errored, ["german"], _score_caps(_enforcing())) == \
+        Score(value=0, error="no numeric 'score'", reasons=["r"])
+    via_job = _capped("excellent", caps_fired=["german"])
+    assert via_job.ok is False and via_job.value == 0 and via_job.caps_applied == []
+
+
+def test_stray_keys_are_still_rejected_with_caps_on():
+    assert _capped(75, caps_fired=["german"], confidence=0.4).ok is False
+    # ... and `caps_fired` itself is a stray key while the flag is off.
+    assert _capped(75, _enforcing(on=False), caps_fired=["german"]).ok is False
+
+
+def test_a_capped_score_is_classified_on_the_capped_value():
+    cfg = _enforcing()
+    cfg["scoring"]["threshold"] = 65
+    scored = score_jobs([make_job()], BASE_CV, cfg,
+                        client=llm_client([_reply(75, caps_fired=["german"])]))
+    assert scored[0].status is ApplyStatus.SCORED_BELOW
+    assert scored[0].score_value == 60
