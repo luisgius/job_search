@@ -1,0 +1,8 @@
+# Real bank statements are personal financial data: never commit them.
+# Only the sample template stays tracked.
+data/*
+!data/.gitkeep
+!data/sample_transactions.csv
+
+# Generated reports may contain real amounts and merchants.
+reports/
